@@ -71,7 +71,7 @@ schema() {
         items:{type:"string",enum:$labs}
       }
     },
-    required:["title","body"]
+    required:["title","body","labels"]
   }'
 }
 
@@ -110,7 +110,7 @@ render() {
 apply() {
   local j ti bo a
   j=$(cat)
-  read -r -p "Create issue? [y/N] " a
+  read -r -p "Create issue? [y/N] " a </dev/tty
   [ "$a" = y ] || exit 0
 
   ti=$(jq -r '.title' <<<"$j")
