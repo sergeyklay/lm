@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# lm-stats — read the run log that lm appends to. No model, no registry.
+# Dry runs are excluded from the rates and kept in the violation histogram.
+
+set -euo pipefail
+: "${LM_LOG:=$HOME/.lm/runs.jsonl}"
+[ -s "$LM_LOG" ] || { echo "lm-stats: nothing logged in $LM_LOG" >&2; exit 2; }
+
+printf '%-10s %5s %7s %8s %7s %8s\n' verb runs clean retried failed "avg ms"
+jq -s -r '
+  map(select((.dry | not) and .calls > 0)) | group_by(.verb)[] |
+  [ .[0].verb, length,
+    (map(select(.calls == 1 and .exit == 0)) | length),
+    (map(select(.calls == 2)) | length),
+    (map(select(.exit != 0)) | length),
+    (map(.ms) | add / length | floor) ] | @tsv' "$LM_LOG" \
+| awk -F'\t' '{printf "%-10s %5d %6d%% %8d %7d %8d\n", $1, $2, ($2 ? 100*$3/$2 : 0), $4, $5, $6}'
+
+echo
+echo "commits created by lm commit:"
+jq -s -r 'map(select(.verb == "commit" and (.dry | not) and .calls > 0))
+  | "  \(map(select(.head_moved)) | length) of \(length)"' "$LM_LOG"
+
+echo
+echo "validator violations:"
+jq -r '.violations[]?' "$LM_LOG" | sort | uniq -c | sort -rn | head -10 | sed 's/^/  /'
