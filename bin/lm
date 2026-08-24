@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# lm — thin runner over a tool registry. One file per tool in $LM_TOOLS.
+
+set -euo pipefail
+
+: "${LM_OLLAMA:=http://127.0.0.1:11434}"
+: "${LM_MODEL:=qwen3.8:27b}"
+: "${LM_CTX:=32768}"
+
+LM_TOOLS="${LM_TOOLS:-$(dirname "$(readlink -f "$0")")/../tools}"
+
+list() { for f in "$LM_TOOLS"/*.sh; do [ -f "$f" ] || continue
+  ( . "$f"; printf '%s\t%s\n' "$name" "$description" ); done; }
+
+call() { # $1 prompt, $2 schema -> model JSON on stdout
+  jq -n --arg m "$LM_MODEL" --arg p "$1" --argjson s "$2" --argjson c "$LM_CTX" \
+    '{model:$m,stream:false,think:false,messages:[{role:"user",content:$p}],format:$s,
+      options:{num_ctx:$c,num_predict:3000,temperature:0},keep_alive:"30m"}' \
+  | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @- | jq -r '.message.content'
+}
+
+
+case "${1:-}" in
+  --list) list; exit 0 ;;
+  --which) shift
+      CAT=$(list | awk -F'\t' '{printf "- %s: %s\n",$1,$2}')
+      NAMES=$(list | cut -f1 | jq -R . | jq -sc .)
+      SCH=$(jq -n --argjson n "$NAMES" '{type:"object",properties:{tool:{type:"string",enum:$n}},required:["tool"]}')
+      OUT=$(call "Available tools:
+$CAT
+
+Request: $*
+
+Pick the single tool that serves this request." "$SCH")
+      [ -n "$OUT" ] || { echo "lm: empty response from model" >&2; exit 5; }
+      jq -r '.tool' <<<"$OUT"; exit 0 ;;
+  ""|-h|--help) echo "usage: lm <verb> [--dry-run] | lm --list | lm --which <text>" >&2
+      list | awk -F'\t' '{printf "  %-10s %s\n",$1,$2}' >&2; exit 2 ;;
+esac
+
+
+VERB=$1; shift
+TOOL="$LM_TOOLS/$VERB.sh"
+[ -f "$TOOL" ] || { echo "lm: no such tool '$VERB'. Available:" >&2; list | cut -f1 | sed 's/^/  /' >&2; exit 2; }
+DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
+. "$TOOL"
+
+
+PROMPT=$(collect) || exit $?
+SCHEMA=$(schema)
+OUT=$(call "$PROMPT" "$SCHEMA")
+[ -n "$OUT" ] || { echo "lm: model returned empty content (a failure, not an empty answer)" >&2; exit 5; }
+ERRS=$(printf '%s' "$OUT" | validate) || true
+if [ -n "$ERRS" ]; then
+  OUT=$(call "$PROMPT
+
+The previous attempt was rejected for these reasons. Fix them and answer again:
+$ERRS" "$SCHEMA")
+  [ -n "$OUT" ] || { echo "lm: model returned empty content on retry" >&2; exit 5; }
+  ERRS=$(printf '%s' "$OUT" | validate) || true
+fi
+if [ -n "$ERRS" ]; then
+  echo "lm: validator rejected two attempts:" >&2; sed 's/^/  - /' <<<"$ERRS" >&2
+  echo "--- draft ---" >&2; echo "$OUT" >&2; exit 4
+fi
+printf '%s' "$OUT" | render
+(( DRY )) && { echo; echo "--dry-run: no side effect"; exit 0; }
+printf '%s' "$OUT" | apply

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# lm-commit — commit message from the staged diff, under a JSON schema.
+set -euo pipefail
+: "${LM_OLLAMA:=http://127.0.0.1:11434}"
+: "${LM_MODEL:=gpt-oss:20b}"
+: "${LM_CTX:=32768}"
+DRY=0; [[ "${1:-}" == "--dry-run" ]] && DRY=1
+
+command -v jq >/dev/null || { echo "lm: jq is required" >&2; exit 2; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; exit 2; }
+
+BRANCH=$(git branch --show-current)
+case "$BRANCH" in
+  main|master|develop|release/*|hotfix/*)
+    echo "lm: refusing to work on protected branch '$BRANCH'" >&2; exit 3 ;;
+esac
+
+DIFF=$(git diff --cached)
+[[ -n "$DIFF" ]] || { echo "lm: nothing staged" >&2; exit 3; }
+FILES=$(git diff --cached --name-only)
+STYLE=$(git log --format='%s' -20 2>/dev/null || true)
+
+# scope enum: every directory segment, every two-segment pair, every filename stem
+SCOPES=$(printf '%s\n' "$FILES" | awk -F/ '{
+    for (i=1; i<NF; i++) { print $i; if (i+1 < NF) print $i"/"$(i+1) }
+    n=split($NF,a,"."); if (n>1) print a[1]
+  }' | sort -u | grep -vE '^(src|internal|pkg|cmd|lib|app|test|tests|docs?)$' | head -25)
+SCOPE_ENUM=$(printf '%s\n' "$SCOPES" "" | jq -R . | jq -sc .)
+
+SCHEMA=$(jq -n --argjson scopes "$SCOPE_ENUM" '{
+  type:"object",
+  properties:{
+    type:{type:"string",enum:["feat","fix","docs","style","refactor","perf","test","chore","ci","build","revert"]},
+    scope:{type:"string",enum:$scopes},
+    subject:{type:"string",maxLength:60},
+    body:{type:"string"}},
+  required:["type","subject","body"]}')
+
+# the diff is truncated generously: prefill is cheap on this card, output is not
+PROMPT=$(printf '%s\n' \
+  "Recent commit subjects in this repository. Match their vocabulary and level of detail:" "$STYLE" "" \
+  "Files changed:" "$FILES" "" \
+  "Staged diff:" "$(printf '%s' "$DIFF" | head -c 40000)" "" \
+  "Write the commit message for this change." \
+  "Subject: imperative mood, lower case after the colon, no trailing period, under 60 characters, no issue number." \
+  "Body: two or three sentences saying what changed and why. No bullet lists, no file names, no phrases like 'This commit'.")
+
+call() {
+  jq -n --arg m "$LM_MODEL" --arg p "$1" --argjson s "$SCHEMA" --argjson c "$LM_CTX" '{
+      model:$m, stream:false, messages:[{role:"user",content:$p}], format:$s,
+      options:{num_ctx:$c,num_predict:3000,temperature:0.1}, keep_alive:"30m"}' \
+  | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @- | jq -r '.message.content'
+}
+
+validate() { # stdin: the model's JSON. stdout: violations, one per line.
+  local j; j=$(cat)
+  echo "$j" | jq -e . >/dev/null 2>&1 || { echo "output is not valid JSON"; return; }
+  local ty sc su bo line
+  ty=$(jq -r '.type' <<<"$j"); sc=$(jq -r '.scope // ""' <<<"$j")
+  su=$(jq -r '.subject' <<<"$j"); bo=$(jq -r '.body' <<<"$j")
+  line=$([[ -n "$sc" ]] && echo "$ty($sc): $su" || echo "$ty: $su")
+  [[ "$su" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert): ]] && echo "subject repeats the type prefix"
+  [[ "$su" =~ \.$ ]] && echo "subject ends with a period"
+  [[ "$su" =~ ^[A-Z] ]] && echo "subject starts with a capital letter"
+  (( ${#line} >= 72 )) && echo "header is ${#line} chars, must be under 72"
+  [[ "$bo" =~ ^(This\ commit|This\ change|Updated|Added|Fixed) ]] && echo "body opens with a banned phrase"
+  LC_ALL=C grep -qP '[^\x00-\x7F]' <<<"$j" && echo "output contains non-ASCII characters"
+  [[ "$su" =~ \#[0-9] ]] && echo "subject contains an issue number"
+  return 0
+}
+
+OUT=$(call "$PROMPT"); ERRS=$(printf '%s' "$OUT" | validate)
+if [[ -n "$ERRS" ]]; then
+  OUT=$(call "$PROMPT
+The previous attempt was rejected for these reasons. Fix them and answer again:
+$ERRS")
+  ERRS=$(printf '%s' "$OUT" | validate)
+fi
+
+if [[ -n "$ERRS" ]]; then
+  echo "lm: validator rejected two attempts:" >&2; sed 's/^/  - /' <<<"$ERRS" >&2
+  echo "--- draft ---" >&2; echo "$OUT" >&2; exit 4
+fi
+
+TY=$(jq -r '.type' <<<"$OUT"); SC=$(jq -r '.scope // ""' <<<"$OUT")
+SU=$(jq -r '.subject' <<<"$OUT"); BO=$(jq -r '.body' <<<"$OUT")
+HDR=$([[ -n "$SC" ]] && echo "$TY($SC): $SU" || echo "$TY: $SU")
+WRAPPED=$(printf '%s' "$BO" | fold -s -w 72 | sed 's/[[:space:]]*$//')
+
+printf '%s\n\n%s\n' "$HDR" "$WRAPPED"
+if (( DRY )); then echo; echo "--dry-run: nothing committed"; exit 0; fi
+read -r -p "commit? [y/N] " a; [[ "$a" == y ]] || exit 0
+git commit -m "$HDR" -m "$WRAPPED"

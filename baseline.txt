@@ -1,0 +1,7 @@
+2026-08-24T08:30:00+02:00
+name, memory.total [MiB], memory.free [MiB], driver_version, compute_cap
+NVIDIA GeForce RTX 5090, 32607 MiB, 27185 MiB, 610.74, 12.0
+ollama version is 0.32.15
+/dev/sdf       1007G  675G  282G  71% /
+
+decode: 183 tok/s
