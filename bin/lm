@@ -6,6 +6,7 @@ set -euo pipefail
 : "${LM_OLLAMA:=http://127.0.0.1:11434}"
 : "${LM_MODEL:=qwen3.8:27b}"
 : "${LM_CTX:=32768}"
+: "${LM_LOG:=$HOME/.lm/runs.jsonl}"    # one JSON object per run; empty disables
 
 LM_TOOLS="${LM_TOOLS:-$(dirname "$(readlink -f "$0")")/../tools}"
 
@@ -46,12 +47,32 @@ DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
 . "$TOOL"
 
 
+log_run() { # $1 exit status. Never fails the run it is reporting on.
+  [ -n "$LM_LOG" ] && mkdir -p "$(dirname "$LM_LOG")" 2>/dev/null || return 0
+  local h moved=false; h=$(git rev-parse HEAD 2>/dev/null || true)
+  { [ -n "$h" ] && [ "$h" != "$HEAD0" ] && moved=true; } || true
+  jq -nc --arg ts "$(date -Is)" --arg repo "$REPO" --arg verb "$VERB" --arg model "$LM_MODEL" \
+    --arg viol "$VIOL" --argjson dry "$DRY" --argjson calls "$CALLS" --argjson rc "$1" \
+    --argjson ms "$(( $(date +%s%3N) - T0 ))" --argjson moved "$moved" \
+    '{ts:$ts,repo:$repo,verb:$verb,model:$model,dry:($dry==1),calls:$calls,
+      violations:($viol|split("\n")|map(select(length>0))),exit:$rc,ms:$ms,head_moved:$moved}' \
+    >> "$LM_LOG" 2>/dev/null || true
+}
+T0=$(date +%s%3N); CALLS=0; VIOL=""
+HEAD0=$(git rev-parse HEAD 2>/dev/null || true)
+REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo -)")
+trap 'log_run $?' EXIT
+
+
 PROMPT=$(collect) || exit $?
 SCHEMA=$(schema)
+CALLS=1
 OUT=$(call "$PROMPT" "$SCHEMA")
 [ -n "$OUT" ] || { echo "lm: model returned empty content (a failure, not an empty answer)" >&2; exit 5; }
 ERRS=$(printf '%s' "$OUT" | validate) || true
+VIOL="$ERRS"
 if [ -n "$ERRS" ]; then
+  CALLS=2
   OUT=$(call "$PROMPT
 
 The previous attempt was rejected for these reasons. Fix them and answer again:
