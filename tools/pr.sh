@@ -44,9 +44,13 @@ validate() {
   [ -z "$ti" ] && echo "title is empty"
   [ -z "$bo" ] && echo "body is empty"
 
-  # Rule: No hard line wraps in prose
-  if grep -qP '(?<!\n)\n(?!\n|-|\*|\d+\.)' <<<"$bo"; then
-    echo "body contains prohibited hard line wraps in prose"
+  # Rule: no hard line wraps in prose. A blank line and a list item are legal,
+  # so the check needs the whole text: grep is line-oriented and can never
+  # match a '\n' written in its pattern.
+  if printf '%s\n' "$bo" | awk '
+      NR > 1 && p != "" && $0 != "" && $0 !~ /^[[:space:]]*([-*]|[0-9]+\.)/ { f = 1 }
+      { p = $0 } END { exit !f }'; then
+    echo "body contains a hard line wrap in prose; write each paragraph as one unwrapped line"
   fi
 
   LC_ALL=C grep -qP '[^\x00-\x7F]' <<<"$j" && echo "output contains non-ASCII characters"
@@ -61,9 +65,9 @@ render() {
 }
 
 apply() {
-  local j
+  local j a
   j=$(cat)
-  read -r -p "Create PR? [y/N] " a
+  read -r -p "Create PR? [y/N] " a </dev/tty
   [ "$a" = y ] || exit 0
 
   # Delegate to GitHub CLI for the actual side-effect

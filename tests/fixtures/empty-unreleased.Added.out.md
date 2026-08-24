@@ -9,4 +9,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for drafting and applying CHANGELOG.md entries from the staged diff in the changelog command
+- Support for drafting changelog entries from the staged diff

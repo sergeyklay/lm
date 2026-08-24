@@ -87,8 +87,13 @@ validate() {
   [ -z "$ti" ] && echo "title is empty"
   [ -z "$bo" ] && echo "body is empty"
 
-  if grep -qP '(?<!\n)\n(?!\n|-|\*|\d+\.)' <<<"$bo"; then
-    echo "body contains prohibited hard line wraps in prose"
+  # Rule: no hard line wraps in prose. A blank line and a list item are legal,
+  # so the check needs the whole text: grep is line-oriented and can never
+  # match a '\n' written in its pattern.
+  if printf '%s\n' "$bo" | awk '
+      NR > 1 && p != "" && $0 != "" && $0 !~ /^[[:space:]]*([-*]|[0-9]+\.)/ { f = 1 }
+      { p = $0 } END { exit !f }'; then
+    echo "body contains a hard line wrap in prose; write each paragraph as one unwrapped line"
   fi
 
   return 0
