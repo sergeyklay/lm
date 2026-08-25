@@ -1,0 +1,16 @@
+{
+  "properties": {
+    "body": {
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 80,
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "body"
+  ],
+  "type": "object"
+}

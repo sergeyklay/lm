@@ -1,0 +1,18 @@
+Commits in this PR:
+- feat: add my own line
+
+- feat: land a shared change on main
+
+Diff against origin/main:
+diff --git a/f.txt b/f.txt
+index df967b9..f2b3d6b 100644
+--- a/f.txt
++++ b/f.txt
+@@ -1 +1,3 @@
+ base
++shared
++mine
+
+Write the pull request description for these changes.
+Title: concise and descriptive.
+Body: detailed summary of the changes. Do NOT use hard line wraps in prose.
