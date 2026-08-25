@@ -1,0 +1,6 @@
+The person running this described the issue as follows:
+the runner drops stderr when a verb refuses
+
+Write a GitHub issue for this.
+Title: concise and descriptive.
+Body: detailed description, context, and motivation. Do NOT use hard line wraps in prose.

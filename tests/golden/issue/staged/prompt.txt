@@ -7,6 +7,6 @@ index 5da2ae8..5c1ebf5 100644
  name="demo"
 +description="one line"
 
-Write a GitHub issue describing the problem or feature these changes address.
+Write a GitHub issue for this.
 Title: concise and descriptive.
 Body: detailed description, context, and motivation. Do NOT use hard line wraps in prose.

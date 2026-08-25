@@ -1,0 +1,3 @@
+lm: nothing staged and no topic given.
+    Stage the change, or say what the issue is: lm issue "..."
+[exit 3]
