@@ -12,11 +12,11 @@ collect() {
   log=$(git log "${default_branch}..HEAD" --format='- %s%n%b' 2>/dev/null || true)
   [ -z "$log" ] && { echo "lm: no commits found against ${default_branch}" >&2; return 3; }
 
-  diff=$(git diff "${default_branch}..HEAD" 2>/dev/null || true)
+  diff=$(git diff "${default_branch}...HEAD" 2>/dev/null || true)
 
   printf '%s\n' \
     "Commits in this PR:" "$log" "" \
-    "Staged diff:" "$(printf '%s' "$diff" | head -c 40000)" "" \
+    "Diff against ${default_branch}:" "$(printf '%s' "$diff" | head -c 40000)" "" \
     "Write the pull request description for these changes." \
     "Title: concise and descriptive." \
     "Body: detailed summary of the changes. Do NOT use hard line wraps in prose."
@@ -69,5 +69,6 @@ apply() {
   j=$(cat)
   confirm "Create PR? [y/N]"
 
+  git push -u origin HEAD
   gh pr create --title "$(jq -r '.title' <<<"$j")" --body "$(jq -r '.body' <<<"$j")"
 }
