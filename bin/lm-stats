@@ -6,9 +6,29 @@ set -euo pipefail
 : "${LM_LOG:=$HOME/.lm/runs.jsonl}"
 [ -s "$LM_LOG" ] || { echo "lm-stats: nothing logged in $LM_LOG" >&2; exit 2; }
 
+# One log spans every repository lm has run in, and the fixture repositories the
+# tools are exercised in produce runs faster than real work does, so the default
+# scope is this repository.
+ALL=0
+case "${1:-}" in
+  "")    ;;
+  --all) ALL=1 ;;
+  *)     echo "lm-stats: unknown argument '$1'. Only --all is taken." >&2; exit 2 ;;
+esac
+REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo -)")
+if [ "$REPO" = - ] && (( ! ALL )); then
+  ALL=1; echo "lm-stats: not in a repository, reading the whole log" >&2
+fi
+SCOPE=(--arg repo "$REPO" --argjson all "$ALL")
+MINE='($all == 1 or .repo == $repo)'
+RUN="((.dry | not) and .calls > 0 and $MINE)"
+
+[ "$(jq -s "${SCOPE[@]}" "map(select($MINE)) | length" "$LM_LOG")" -gt 0 ] || {
+  echo "lm-stats: nothing logged for $REPO; --all reads every repository" >&2; exit 2; }
+
 printf '%-10s %5s %7s %9s %8s %7s %8s\n' verb runs clean declined retried failed "avg ms"
-jq -s -r '
-  map(select((.dry | not) and .calls > 0)) | group_by(.verb)[] |
+jq -s -r "${SCOPE[@]}" "
+  map(select($RUN)) | group_by(.verb)[] |"'
   [ .[0].verb, length,
     (map(select(.calls == 1 and .exit == 0)) | length),
     (map(select(.exit == 7)) | length),
@@ -19,9 +39,10 @@ jq -s -r '
 
 echo
 echo "commits created by lm commit:"
-jq -s -r 'map(select(.verb == "commit" and (.dry | not) and .calls > 0))
+jq -s -r "${SCOPE[@]}" "map(select(.verb == \"commit\" and $RUN))"'
   | "  \(map(select(.head_moved)) | length) of \(length)"' "$LM_LOG"
 
 echo
 echo "validator violations:"
-jq -r '.violations[]?' "$LM_LOG" | sort | uniq -c | sort -rn | head -10 | sed 's/^/  /'
+jq -r "${SCOPE[@]}" "select($MINE)"' | .violations[]?' "$LM_LOG" \
+  | sort | uniq -c | sort -rn | head -10 | sed 's/^/  /'
