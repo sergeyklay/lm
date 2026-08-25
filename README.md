@@ -95,6 +95,7 @@ dashes and all.
 bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the lm-ship composition, with the verbs stubbed
+bash tests/runner.sh              # bin/lm around the model call, with curl stubbed
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `tests/runner.sh` script that exercises the `bin/lm` runner around the model call with `curl` stubbed.
 - The `lm-ship` command, which runs `commit` then `pr` over the same text, opening a thematic branch named after the commit subject unless `--here` is used to commit on the current branch.
 
 ### Changed
