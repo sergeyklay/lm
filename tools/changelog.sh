@@ -36,10 +36,13 @@ collect() {
     return 3
   fi
 
-  # The whole changelog, newest first, capped. This is the only statement of what
-  # this project tells its users that does not have to be written into the tool,
-  # and it travels: a project whose tests are part of its public surface has
-  # entries about tests, and one whose tests are not, has none.
+  # The whole changelog, newest first, capped. Measured on one diff in this
+  # repository, by reading the bullets rather than counting keywords, and the
+  # same at temperature 0 and 0.7: this prompt yielded one entry about test
+  # code, filler of the same length yielded sixteen entries with several about
+  # test code, and the published changelog yielded none. Why it works is not
+  # established. A larger corpus of good entries plausibly sets altitude and
+  # brevity whatever the subject, and that is a guess, not the measurement.
   local published
   published=$(head -c 12000 CHANGELOG.md)
 
@@ -56,6 +59,10 @@ collect() {
     "Files changed:" "$files" "" \
     "$label" "$(printf '%s' "$diff" | head -c 40000)" ""
 
+  # The six category definitions below look self-evident and are not: across eight
+  # runs without them the model produced no Changed entry at all for a release
+  # that needed three. A prompt-trimming pass that deletes them will not see the
+  # regression until a release ships with a whole category missing.
   printf '%s\n' \
     "Write an entry for each change a person could notice by installing this project and running it." \
     "If they could not notice it that way there is no entry, and a diff often yields fewer entries than it has files." \
