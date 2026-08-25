@@ -8,6 +8,12 @@ collect() {
     echo "lm: CHANGELOG.md not found in the repository root" >&2
     return 3
   fi
+  # Here rather than in apply(): the section is what the entry is written into,
+  # so without it there is nothing to draft and the model call is wasted.
+  if ! grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+    echo "lm: CHANGELOG.md has no '## [Unreleased]' section" >&2
+    return 3
+  fi
 
   # The index first, then the working tree. A changelog entry describes a change,
   # and a change is no less real for not being staged yet. This is the opposite
@@ -191,11 +197,6 @@ _insert() {
 apply() {
   local j n i catg bullet out
   j=$(cat)
-
-  if ! grep -q "^## \[Unreleased\]" CHANGELOG.md; then
-    echo "lm: CHANGELOG.md has no '## [Unreleased]' section" >&2
-    exit 1
-  fi
 
   confirm "Apply to CHANGELOG.md? [y/N]"
 
