@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `pr` command now pushes the current branch to the remote before creating the pull request, ensuring the PR is created against the latest remote state
 - The `commit` and `pr` commands now read their confirmation prompt from the terminal, so answering `y` creates the commit or the pull request instead of silently doing nothing
 - The prose line-wrap check in the `pr` and `issue` commands, which accepted every body it was given
 
