@@ -32,7 +32,7 @@ lm fix             # repair a build error, with the compiler as the oracle
 `--dry-run` on any verb prints the result and stops before the side effect.
 
 ```bash
-lm --list                      # every tool with its description
+lm --list                      # every tool with its description, tab-separated
 lm --which "text"              # pick the verb that serves a request
 ```
 
