@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for filling `.github/pull_request_template.md` sections in the `pr` command, where the script injects the template headings and the model supplies only the section contents
 - A `usage` function in the `lm` script that formats the command list with dynamic column alignment for the `--help` and no-argument invocations
 - A `declined` column in the `lm-stats` output, tracking runs where the human refused the confirmation prompt
 - Run logging to a JSONL file and the `lm-stats` command for inspecting verb-level success rates, retry counts, and validator violations
