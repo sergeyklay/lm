@@ -97,7 +97,9 @@ log_run() { # $1 exit status. Never fails the run it is reporting on.
 }
 T0=$(date +%s%3N); CALLS=0; VIOL=""
 HEAD0=$(git rev-parse HEAD 2>/dev/null || true)
-REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo -)")
+# A run outside a repository still happened somewhere, and "-" names nothing
+# lm-stats can scope to, so the working directory stands in for the repository.
+REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 trap 'log_run $?' EXIT
 
 
