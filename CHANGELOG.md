@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `lm` runner now records the working directory name as the repository identifier when run outside a Git repository, allowing `lm-stats` to scope results to that specific directory instead of falling back to the entire log.
+- `lm-stats` now defaults to reporting runs from the current working directory when not inside a Git repository, rather than automatically reading the whole log.
 - The `changelog` command now drafts entries against the full published history of the project rather than only the current Unreleased section, allowing it to match the project's established vocabulary and scope.
 - The `changelog` command no longer explicitly excludes tests, CI, and formatting from entries, instead relying on the project's existing changelog to define what is considered user-visible.
 - The `commit` command no longer refuses to run on protected branches such as `main`, `master`, `develop`, `release/*`, or `hotfix/*`.

@@ -8,17 +8,14 @@ set -euo pipefail
 
 # One log spans every repository lm has run in, and the fixture repositories the
 # tools are exercised in produce runs faster than real work does, so the default
-# scope is this repository.
+# scope is the tree you are in.
 ALL=0
 case "${1:-}" in
   "")    ;;
   --all) ALL=1 ;;
   *)     echo "lm-stats: unknown argument '$1'. Only --all is taken." >&2; exit 2 ;;
 esac
-REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo -)")
-if [ "$REPO" = - ] && (( ! ALL )); then
-  ALL=1; echo "lm-stats: not in a repository, reading the whole log" >&2
-fi
+REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 SCOPE=(--arg repo "$REPO" --argjson all "$ALL")
 MINE='($all == 1 or .repo == $repo)'
 RUN="((.dry | not) and .calls > 0 and $MINE)"
