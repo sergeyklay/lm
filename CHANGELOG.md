@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `changelog` command now exits with an error if `CHANGELOG.md` lacks an `## [Unreleased]` section, preventing a wasted model call when there is no target section to draft into.
 - The `pr` command now warns when the remote-tracking base branch is behind the local branch of the same name, indicating that some commits are already on the local branch and suggesting a fetch to ensure the description covers only the current branch's changes.
 
 ## [0.0.3] - 2026-08-25
