@@ -22,6 +22,14 @@ call() { # $1 prompt, $2 schema -> model JSON on stdout
 
 confirm() { local a; read -r -p "$1 " a </dev/tty; [ "$a" = y ] || exit 7; }
 
+usage() { echo "usage: lm <verb> [--dry-run] | lm --list | lm --which <text>"
+  list | awk -F'\t' '
+    { n[NR] = $1; d[NR] = $2; if (length($1) > w) w = length($1) }
+    END { printf "\nCommands:\n\n"
+          f = "  %-" (w + 4) "s%s\n"
+          for (i = 1; i <= NR; i++) printf f, n[i], d[i]
+          print "" }'; }
+
 
 case "${1:-}" in
   --list) list; exit 0 ;;
@@ -37,8 +45,8 @@ Request: $*
 Pick the single tool that serves this request." "$SCH")
       [ -n "$OUT" ] || { echo "lm: empty response from model" >&2; exit 5; }
       jq -r '.tool' <<<"$OUT"; exit 0 ;;
-  ""|-h|--help) echo "usage: lm <verb> [--dry-run] | lm --list | lm --which <text>" >&2
-      list | awk -F'\t' '{printf "  %-10s %s\n",$1,$2}' >&2; exit 2 ;;
+  -h|--help) usage; exit 0 ;;
+  "") usage >&2; exit 2 ;;
 esac
 
 

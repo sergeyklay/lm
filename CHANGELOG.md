@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `usage` function in the `lm` script that formats the command list with dynamic column alignment for the `--help` and no-argument invocations
 - A `declined` column in the `lm-stats` output, tracking runs where the human refused the confirmation prompt
 - Run logging to a JSONL file and the `lm-stats` command for inspecting verb-level success rates, retry counts, and validator violations
 - Support for drafting and applying CHANGELOG.md entries from the staged diff in the changelog command
