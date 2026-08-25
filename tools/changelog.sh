@@ -30,13 +30,16 @@ collect() {
     return 3
   fi
 
-  local recent_changelog
-
-  # Extract the [Unreleased] section to give the model context of existing unreleased changes
-  recent_changelog=$(awk '/^## \[Unreleased\]/{flag=1; print; next} /^## \[/{flag=0} flag' CHANGELOG.md | head -n 30 2>/dev/null || true)
+  # The whole changelog, newest first, capped. This is the only statement of what
+  # this project tells its users that does not have to be written into the tool,
+  # and it travels: a project whose tests are part of its public surface has
+  # entries about tests, and one whose tests are not, has none.
+  local published
+  published=$(head -c 12000 CHANGELOG.md)
 
   printf '%s\n' \
-    "Existing Unreleased CHANGELOG section for context (match its vocabulary):" "$recent_changelog" ""
+    "The changelog this project has published so far. It records what this project considers" \
+    "worth telling its users, and by omission what it does not. Match both:" "$published" ""
 
   [ -n "$said" ] && printf '%s\n' \
     "The person running this described the change as follows. Treat it as what they meant," \
@@ -48,7 +51,8 @@ collect() {
     "$label" "$(printf '%s' "$diff" | head -c 40000)" ""
 
   printf '%s\n' \
-    "Write one entry for every user-visible change." \
+    "Write an entry for each change a person could notice by installing this project and running it." \
+    "If they could not notice it that way there is no entry, and a diff often yields fewer entries than it has files." \
     "One entry per observable change, not one per file." \
     "Categories, as Keep a Changelog defines them:" \
     "  Added for new features." \
@@ -61,7 +65,6 @@ collect() {
     "Length follows the change: one sentence usually, two when one would leave the reader guessing." \
     "An entry is not a manual and not a design note: no usage instructions, no rationale, no implementation detail." \
     "Unless this repository is plainly a library or a framework, its internals are out of scope: describe what someone running it observes, not what a script defines." \
-    "Tests, CI and formatting are not entries." \
     "Start with the thing that changed, never with the category name:" \
     "write \"Support for X in the Y command\", not \"Added support for X\"." \
     "Write each entry as one unwrapped line, with no line breaks."

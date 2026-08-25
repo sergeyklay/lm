@@ -3,9 +3,6 @@ description="Write a Conventional Commits message for the staged changes"
 
 collect() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; return 2; }
-  local br; br=$(git branch --show-current)
-  case "$br" in main|master|develop|release/*|hotfix/*)
-      echo "lm: refusing to work on protected branch '$br'" >&2; return 3 ;; esac
   # The index and nothing else: apply() runs git commit, which commits the index.
   # A message written from the working tree would describe what is not going in.
   local diff files style said="$*"
