@@ -6,7 +6,7 @@ Each tool collects its input from the repository, asks the model once under a JS
 
 ## Requirements
 
-`bash`, `jq`, `curl`, `git`, and a running [ollama](https://ollama.com) with a model that honours `format`. `gh` for `issue` and `pr`, the Go toolchain for `fix`.
+`bash`, `jq`, `curl`, `git`, and a running [ollama](https://ollama.com) with a model that honours `format`. `gh` for `issue` and `pr`.
 
 ```bash
 ollama pull qwen3.8:27b
@@ -26,7 +26,6 @@ lm commit          # Conventional Commits message from the staged diff
 lm changelog       # CHANGELOG.md entries for what changed, staged or not
 lm pr              # pull request description from the commits ahead of the default branch
 lm issue           # GitHub issue, labels taken from the repository
-lm fix             # repair a build error, with the compiler as the oracle
 ```
 
 A verb takes free text after its name, and `--dry-run` stops it before the side effect.
