@@ -20,6 +20,15 @@ read as words. A flag the tool declared arrives as a variable, not as an argumen
 `--force` becomes `LM_FORCE=1`. Only text reaches `collect`, and text after `--` is text,
 dashes and all.
 
+`schema()` is compiled to a GBNF grammar before the model is called, so a shape the
+compiler rejects costs the whole request — `HTTP 400 failed to parse grammar`, ahead of any
+prefill. Two limits bind every schema, at any depth. A `pattern` opens with `^` and closes
+with `$`, and uses no PCRE shorthand: `\d`, `\w` and `\s` all fail, including inside a
+character class, so write `[0-9]`. A `maxLength` of 2000 or more fails the same way; 1999
+passes. Worse than either is a pattern the compiler neither rejects nor supports —
+`^(?=.*z).*$` returns 200 and constrains nothing — so a new `pattern` is worth one throwaway
+call before it ships.
+
 `validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry. `apply` asks through `confirm "text"`, which exits 7 when the human refuses. Any other prompt in `apply` must read from `/dev/tty`, because stdin carries the model's answer.
 
 A tool refuses with `return 3` when there is nothing to work on. The other codes are the
