@@ -46,6 +46,16 @@ lm --list                      # every tool with its description, tab-separated
 lm --which "text"              # pick the verb that serves a request
 ```
 
+`lm-ship` runs `commit` then `pr` over the same text. It opens a thematic branch first,
+named `<type>/<kebab-description>` after the subject the model writes, so the branch you end
+up on follows the work rather than the other way round. `--here` commits where you already
+are. Declining the commit leaves neither a branch nor a commit.
+
+```bash
+lm-ship                        # stage, then this: branch, commit, pull request
+lm-ship --here "what changed"  # same, on the branch you are on
+```
+
 Configuration is environment only:
 
 | Variable | Default |
@@ -84,6 +94,7 @@ dashes and all.
 ```bash
 bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/golden.sh              # every verb except the model call
+bash tests/ship.sh                # the lm-ship composition, with the verbs stubbed
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The `lm-ship` command, which runs `commit` then `pr` over the same text, opening a thematic branch named after the commit subject unless `--here` is used to commit on the current branch.
+
 ### Changed
 
 - The `issue` command now requires a topic argument when nothing is staged, rather than prompting interactively for the issue summary.
