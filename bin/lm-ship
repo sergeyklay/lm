@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# lm-ship — commit, then open the pull request. Makes no model call of its own:
+# it runs the two verbs that make one each, and stops on the first refusal.
+
+set -euo pipefail
+
+HERE=0; ARGS=()
+for a in "$@"; do
+  case "$a" in
+    --here) HERE=1 ;;
+    *)      ARGS+=("$a") ;;
+  esac
+done
+
+LM=$(dirname "$(readlink -f "$0")")/lm
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; exit 2; }
+
+# <type>/<kebab-description>, from the subject the model just wrote. Four words is
+# where a branch name stops being read and starts being scrolled past.
+_name() {
+  local s t d
+  s=$(git log -1 --format='%s')
+  t=${s%%:*}; t=${t%%(*}
+  d=$(printf '%s' "${s#*: }" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' '-' \
+      | sed 's/^-//;s/-$//' | cut -d- -f1-4 \
+      | sed -E 's/-(a|an|the|to|of|in|on|for|from|with|and|when|that|its)$//')
+  printf '%s/%s' "${t:-chore}" "${d:-change}"
+}
+
+# The operator should not have to decide which branch they are on, so a thematic
+# one is what happens when nothing is said. Its name is unknown until the commit
+# exists, so it opens under a placeholder and is renamed once the subject is there.
+START=$(git branch --show-current)
+TMP=""
+if (( ! HERE )); then
+  TMP="lm-ship-$$"
+  git switch -q -c "$TMP"
+fi
+
+rc=0
+"$LM" commit "${ARGS[@]}" || rc=$?
+if (( rc )); then
+  # A refusal leaves neither a branch nor a commit: nothing was committed, so the
+  # placeholder still points where the operator started.
+  if [ -n "$TMP" ]; then git switch -q "$START"; git branch -q -D "$TMP"; fi
+  exit "$rc"
+fi
+
+if [ -n "$TMP" ]; then
+  n=$(_name)
+  git branch -q -m "$n" 2>/dev/null || git branch -q -m "$n-$(git rev-parse --short HEAD)"
+  echo "lm: on $(git branch --show-current)" >&2
+fi
+
+exec "$LM" pr "${ARGS[@]}"
