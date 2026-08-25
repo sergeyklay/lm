@@ -5,7 +5,7 @@ Existing Unreleased CHANGELOG section for context (match its vocabulary):
 
 - An earlier entry
 
-Files changed in this commit:
+Files changed:
 demo.sh
 
 Staged diff to document:
@@ -17,7 +17,7 @@ index 5da2ae8..5c1ebf5 100644
  name="demo"
 +description="one line"
 
-Write one entry for every user-visible change in this diff.
+Write one entry for every user-visible change.
 One entry per observable change, not one per file.
 Categories, as Keep a Changelog defines them:
   Added for new features.
