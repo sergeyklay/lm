@@ -56,6 +56,18 @@ collect() {
   log=$(git log "$base..HEAD" --format='- %s%n%b')
   [ -z "$log" ] && { echo "lm: no commits on this branch against $base; run 'lm commit' first" >&2; return 3; }
 
+  # A stale $base is harmless on its own: the merge base does not move when the
+  # default branch advances along a line this one never touched, so log and diff
+  # come out identical either way. It misleads only once the branch already holds
+  # commits the ref is behind by, and the local branch of the same name is what
+  # knows that, for no network and no fetch on a read-only path.
+  local b=${base#origin/} n all
+  all=$(git rev-list --count "$base..HEAD")
+  if n=$(git rev-list --count "$base..HEAD" "^$b" 2>/dev/null) && (( n < all )); then
+    echo "lm: $base is behind '$b': $((all - n)) of these commits are already on '$b'." >&2
+    echo "    Run 'git fetch' so the description covers this branch alone." >&2
+  fi
+
   diff=$(git diff "$base...HEAD")
 
   printf '%s\n' \
