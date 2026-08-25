@@ -1,5 +1,5 @@
 name="pr"
-description="Generate a pull request description from git log <default>..HEAD"
+description="Generate a pull request description from the commits ahead of the default branch"
 
 # slug<TAB>heading for the shallowest heading level of the PR template, in file
 # order. Empty when the repository has no template, which selects the plain
@@ -28,21 +28,39 @@ _render_body() {
   done <<<"$secs"
 }
 
+# The branch a pull request would target, as a remote-tracking ref. Read-only
+# by contract: collect() runs before the human has approved anything, so this
+# must not reach for the network or write refs the way set-head --auto does.
+_base() {
+  local b
+  b=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) && { echo "$b"; return 0; }
+  for b in main master develop trunk; do
+    git show-ref -q --verify "refs/remotes/origin/$b" && { echo "origin/$b"; return 0; }
+  done
+  echo "lm: cannot tell which branch a pull request would target." >&2
+  echo "    Run 'git remote set-head origin --auto' once to record it." >&2
+  return 1
+}
+
 collect() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; return 2; }
 
-  local default_branch diff log secs tpl
-  default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-  [ -z "$default_branch" ] && default_branch="main"
+  local base diff log secs tpl
+  base=$(_base) || return 3
 
-  log=$(git log "${default_branch}..HEAD" --format='- %s%n%b' 2>/dev/null || true)
-  [ -z "$log" ] && { echo "lm: no commits found against ${default_branch}" >&2; return 3; }
+  if [ "$(git branch --show-current)" = "${base#origin/}" ]; then
+    echo "lm: on '${base#origin/}', which is what a pull request targets; branch first" >&2
+    return 3
+  fi
 
-  diff=$(git diff "${default_branch}...HEAD" 2>/dev/null || true)
+  log=$(git log "$base..HEAD" --format='- %s%n%b')
+  [ -z "$log" ] && { echo "lm: no commits on this branch against $base; run 'lm commit' first" >&2; return 3; }
+
+  diff=$(git diff "$base...HEAD")
 
   printf '%s\n' \
     "Commits in this PR:" "$log" "" \
-    "Diff against ${default_branch}:" "$(printf '%s' "$diff" | head -c 40000)" "" \
+    "Diff against $base:" "$(printf '%s' "$diff" | head -c 40000)" "" \
     "Write the pull request description for these changes." \
     "Title: concise and descriptive." \
     "Body: detailed summary of the changes. Do NOT use hard line wraps in prose."
