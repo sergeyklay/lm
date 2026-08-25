@@ -69,8 +69,14 @@ apply()    { :; }   # perform the side effect
 ## Tests
 
 ```bash
-bash tests/changelog-insert.sh
+bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
+bash tests/golden.sh              # every verb except the model call
 ```
+
+`golden.sh` builds a fixture repository per case and pins what the verb does around the
+model: the prompt `collect` writes, the shape `schema` asks for, the violations `validate`
+reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
+diff before committing them.
 
 ## License
 

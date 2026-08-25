@@ -1,0 +1,28 @@
+{
+  "properties": {
+    "sections": {
+      "properties": {
+        "risk": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "risk"
+      ],
+      "type": "object"
+    },
+    "title": {
+      "maxLength": 80,
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "sections"
+  ],
+  "type": "object"
+}

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A golden test suite that pins the prompt, schema, validation, and render output of every verb against recorded fixtures
+- A `--update` flag for the golden test runner to rewrite expectations, with a reminder to review the diff before committing
+- Documentation in the README explaining how to run the golden tests and what they verify
+
 ### Changed
 
 - The changelog tool now drafts multiple entries for a single commit, grouping them by category in the output and applying them to CHANGELOG.md in one pass.

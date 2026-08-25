@@ -1,0 +1,1 @@
+{"title":"The demo tool is missing a description","body":"The router shortlist reads the description field of every tool, and the demo tool ships without one, so lm --which cannot offer it.","labels":["bug"]}

@@ -1,0 +1,28 @@
+Commits in this PR:
+- feat: widen the file
+
+Diff against origin/main:
+diff --git a/f.txt b/f.txt
+index df967b9..4628cf7 100644
+--- a/f.txt
++++ b/f.txt
+@@ -1 +1,2 @@
+ base
++widened
+
+Write the pull request description for these changes.
+Title: concise and descriptive.
+Body: detailed summary of the changes. Do NOT use hard line wraps in prose.
+
+This repository has a pull request template. Fill one field per section.
+Write the content only: the headings are added for you, so do not repeat them.
+Replace every bracketed placeholder with a real value and keep the bold field labels.
+
+Template:
+### Scope
+
+**Type:** [Feat | Fix]
+
+### Risk
+
+- **Breaking Changes:** [Yes | No]

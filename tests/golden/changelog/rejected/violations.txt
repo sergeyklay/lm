@@ -1,0 +1,2 @@
+entry 2: bullet repeats the category name; drop that first word and start with the thing that changed, as in "Support for X in the Y command"
+entry 3: bullet documents a non-event (absence of a change)
