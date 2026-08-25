@@ -69,5 +69,4 @@ A composition stops on any of these. 7 is the one that is not a failure — it i
 | 3 | the verb has nothing to work on |
 | 4 | the validator rejected two answers |
 | 5 | the model returned empty content |
-| 6 | `lm fix` applied a change and the build still failed, so it reverted |
 | 7 | you declined the confirmation |
