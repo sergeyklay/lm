@@ -45,15 +45,30 @@ Request: $*
 Pick the single tool that serves this request." "$SCH")
       [ -n "$OUT" ] || { echo "lm: empty response from model" >&2; exit 5; }
       jq -r '.tool' <<<"$OUT"; exit 0 ;;
-  -h|--help) usage; exit 0 ;;
   "") usage >&2; exit 2 ;;
 esac
+
+# Help wins wherever it appears: GNU Coding Standards 4.8.2 says other options
+# and arguments are ignored once it is seen, and the program does not do its
+# normal work. Scanned after --which, whose arguments are a query and not flags.
+for a in "$@"; do
+  case "$a" in -h|--help) usage; exit 0 ;; esac
+done
 
 
 VERB=$1; shift
 TOOL="$LM_TOOLS/$VERB.sh"
 [ -f "$TOOL" ] || { echo "lm: no such tool '$VERB'. Available:" >&2; list | cut -f1 | sed 's/^/  /' >&2; exit 2; }
-DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
+# Flags are found by scanning, so a flag and free text coexist in either order.
+# Everything left over reaches collect(), which is the only channel a human has
+# for saying something the repository does not already say.
+DRY=0; ARGS=()
+for a in "$@"; do
+  case "$a" in
+    --dry-run) DRY=1 ;;
+    *)         ARGS+=("$a") ;;
+  esac
+done
 . "$TOOL"
 
 
@@ -74,7 +89,7 @@ REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo -)")
 trap 'log_run $?' EXIT
 
 
-PROMPT=$(collect) || exit $?
+PROMPT=$(collect "${ARGS[@]}") || exit $?
 SCHEMA=$(schema)
 CALLS=1
 OUT=$(call "$PROMPT" "$SCHEMA")

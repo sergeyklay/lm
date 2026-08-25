@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `--help` flag is now recognized in any position within the command line, not just as the first argument.
+- The `--dry-run` flag can now be placed in any position relative to other arguments, allowing it to coexist with free-text inputs in either order.
 - The changelog tool now drafts multiple entries for a single commit, grouping them by category in the output and applying them to CHANGELOG.md in one pass.
 
 ## [0.0.2] - 2026-08-25
