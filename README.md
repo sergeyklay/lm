@@ -62,6 +62,7 @@ Drop one file into `tools/`. Nothing else changes: the index is the directory li
 ```bash
 name="verb"
 description="One line. It is what the router sees."
+flags="--force"     # optional. Anything else that looks like a flag is a typo.
 
 collect()  { :; }   # build the prompt from the repository, deterministically
 schema()   { :; }   # JSON schema of the answer, enum on every closed set
@@ -69,6 +70,10 @@ validate() { :; }   # print one line per violation, nothing when clean
 render()   { :; }   # show the result to the human
 apply()    { :; }   # perform the side effect
 ```
+
+A verb is called as `lm <verb> [flags] [text]`, in any order. The runner takes `--dry-run`
+for itself, checks every other flag against `flags`, and hands what is left to `collect`.
+Text after `--` is text, dashes and all.
 
 `validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry. `apply` asks through `confirm "text"`, which exits 7 when the human refuses. Any other prompt in `apply` must read from `/dev/tty`, because stdin carries the model's answer.
 

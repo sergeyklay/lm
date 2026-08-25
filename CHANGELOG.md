@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for verb-specific flags declared in the `flags` variable, allowing tools to accept custom options alongside `--dry-run`.
+- A `--` separator that treats all subsequent arguments as literal text, preventing them from being interpreted as flags.
+- A warning message when free-text input is provided but not included in the generated prompt, alerting the user that their text was ignored.
 - Support for free-text descriptions in `lm changelog` and `lm commit`, allowing the user to specify the intent of the change when no diff is available or to supplement the diff context.
 - Golden tests now capture and verify `stderr` output from the `collect` function, ensuring user-facing messages are stable.
 - Support for an optional `args` file in golden test cases, allowing tests to pass specific arguments to the `collect` function.
@@ -18,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Unknown flags now trigger a specific error message listing valid options, rather than being silently passed as text to the tool.
+- The usage string now explicitly documents the `[text]` argument position for verbs.
 - `lm changelog` now reads the working tree diff when nothing is staged, enabling changelog entries to be drafted before changes are staged.
 - `lm commit` now provides a specific error message when the working tree has changes but nothing is staged, guiding the user to stage changes first.
 - The `--help` flag is now recognized in any position within the command line, not just as the first argument.
