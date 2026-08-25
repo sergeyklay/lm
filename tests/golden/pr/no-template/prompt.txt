@@ -1,0 +1,15 @@
+Commits in this PR:
+- feat: widen the file
+
+Diff against origin/main:
+diff --git a/f.txt b/f.txt
+index df967b9..4628cf7 100644
+--- a/f.txt
++++ b/f.txt
+@@ -1 +1,2 @@
+ base
++widened
+
+Write the pull request description for these changes.
+Title: concise and descriptive.
+Body: detailed summary of the changes. Do NOT use hard line wraps in prose.

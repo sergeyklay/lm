@@ -1,0 +1,36 @@
+Existing Unreleased CHANGELOG section for context (match its vocabulary):
+## [Unreleased]
+
+### Added
+
+- An earlier entry
+
+Files changed in this commit:
+demo.sh
+
+Staged diff to document:
+diff --git a/demo.sh b/demo.sh
+index 5da2ae8..5c1ebf5 100644
+--- a/demo.sh
++++ b/demo.sh
+@@ -1 +1,2 @@
+ name="demo"
++description="one line"
+
+Write one entry for every user-visible change in this diff.
+One entry per observable change, not one per file.
+Categories, as Keep a Changelog defines them:
+  Added for new features.
+  Changed for changes in existing functionality.
+  Deprecated for soon-to-be removed features.
+  Removed for now removed features.
+  Fixed for any bug fixes.
+  Security in case of vulnerabilities.
+Each entry must make plain what changed for the person on the other side of it.
+Length follows the change: one sentence usually, two when one would leave the reader guessing.
+An entry is not a manual and not a design note: no usage instructions, no rationale, no implementation detail.
+Unless this repository is plainly a library or a framework, its internals are out of scope: describe what someone running it observes, not what a script defines.
+Tests, CI and formatting are not entries.
+Start with the thing that changed, never with the category name:
+write "Support for X in the Y command", not "Added support for X".
+Write each entry as one unwrapped line, with no line breaks.

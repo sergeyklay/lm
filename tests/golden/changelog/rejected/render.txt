@@ -1,0 +1,10 @@
+Proposed for CHANGELOG.md under [Unreleased]:
+
+### Added
+
+- A description on the demo tool
+- Added a second thing
+
+### Fixed
+
+- Nothing to do for existing users

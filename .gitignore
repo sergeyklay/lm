@@ -1,0 +1,4 @@
+# Written by a verb into the working tree and removed again on the happy path.
+# They survive an interrupted run, and neither belongs in a commit.
+CHANGELOG.tmp
+*.lmbak

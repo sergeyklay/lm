@@ -1,0 +1,28 @@
+{
+  "properties": {
+    "body": {
+      "type": "string"
+    },
+    "labels": {
+      "items": {
+        "enum": [
+          "bug",
+          "enhancement",
+          "documentation"
+        ],
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "title": {
+      "maxLength": 80,
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "body",
+    "labels"
+  ],
+  "type": "object"
+}

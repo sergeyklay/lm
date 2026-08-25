@@ -1,0 +1,9 @@
+# feat: widen the file
+
+### Scope
+
+**Type:** Feat
+
+### Risk
+
+- **Breaking Changes:** No

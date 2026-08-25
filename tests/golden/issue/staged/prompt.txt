@@ -1,0 +1,12 @@
+Staged changes to be reported as an issue:
+diff --git a/demo.sh b/demo.sh
+index 5da2ae8..5c1ebf5 100644
+--- a/demo.sh
++++ b/demo.sh
+@@ -1 +1,2 @@
+ name="demo"
++description="one line"
+
+Write a GitHub issue describing the problem or feature these changes address.
+Title: concise and descriptive.
+Body: detailed description, context, and motivation. Do NOT use hard line wraps in prose.

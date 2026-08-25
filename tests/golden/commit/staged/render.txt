@@ -1,0 +1,4 @@
+feat(demo): give the demo tool a description
+
+The router shortlist reads the description field, and the demo tool did
+not have one. Adding it makes the tool selectable by lm --which.

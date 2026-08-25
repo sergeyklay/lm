@@ -1,0 +1,35 @@
+{
+  "properties": {
+    "entries": {
+      "items": {
+        "properties": {
+          "bullet": {
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "Added",
+              "Changed",
+              "Deprecated",
+              "Removed",
+              "Fixed",
+              "Security"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "bullet"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "entries"
+  ],
+  "type": "object"
+}
