@@ -1,5 +1,5 @@
 name="changelog"
-description="Draft CHANGELOG.md entries for the staged changes, validating they sit under [Unreleased]"
+description="Draft CHANGELOG.md entries under [Unreleased] from the index, the working tree or free text"
 
 collect() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; return 2; }

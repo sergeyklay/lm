@@ -23,7 +23,7 @@ export PATH="$HOME/lm/bin:$PATH"
 
 ```bash
 lm commit          # Conventional Commits message from the staged diff
-lm changelog       # CHANGELOG.md entry from the staged diff
+lm changelog       # CHANGELOG.md entries for what changed, staged or not
 lm pr              # pull request description from the commits ahead of the default branch
 lm issue           # GitHub issue, labels taken from the repository
 lm fix             # repair a build error, with the compiler as the oracle
