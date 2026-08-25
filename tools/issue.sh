@@ -84,11 +84,10 @@ validate() {
 }
 
 render() {
-  local j ti bo labs
+  local j ti bo
   j=$(cat)
   ti=$(jq -r '.title' <<<"$j")
   bo=$(jq -r '.body' <<<"$j")
-  labs=$(jq -r '.labels[]?' <<<"$j" | paste -sd, -)
 
   echo "# $ti"
   echo ""

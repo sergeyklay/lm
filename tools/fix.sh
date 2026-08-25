@@ -2,8 +2,7 @@ name="fix"
 description="Fix mechanical build errors using the compiler as an oracle"
 
 _diag() {
-  # Run the compiler as an oracle and capture the diagnostic output
-  go build ./... 2>&1 || true
+  go build ./... 2>&1 || true    # a failing build is the subject, not an error
 }
 
 collect() {
@@ -11,8 +10,7 @@ collect() {
   diag=$(_diag)
   [ -z "$diag" ] && { echo "lm: build is clean" >&2; return 3; }
 
-  # Extract the file path from the compiler output (one diagnostic per pass)
-  local path
+  local path                    # -m1: one diagnostic per pass, the rest follow later
   path=$(echo "$diag" | grep -m1 -oP '^[a-zA-Z0-9_\-\./]+\.go')
   [ -z "$path" ] && { echo "lm: cannot isolate file path from diagnostic" >&2; return 3; }
 
@@ -23,7 +21,6 @@ collect() {
 }
 
 schema() {
-  # Requires a JSON structure containing both the path and the new file content
   jq -n -c '{
     type:"object",
     properties:{
@@ -48,7 +45,6 @@ validate() {
   return 0
 }
 
-
 render() {
   local j p
   j=$(cat)
@@ -59,7 +55,6 @@ render() {
 }
 
 apply() {
-  # Implementation directly from the specification
   local j p; j=$(cat); p=$(jq -r .path <<<"$j")
   cp -- "$p" "$p.lmbak"
   jq -r .content <<<"$j" > "$p"
