@@ -1,0 +1,9 @@
+Proposed for CHANGELOG.md under [Unreleased]:
+
+### Added
+
+- A description on the demo tool, so lm --which can offer it
+
+### Fixed
+
+- The demo tool no longer appears in the shortlist without a description

@@ -5,17 +5,9 @@ Existing Unreleased CHANGELOG section for context (match its vocabulary):
 
 - An earlier entry
 
-Files changed:
-demo.sh
-
-Staged diff to document:
-diff --git a/demo.sh b/demo.sh
-index 5da2ae8..5c1ebf5 100644
---- a/demo.sh
-+++ b/demo.sh
-@@ -1 +1,2 @@
- name="demo"
-+description="one line"
+The person running this described the change as follows. Treat it as what they meant,
+not as wording to copy, and still take the facts from the diff below when there is one:
+the demo tool now carries a description so the router can offer it
 
 Write one entry for every user-visible change.
 One entry per observable change, not one per file.

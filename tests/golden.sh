@@ -9,7 +9,9 @@
 # A case is tests/golden/<verb>/<name>/ holding:
 #   setup.sh      builds the fixture repository in an empty directory
 #   answer.json   an answer of the shape schema() asks for
+#   args          optional, one argument per line, handed to collect()
 #   prompt.txt schema.json violations.txt render.txt   the expectations
+#   stderr.txt    what collect() said to the human while building the prompt
 #
 #   bash tests/golden.sh            check
 #   bash tests/golden.sh --update   rewrite the expectations, then read the diff
@@ -34,14 +36,16 @@ for setup in "$GOLDEN"/*/*/setup.sh; do
   work=$(mktemp -d)
   ( cd "$work" && . "$setup" ) >/dev/null 2>&1 || { echo "FAIL $name: setup failed"; fail=1; rm -rf "$work"; continue; }
 
-  for part in prompt schema violations render; do
+  for part in prompt stderr schema violations render; do
     ext=txt; [ "$part" = schema ] && ext=json
     want="$case_dir/$part.$ext"
     got=$(
       cd "$work" || exit 1
       . "$tool"
+      args=(); [ -f "$case_dir/args" ] && mapfile -t args < "$case_dir/args"
       case $part in
-        prompt)     collect ;;
+        prompt)     collect "${args[@]}" 2>/dev/null ;;
+        stderr)     collect "${args[@]}" 2>&1 >/dev/null ;;
         schema)     schema | jq -S . ;;
         violations) validate < "$case_dir/answer.json" ;;
         render)     render   < "$case_dir/answer.json" ;;

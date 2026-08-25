@@ -33,6 +33,12 @@ lm fix             # repair a build error, with the compiler as the oracle
 headings become the schema, and the script writes them back, so the model only supplies
 the contents.
 
+A verb takes free text after its name, and passes it to the model as what the human meant
+the change to be. `lm changelog` reads the index when something is staged and the working
+tree otherwise, so an entry can be drafted before anything is staged, or from the text alone
+when nothing has changed at all. `lm commit` reads the index and only the index, because
+that is what it commits.
+
 `--dry-run` on any verb prints the result and stops before the side effect.
 
 ```bash

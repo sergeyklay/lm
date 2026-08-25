@@ -6,14 +6,29 @@ collect() {
   local br; br=$(git branch --show-current)
   case "$br" in main|master|develop|release/*|hotfix/*)
       echo "lm: refusing to work on protected branch '$br'" >&2; return 3 ;; esac
-  local diff files style
-  diff=$(git diff --cached); [ -n "$diff" ] || { echo "lm: nothing staged" >&2; return 3; }
+  # The index and nothing else: apply() runs git commit, which commits the index.
+  # A message written from the working tree would describe what is not going in.
+  local diff files style said="$*"
+  if diff=$(git diff --cached); [ -z "$diff" ]; then
+    if [ -n "$(git diff)" ]; then
+      echo "lm: nothing staged, though the working tree has changes; stage them first" >&2
+    else
+      echo "lm: nothing staged" >&2
+    fi
+    return 3
+  fi
   files=$(git diff --cached --name-only)
   style=$(git log --format='%s' -20 2>/dev/null || true)
   printf '%s\n' \
     "Recent commit subjects in this repository. Match their vocabulary and level of detail:" "$style" "" \
     "Files changed:" "$files" "" \
-    "Staged diff:" "$(printf '%s' "$diff" | head -c 40000)" "" \
+    "Staged diff:" "$(printf '%s' "$diff" | head -c 40000)" ""
+
+  [ -n "$said" ] && printf '%s\n' \
+    "The person running this described the change as follows. Treat it as what they meant," \
+    "not as wording to copy, and still take the facts from the diff above:" "$said" ""
+
+  printf '%s\n' \
     "Write the commit message for this change." \
     "Subject: imperative mood, lower case after the colon, no trailing period, under 60 characters, no issue number." \
     "Body: two or three sentences saying what changed and why. No bullet lists, no file names, no phrases like 'This commit'."

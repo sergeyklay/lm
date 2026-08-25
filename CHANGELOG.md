@@ -9,12 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for free-text descriptions in `lm changelog` and `lm commit`, allowing the user to specify the intent of the change when no diff is available or to supplement the diff context.
+- Golden tests now capture and verify `stderr` output from the `collect` function, ensuring user-facing messages are stable.
+- Support for an optional `args` file in golden test cases, allowing tests to pass specific arguments to the `collect` function.
 - A golden test suite that pins the prompt, schema, validation, and render output of every verb against recorded fixtures
 - A `--update` flag for the golden test runner to rewrite expectations, with a reminder to review the diff before committing
 - Documentation in the README explaining how to run the golden tests and what they verify
 
 ### Changed
 
+- `lm changelog` now reads the working tree diff when nothing is staged, enabling changelog entries to be drafted before changes are staged.
+- `lm commit` now provides a specific error message when the working tree has changes but nothing is staged, guiding the user to stage changes first.
 - The `--help` flag is now recognized in any position within the command line, not just as the first argument.
 - The `--dry-run` flag can now be placed in any position relative to other arguments, allowing it to coexist with free-text inputs in either order.
 - The changelog tool now drafts multiple entries for a single commit, grouping them by category in the output and applying them to CHANGELOG.md in one pass.

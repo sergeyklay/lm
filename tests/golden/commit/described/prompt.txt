@@ -1,0 +1,22 @@
+Recent commit subjects in this repository. Match their vocabulary and level of detail:
+feat: add the demo tool
+
+Files changed:
+tools/demo.sh
+
+Staged diff:
+diff --git a/tools/demo.sh b/tools/demo.sh
+index 5da2ae8..5c1ebf5 100644
+--- a/tools/demo.sh
++++ b/tools/demo.sh
+@@ -1 +1,2 @@
+ name="demo"
++description="one line"
+
+The person running this described the change as follows. Treat it as what they meant,
+not as wording to copy, and still take the facts from the diff above:
+the router shortlist reads description, and this tool had none
+
+Write the commit message for this change.
+Subject: imperative mood, lower case after the colon, no trailing period, under 60 characters, no issue number.
+Body: two or three sentences saying what changed and why. No bullet lists, no file names, no phrases like 'This commit'.

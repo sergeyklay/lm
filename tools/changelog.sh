@@ -9,18 +9,46 @@ collect() {
     return 3
   fi
 
-  local diff files recent_changelog
-  diff=$(git diff --cached); [ -n "$diff" ] || { echo "lm: nothing staged" >&2; return 3; }
+  # The index first, then the working tree. A changelog entry describes a change,
+  # and a change is no less real for not being staged yet. This is the opposite
+  # of the commit verb, which must read the index because that is what it commits.
+  local diff files label said="$*"
+  diff=$(git diff --cached); label="Staged diff to document:"
   files=$(git diff --cached --name-only)
+  if [ -n "$diff" ]; then
+    # Reading the index is the quiet case; reading it while the tree holds more
+    # is the one worth a word, because the entry will not cover the remainder.
+    local rest; rest=$(git diff --name-only | paste -sd' ')
+    [ -n "$rest" ] && echo "lm: not staged, so not described here: $rest" >&2
+  else
+    diff=$(git diff); files=$(git diff --name-only)
+    label="Working tree diff to document:"
+  fi
+  if [ -z "$diff" ] && [ -z "$said" ]; then
+    echo "lm: nothing staged and nothing changed in the working tree." >&2
+    echo "    Change something, or say what changed: lm changelog \"...\"" >&2
+    return 3
+  fi
+
+  local recent_changelog
 
   # Extract the [Unreleased] section to give the model context of existing unreleased changes
   recent_changelog=$(awk '/^## \[Unreleased\]/{flag=1; print; next} /^## \[/{flag=0} flag' CHANGELOG.md | head -n 30 2>/dev/null || true)
 
   printf '%s\n' \
-    "Existing Unreleased CHANGELOG section for context (match its vocabulary):" "$recent_changelog" "" \
-    "Files changed in this commit:" "$files" "" \
-    "Staged diff to document:" "$(printf '%s' "$diff" | head -c 40000)" "" \
-    "Write one entry for every user-visible change in this diff." \
+    "Existing Unreleased CHANGELOG section for context (match its vocabulary):" "$recent_changelog" ""
+
+  [ -n "$said" ] && printf '%s\n' \
+    "The person running this described the change as follows. Treat it as what they meant," \
+    "not as wording to copy, and still take the facts from the diff below when there is one:" \
+    "$said" ""
+
+  [ -n "$diff" ] && printf '%s\n' \
+    "Files changed:" "$files" "" \
+    "$label" "$(printf '%s' "$diff" | head -c 40000)" ""
+
+  printf '%s\n' \
+    "Write one entry for every user-visible change." \
     "One entry per observable change, not one per file." \
     "Categories, as Keep a Changelog defines them:" \
     "  Added for new features." \
