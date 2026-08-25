@@ -1,5 +1,5 @@
 name="changelog"
-description="Draft a CHANGELOG.md entry for the staged changes, validating it sits under [Unreleased]"
+description="Draft CHANGELOG.md entries for the staged changes, validating they sit under [Unreleased]"
 
 collect() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; return 2; }
@@ -20,63 +20,84 @@ collect() {
     "Existing Unreleased CHANGELOG section for context (match its vocabulary):" "$recent_changelog" "" \
     "Files changed in this commit:" "$files" "" \
     "Staged diff to document:" "$(printf '%s' "$diff" | head -c 40000)" "" \
-    "Write a changelog entry for this change." \
-    "The entry must be a single sentence describing the user-visible change." \
+    "Write one entry for every user-visible change in this diff." \
+    "One entry per observable change, not one per file." \
+    "Categories, as Keep a Changelog defines them:" \
+    "  Added for new features." \
+    "  Changed for changes in existing functionality." \
+    "  Deprecated for soon-to-be removed features." \
+    "  Removed for now removed features." \
+    "  Fixed for any bug fixes." \
+    "  Security in case of vulnerabilities." \
+    "Each entry must make plain what changed for the person on the other side of it." \
+    "Length follows the change: one sentence usually, two when one would leave the reader guessing." \
+    "An entry is not a manual and not a design note: no usage instructions, no rationale, no implementation detail." \
+    "Unless this repository is plainly a library or a framework, its internals are out of scope: describe what someone running it observes, not what a script defines." \
+    "Tests, CI and formatting are not entries." \
     "Start with the thing that changed, never with the category name:" \
     "write \"Support for X in the Y command\", not \"Added support for X\"." \
-    "Do not mention tests, CI, formatting or internal refactoring: the changelog records what a user of the project can observe." \
-    "Write the entry as one unwrapped line, with no line breaks."
+    "Write each entry as one unwrapped line, with no line breaks."
 }
 
 schema() {
   jq -n -c '{
     type:"object",
     properties:{
-      category:{type:"string",enum:["Added","Changed","Deprecated","Removed","Fixed","Security"]},
-      bullet:{type:"string"}
+      entries:{
+        type:"array",
+        minItems:1,
+        items:{
+          type:"object",
+          properties:{
+            category:{type:"string",enum:["Added","Changed","Deprecated","Removed","Fixed","Security"]},
+            bullet:{type:"string"}
+          },
+          required:["category","bullet"]
+        }
+      }
     },
-    required:["category","bullet"]
+    required:["entries"]
   }'
 }
 
 validate() {
-  local j catg bullet
+  local j n i catg bullet
   j=$(cat)
 
   jq -e . >/dev/null 2>&1 <<<"$j" || { echo "output is not valid JSON"; return 0; }
 
-  catg=$(jq -r '.category' <<<"$j")
-  bullet=$(jq -r '.bullet' <<<"$j")
+  n=$(jq '.entries | length' <<<"$j" 2>/dev/null || echo 0)
+  [ "${n:-0}" -eq 0 ] && { echo "no entries: give one entry per user-visible change in the diff"; return 0; }
 
-  [ -z "$catg" ] && echo "category is empty"
-  [ -z "$bullet" ] && echo "bullet is empty"
+  for ((i = 0; i < n; i++)); do
+  catg=$(jq -r --argjson i "$i" '.entries[$i].category // ""' <<<"$j")
+  bullet=$(jq -r --argjson i "$i" '.entries[$i].bullet // ""' <<<"$j")
+
+  [ -z "$catg" ] && echo "entry $((i + 1)): category is empty"
+  [ -z "$bullet" ] && echo "entry $((i + 1)): bullet is empty"
 
   # A bullet is one sentence on one line. Tested with bash, not with grep:
   # grep is line-oriented, so a '\n' in the pattern can never match.
   case "$bullet" in
-    *$'\n'*) echo "bullet contains a line break; write the whole entry as one unwrapped line" ;;
+    *$'\n'*) echo "entry $((i + 1)): bullet contains a line break; write the whole entry as one unwrapped line" ;;
   esac
 
   case "$bullet" in
     Added\ *|Changed\ *|Deprecated\ *|Removed\ *|Fixed\ *|Security\ *)
-      echo "bullet repeats the category name; drop that first word and start with the thing that changed, as in \"Support for X in the Y command\"" ;;
+      echo "entry $((i + 1)): bullet repeats the category name; drop that first word and start with the thing that changed, as in \"Support for X in the Y command\"" ;;
   esac
 
-  [[ "$bullet" =~ (No\ migration|Nothing\ to\ do) ]] && echo "bullet documents a non-event (absence of a change)"
+  [[ "$bullet" =~ (No\ migration|Nothing\ to\ do) ]] && echo "entry $((i + 1)): bullet documents a non-event (absence of a change)"
+  done
 
   return 0
 }
 
 render() {
-  local j catg bullet
-  j=$(cat)
-  catg=$(jq -r '.category' <<<"$j")
-  bullet=$(jq -r '.bullet' <<<"$j")
-
-  echo "Proposed entry for CHANGELOG.md under [Unreleased] -> ### $catg:"
+  echo "Proposed for CHANGELOG.md under [Unreleased]:"
   echo ""
-  echo "- $bullet"
-  echo ""
+  jq -r '.entries | group_by(.category)[]
+    | "### " + .[0].category, "", (.[] | "- " + .bullet), ""'
 }
 
 # _insert <category> <bullet text>
@@ -137,19 +158,26 @@ _insert() {
 }
 
 apply() {
-  local j catg bullet
+  local j n i catg bullet out
   j=$(cat)
-  catg=$(jq -r '.category' <<<"$j")
-  bullet=$(jq -r '.bullet' <<<"$j")
-
-  confirm "Apply to CHANGELOG.md? [y/N]"
 
   if ! grep -q "^## \[Unreleased\]" CHANGELOG.md; then
     echo "lm: CHANGELOG.md has no '## [Unreleased]' section" >&2
     exit 1
   fi
 
-  _insert "$catg" "$bullet" < CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
+  confirm "Apply to CHANGELOG.md? [y/N]"
 
-  echo "Appended to CHANGELOG.md. Don't forget to 'git add CHANGELOG.md'."
+  n=$(jq '.entries | length' <<<"$j")
+  out=$(cat CHANGELOG.md)
+  # Backwards, because _insert puts each bullet first under its category: the
+  # one written last is the one that ends up on top.
+  for ((i = n - 1; i >= 0; i--)); do
+    catg=$(jq -r --argjson i "$i" '.entries[$i].category' <<<"$j")
+    bullet=$(jq -r --argjson i "$i" '.entries[$i].bullet' <<<"$j")
+    out=$(_insert "$catg" "$bullet" <<<"$out")
+  done
+  printf '%s\n' "$out" > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
+
+  echo "Appended $n to CHANGELOG.md. Don't forget to 'git add CHANGELOG.md'."
 }
