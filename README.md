@@ -56,6 +56,21 @@ lm-ship                        # stage, then this: branch, commit, pull request
 lm-ship --here "what changed"  # same, on the branch you are on
 ```
 
+Every run appends one JSON object to `$LM_LOG` — the verb, the repository, how many model
+calls it took, what the validator rejected, the exit code, and whether `HEAD` moved.
+
+`lm-stats` reads that log and nothing else: no model, no registry, no network. It reports a row
+per verb — runs, how many were clean on the first answer, how many you declined, how many took
+the retry, how many failed, and the average time a run took with your own thinking in it —
+then how many `lm commit` runs actually moved `HEAD`, then the violations the validators
+printed most often. A `--dry-run` reaches the violations but not the rates. One log spans every
+repository `lm` has ever run in, so it counts the one you are in.
+
+```bash
+lm-stats                       # this repository
+lm-stats --all                 # every repository the log has seen
+```
+
 Configuration is environment only:
 
 | Variable | Default |
@@ -64,6 +79,7 @@ Configuration is environment only:
 | `LM_MODEL` | `qwen3.8:27b` |
 | `LM_CTX` | `32768` |
 | `LM_TOOLS` | `<repo>/tools` |
+| `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 
 ## Adding a tool
 
