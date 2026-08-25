@@ -56,5 +56,5 @@ _hdr() { local j=$1 ty sc su; ty=$(jq -r '.type' <<<"$j"); sc=$(jq -r '.scope //
 _body() { jq -r '.body' <<<"$1" | fold -s -w 72 | sed 's/[[:space:]]*$//'; }
 
 render() { local j; j=$(cat); printf '%s\n\n%s\n' "$(_hdr "$j")" "$(_body "$j")"; }
-apply()  { local j a; j=$(cat); read -r -p "commit? [y/N] " a </dev/tty; [ "$a" = y ] || exit 0
+apply()  { local j; j=$(cat); confirm "commit? [y/N]"
            git commit -m "$(_hdr "$j")" -m "$(_body "$j")"; }

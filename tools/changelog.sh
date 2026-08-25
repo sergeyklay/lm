@@ -137,13 +137,12 @@ _insert() {
 }
 
 apply() {
-  local j catg bullet a
+  local j catg bullet
   j=$(cat)
   catg=$(jq -r '.category' <<<"$j")
   bullet=$(jq -r '.bullet' <<<"$j")
 
-  read -r -p "Apply to CHANGELOG.md? [y/N] " a </dev/tty
-  [ "$a" = y ] || exit 0
+  confirm "Apply to CHANGELOG.md? [y/N]"
 
   if ! grep -q "^## \[Unreleased\]" CHANGELOG.md; then
     echo "lm: CHANGELOG.md has no '## [Unreleased]' section" >&2

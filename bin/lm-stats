@@ -6,15 +6,16 @@ set -euo pipefail
 : "${LM_LOG:=$HOME/.lm/runs.jsonl}"
 [ -s "$LM_LOG" ] || { echo "lm-stats: nothing logged in $LM_LOG" >&2; exit 2; }
 
-printf '%-10s %5s %7s %8s %7s %8s\n' verb runs clean retried failed "avg ms"
+printf '%-10s %5s %7s %9s %8s %7s %8s\n' verb runs clean declined retried failed "avg ms"
 jq -s -r '
   map(select((.dry | not) and .calls > 0)) | group_by(.verb)[] |
   [ .[0].verb, length,
     (map(select(.calls == 1 and .exit == 0)) | length),
+    (map(select(.exit == 7)) | length),
     (map(select(.calls == 2)) | length),
-    (map(select(.exit != 0)) | length),
+    (map(select(.exit != 0 and .exit != 7)) | length),
     (map(.ms) | add / length | floor) ] | @tsv' "$LM_LOG" \
-| awk -F'\t' '{printf "%-10s %5d %6d%% %8d %7d %8d\n", $1, $2, ($2 ? 100*$3/$2 : 0), $4, $5, $6}'
+| awk -F'\t' '{printf "%-10s %5d %6d%% %9d %8d %7d %8d\n", $1, $2, ($2 ? 100*$3/$2 : 0), $4, $5, $6, $7}'
 
 echo
 echo "commits created by lm commit:"

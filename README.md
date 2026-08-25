@@ -60,7 +60,7 @@ render()   { :; }   # show the result to the human
 apply()    { :; }   # perform the side effect
 ```
 
-`validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry. A tool that prompts in `apply` must read from `/dev/tty`, because stdin carries the model's answer.
+`validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry. `apply` asks through `confirm "text"`, which exits 7 when the human refuses. Any other prompt in `apply` must read from `/dev/tty`, because stdin carries the model's answer.
 
 ## Tests
 
