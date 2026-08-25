@@ -1,0 +1,3 @@
+# gh is not reachable from a fixture, and the enum is the point of the case:
+# stand in for the repository's labels so schema() has a closed set to build.
+_labels() { printf 'bug\nenhancement\ndocumentation\n'; }

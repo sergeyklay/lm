@@ -1,65 +1,49 @@
 name="issue"
 description="Draft and create a GitHub issue, picking labels from the repository taxonomy"
 
-_get_labels() {
-  # Determine cache file location inside the .git directory
-  local git_dir cache_file fetch
-  git_dir=$(git rev-parse --git-dir 2>/dev/null) || return 1
-  cache_file="$git_dir/lm_labels_cache.txt"
-
-  fetch=0
-  # Check if cache is missing or older than 24 hours (1440 minutes)
-  if [ ! -f "$cache_file" ]; then
-    fetch=1
-  elif [ -n "$(find "$cache_file" -mmin +1440 2>/dev/null)" ]; then
-    fetch=1
-  fi
-
-  if (( fetch )); then
-    # Fetch labels using gh cli and atomically save to cache
-    gh label list --limit 100 --json name -q '.[].name' > "$cache_file.tmp" 2>/dev/null && mv -f "$cache_file.tmp" "$cache_file" || true
-  fi
-
-  if [ -f "$cache_file" ] && [ -s "$cache_file" ]; then
-    cat "$cache_file"
-  else
-    # Fallback if gh fails or user is offline
-    echo 'bug'
-    echo 'enhancement'
-    echo 'documentation'
-  fi
+# The enum the model picks from, straight from the repository every run. No cache
+# under .git: schema() runs before the human has approved anything, and a cache is
+# a write. collect() and schema() each call it, in separate subshells, which costs
+# one gh request against a model call that costs tens of seconds.
+_labels() {
+  gh label list --limit 100 --json name -q '.[].name' 2>/dev/null
 }
 
 collect() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; return 2; }
-  if ! command -v gh >/dev/null 2>&1; then echo "lm: gh cli is required" >&2; return 3; fi
+  command -v gh >/dev/null 2>&1 || { echo "lm: gh cli is required" >&2; return 3; }
 
-  local diff topic
+  local diff topic="$*"
   diff=$(git diff --cached 2>/dev/null)
 
-  # Interactive prompt for issue intent if the diff is empty
-  # Prompts go to stderr, reads from /dev/tty so stdout remains clean for the runner
-  if [ -z "$diff" ]; then
-     read -r -p "lm: Nothing staged. Issue topic or bug summary: " topic </dev/tty >&2
-     [ -z "$topic" ] && { echo "lm: empty topic, aborting" >&2; return 3; }
-     printf '%s\n' \
-       "User provided issue topic:" "$topic" "" \
-       "Write a GitHub issue for this topic."
-  else
-     printf '%s\n' \
-       "Staged changes to be reported as an issue:" "$(printf '%s' "$diff" | head -c 40000)" "" \
-       "Write a GitHub issue describing the problem or feature these changes address."
+  if [ -z "$diff" ] && [ -z "$topic" ]; then
+    echo "lm: nothing staged and no topic given." >&2
+    echo "    Stage the change, or say what the issue is: lm issue \"...\"" >&2
+    return 3
   fi
 
+  # Without the label set there is no closed set to answer from, so the run ends
+  # here rather than after a model call the schema could not constrain.
+  if [ -z "$(_labels)" ]; then
+    echo "lm: no labels readable in this repository; check 'gh auth status'" >&2
+    return 3
+  fi
+
+  [ -n "$topic" ] && printf '%s\n' \
+    "The person running this described the issue as follows:" "$topic" ""
+
+  [ -n "$diff" ] && printf '%s\n' \
+    "Staged changes to be reported as an issue:" "$(printf '%s' "$diff" | head -c 40000)" ""
+
   printf '%s\n' \
+    "Write a GitHub issue for this." \
     "Title: concise and descriptive." \
     "Body: detailed description, context, and motivation. Do NOT use hard line wraps in prose."
 }
 
 schema() {
-  # The label enum is built exactly at call time
   local labels_json
-  labels_json=$(_get_labels | jq -R . | jq -sc .)
+  labels_json=$(_labels | jq -R . | jq -sc .)
 
   jq -n -c --argjson labs "$labels_json" '{
     type:"object",
