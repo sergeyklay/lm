@@ -1,4 +1,7 @@
-Existing Unreleased CHANGELOG section for context (match its vocabulary):
+The changelog this project has published so far. It records what this project considers
+worth telling its users, and by omission what it does not. Match both:
+# Changelog
+
 ## [Unreleased]
 
 ### Added
@@ -9,7 +12,8 @@ The person running this described the change as follows. Treat it as what they m
 not as wording to copy, and still take the facts from the diff below when there is one:
 the demo tool now carries a description so the router can offer it
 
-Write one entry for every user-visible change.
+Write an entry for each change a person could notice by installing this project and running it.
+If they could not notice it that way there is no entry, and a diff often yields fewer entries than it has files.
 One entry per observable change, not one per file.
 Categories, as Keep a Changelog defines them:
   Added for new features.
@@ -22,7 +26,6 @@ Each entry must make plain what changed for the person on the other side of it.
 Length follows the change: one sentence usually, two when one would leave the reader guessing.
 An entry is not a manual and not a design note: no usage instructions, no rationale, no implementation detail.
 Unless this repository is plainly a library or a framework, its internals are out of scope: describe what someone running it observes, not what a script defines.
-Tests, CI and formatting are not entries.
 Start with the thing that changed, never with the category name:
 write "Support for X in the Y command", not "Added support for X".
 Write each entry as one unwrapped line, with no line breaks.

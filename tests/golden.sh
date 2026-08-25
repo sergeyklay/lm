@@ -10,8 +10,10 @@
 #   setup.sh      builds the fixture repository in an empty directory
 #   answer.json   an answer of the shape schema() asks for
 #   args          optional, one argument per line, handed to collect()
+#   env           optional, sourced first; how a case sets a flag the runner
+#                 would otherwise have turned into LM_<NAME>
 #   prompt.txt schema.json violations.txt render.txt   the expectations
-#   stderr.txt    what collect() said to the human while building the prompt
+#   stderr.txt    what collect() said to the human, plus [exit N] when it refused
 #
 #   bash tests/golden.sh            check
 #   bash tests/golden.sh --update   rewrite the expectations, then read the diff
@@ -43,9 +45,11 @@ for setup in "$GOLDEN"/*/*/setup.sh; do
       cd "$work" || exit 1
       . "$tool"
       args=(); [ -f "$case_dir/args" ] && mapfile -t args < "$case_dir/args"
+      [ -f "$case_dir/env" ] && . "$case_dir/env"
       case $part in
-        prompt)     collect "${args[@]}" 2>/dev/null ;;
-        stderr)     collect "${args[@]}" 2>&1 >/dev/null ;;
+        prompt)     collect "${args[@]}" 2>/dev/null; exit 0 ;;
+        stderr)     collect "${args[@]}" 2>&1 >/dev/null; r=$?
+                    [ "$r" -ne 0 ] && echo "[exit $r]"; exit 0 ;;
         schema)     schema | jq -S . ;;
         violations) validate < "$case_dir/answer.json" ;;
         render)     render   < "$case_dir/answer.json" ;;

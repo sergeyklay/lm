@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `changelog` command now drafts entries against the full published history of the project rather than only the current Unreleased section, allowing it to match the project's established vocabulary and scope.
+- The `changelog` command no longer explicitly excludes tests, CI, and formatting from entries, instead relying on the project's existing changelog to define what is considered user-visible.
+- The `commit` command no longer refuses to run on protected branches such as `main`, `master`, `develop`, `release/*`, or `hotfix/*`.
 - Unknown flags now trigger a specific error message listing valid options, rather than being silently passed as text to the tool.
 - The usage string now explicitly documents the `[text]` argument position for verbs.
 - `lm changelog` now reads the working tree diff when nothing is staged, enabling changelog entries to be drafted before changes are staged.
