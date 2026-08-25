@@ -29,6 +29,10 @@ lm issue           # GitHub issue, labels taken from the repository
 lm fix             # repair a build error, with the compiler as the oracle
 ```
 
+`lm pr` fills `.github/pull_request_template.md` when the repository has one: the section
+headings become the schema, and the script writes them back, so the model only supplies
+the contents.
+
 `--dry-run` on any verb prints the result and stops before the side effect.
 
 ```bash
