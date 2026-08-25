@@ -29,95 +29,20 @@ lm issue           # GitHub issue, labels taken from the repository
 lm fix             # repair a build error, with the compiler as the oracle
 ```
 
-`lm pr` fills `.github/pull_request_template.md` when the repository has one: the section
-headings become the schema, and the script writes them back, so the model only supplies
-the contents.
-
-A verb takes free text after its name, and passes it to the model as what the human meant
-the change to be. `lm changelog` reads the index when something is staged and the working
-tree otherwise, so an entry can be drafted before anything is staged, or from the text alone
-when nothing has changed at all. `lm commit` reads the index and only the index, because
-that is what it commits.
-
-`--dry-run` on any verb prints the result and stops before the side effect.
+A verb takes free text after its name, and `--dry-run` stops it before the side effect.
 
 ```bash
 lm --list                      # every tool with its description, tab-separated
 lm --which "text"              # pick the verb that serves a request
+lm-ship                        # branch, commit and open the pull request
+lm-stats                       # what the run log says about this repository
 ```
 
-`lm-ship` runs `commit` then `pr` over the same text. It opens a thematic branch first,
-named `<type>/<kebab-description>` after the subject the model writes, so the branch you end
-up on follows the work rather than the other way round. `--here` commits where you already
-are. Declining the commit leaves neither a branch nor a commit.
+## Documentation
 
-```bash
-lm-ship                        # stage, then this: branch, commit, pull request
-lm-ship --here "what changed"  # same, on the branch you are on
-```
-
-Every run appends one JSON object to `$LM_LOG` — the verb, the repository, how many model
-calls it took, what the validator rejected, the exit code, and whether `HEAD` moved.
-
-`lm-stats` reads that log and nothing else: no model, no registry, no network. It reports a row
-per verb — runs, how many were clean on the first answer, how many you declined, how many took
-the retry, how many failed, and the average time a run took with your own thinking in it —
-then how many `lm commit` runs actually moved `HEAD`, then the violations the validators
-printed most often. A `--dry-run` reaches the violations but not the rates. One log spans every
-repository `lm` has ever run in, so it counts the one you are in.
-
-```bash
-lm-stats                       # this repository
-lm-stats --all                 # every repository the log has seen
-```
-
-Configuration is environment only:
-
-| Variable | Default |
-| --- | --- |
-| `LM_OLLAMA` | `http://127.0.0.1:11434` |
-| `LM_MODEL` | `qwen3.8:27b` |
-| `LM_CTX` | `32768` |
-| `LM_TOOLS` | `<repo>/tools` |
-| `LM_LOG` | `$HOME/.lm/runs.jsonl` |
-
-## Adding a tool
-
-Drop one file into `tools/`. Nothing else changes: the index is the directory listing.
-
-```bash
-name="verb"
-description="One line. It is what the router sees."
-flags="--force"     # optional. Anything else that looks like a flag is a typo.
-
-collect()  { :; }   # build the prompt from the repository, deterministically
-schema()   { :; }   # JSON schema of the answer, enum on every closed set
-validate() { :; }   # print one line per violation, nothing when clean
-render()   { :; }   # show the result to the human
-apply()    { :; }   # perform the side effect
-```
-
-A verb is called as `lm <verb> [flags] [text]`, in any order. The runner takes `--dry-run`
-for itself and checks every other flag against `flags`, so a typo is refused rather than
-read as words. A flag the tool declared arrives as a variable, not as an argument:
-`--force` becomes `LM_FORCE=1`. Only text reaches `collect`, and text after `--` is text,
-dashes and all.
-
-`validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry. `apply` asks through `confirm "text"`, which exits 7 when the human refuses. Any other prompt in `apply` must read from `/dev/tty`, because stdin carries the model's answer.
-
-## Tests
-
-```bash
-bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
-bash tests/golden.sh              # every verb except the model call
-bash tests/ship.sh                # the lm-ship composition, with the verbs stubbed
-bash tests/runner.sh              # bin/lm around the model call, with curl stubbed
-```
-
-`golden.sh` builds a fixture repository per case and pins what the verb does around the
-model: the prompt `collect` writes, the shape `schema` asks for, the violations `validate`
-reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
-diff before committing them.
+- [What each verb does](docs/verbs.md) — per-verb behaviour, the two compositions,
+  configuration and exit codes.
+- [Adding a tool](docs/tools.md) — the registry contract, and the tests that pin it.
 
 ## License
 

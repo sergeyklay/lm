@@ -1,0 +1,73 @@
+# What each verb does
+
+`README.md` lists the verbs; this page says how each one behaves, and what the two
+compositions and the configuration around them do.
+
+## The verbs
+
+`lm pr` fills `.github/pull_request_template.md` when the repository has one: the section
+headings become the schema, and the script writes them back, so the model only supplies
+the contents.
+
+A verb takes free text after its name, and passes it to the model as what the human meant
+the change to be. `lm changelog` reads the index when something is staged and the working
+tree otherwise, so an entry can be drafted before anything is staged, or from the text alone
+when nothing has changed at all. `lm commit` reads the index and only the index, because
+that is what it commits.
+
+`--dry-run` on any verb prints the result and stops before the side effect. `lm --which`
+picks the verb for a request by reading the same one-line descriptions `lm --list` prints.
+
+## lm-ship
+
+`lm-ship` runs `commit` then `pr` over the same text. It opens a thematic branch first,
+named `<type>/<kebab-description>` after the subject the model writes, so the branch you end
+up on follows the work rather than the other way round. `--here` commits where you already
+are. Declining the commit leaves neither a branch nor a commit.
+
+```bash
+lm-ship                        # stage, then this: branch, commit, pull request
+lm-ship --here "what changed"  # same, on the branch you are on
+```
+
+## lm-stats
+
+Every run appends one JSON object to `$LM_LOG` — the verb, the repository, how many model
+calls it took, what the validator rejected, the exit code, and whether `HEAD` moved.
+
+`lm-stats` reads that log and nothing else: no model, no registry, no network. It reports a row
+per verb — runs, how many were clean on the first answer, how many you declined, how many took
+the retry, how many failed, and the average time a run took with your own thinking in it —
+then how many `lm commit` runs actually moved `HEAD`, then the violations the validators
+printed most often. A `--dry-run` reaches the violations but not the rates. One log spans every
+repository `lm` has ever run in, so it counts the one you are in.
+
+```bash
+lm-stats                       # this repository
+lm-stats --all                 # every repository the log has seen
+```
+
+## Configuration
+
+Environment only:
+
+| Variable | Default |
+| --- | --- |
+| `LM_OLLAMA` | `http://127.0.0.1:11434` |
+| `LM_MODEL` | `qwen3.8:27b` |
+| `LM_CTX` | `32768` |
+| `LM_TOOLS` | `<repo>/tools` |
+| `LM_LOG` | `$HOME/.lm/runs.jsonl` |
+
+## Exit codes
+
+A composition stops on any of these. 7 is the one that is not a failure — it is you saying no.
+
+| Code | Meaning |
+| --- | --- |
+| 2 | no such verb, an undeclared flag, or not a git repository |
+| 3 | the verb has nothing to work on |
+| 4 | the validator rejected two answers |
+| 5 | the model returned empty content |
+| 6 | `lm fix` applied a change and the build still failed, so it reverted |
+| 7 | you declined the confirmation |
