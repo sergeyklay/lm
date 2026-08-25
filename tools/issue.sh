@@ -113,16 +113,15 @@ render() {
 }
 
 apply() {
-  local j ti bo a
+  local j ti bo
   j=$(cat)
 
   ti=$(jq -r '.title' <<<"$j")
   bo=$(jq -r '.body' <<<"$j")
 
-  # Interactive label selection using read
   local suggested_labels
   suggested_labels=$(jq -r '.labels[]?' <<<"$j" | paste -sd, - | sed 's/,/, /g')
-  
+
   echo ""
   echo "---"
   echo ""
@@ -131,24 +130,19 @@ apply() {
 
   local final_labels=()
   if [ -z "$labels_input" ]; then
-    # Keep suggested labels
     while read -r l; do
       [ -n "$l" ] && final_labels+=("$l")
     done < <(jq -r '.labels[]?' <<<"$j")
   elif [ "$labels_input" != "none" ]; then
-    # Parse comma-separated user input
     IFS=',' read -ra parsed_labels <<< "$labels_input"
     for l in "${parsed_labels[@]}"; do
-      # Trim leading/trailing whitespace
       l=$(echo "$l" | xargs)
       [ -n "$l" ] && final_labels+=("$l")
     done
   fi
 
   echo ""
-  read -r -p "Create issue? [y/N] " a </dev/tty
-  [ "$a" = y ] || exit 0
-
+  confirm "Create issue? [y/N]"
 
   local label_args=()
   for l in "${final_labels[@]}"; do

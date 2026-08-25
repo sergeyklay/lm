@@ -65,11 +65,9 @@ render() {
 }
 
 apply() {
-  local j a
+  local j
   j=$(cat)
-  read -r -p "Create PR? [y/N] " a </dev/tty
-  [ "$a" = y ] || exit 0
+  confirm "Create PR? [y/N]"
 
-  # Delegate to GitHub CLI for the actual side-effect
   gh pr create --title "$(jq -r '.title' <<<"$j")" --body "$(jq -r '.body' <<<"$j")"
 }

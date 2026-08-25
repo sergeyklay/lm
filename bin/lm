@@ -20,6 +20,8 @@ call() { # $1 prompt, $2 schema -> model JSON on stdout
   | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @- | jq -r '.message.content'
 }
 
+confirm() { local a; read -r -p "$1 " a </dev/tty; [ "$a" = y ] || exit 7; }
+
 
 case "${1:-}" in
   --list) list; exit 0 ;;
