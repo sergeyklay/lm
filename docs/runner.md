@@ -14,12 +14,16 @@ and `--which` are the shell runner's and pass through. `--dry-run` belongs to a 
 refusal says so rather than listing it as though `lm` took it.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
-extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`. No
-configuration file outside the repository is read.
+extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`. It keeps
+its settings, its credentials and its session history in the harness's own directory under the
+home directory, outside this repository, and writes there as you use it.
 
 `libexec/lm-verb` is the shell runner and still runs every verb. The Node side under `src/` is
 the half being built to replace it, and it reads the same registry, so a tool file does not know
-which one called it.
+which one called it. A verb reads none of that directory: the Node runner hands the harness
+settings of its own with the automatic retry and the compact-and-retry both off, so a verb costs
+the one model call the record reports, or the two a validator's rejection buys, and never a
+number that depends on a file outside the repository.
 
 Node runs the TypeScript directly, with no build step, which Node 24 is new enough to do.
 `bin/lm` itself carries no type annotations, because a file without an extension is not

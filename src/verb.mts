@@ -1,4 +1,4 @@
-import { createAgentSession, SessionManager, createExtensionRuntime } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, SessionManager, SettingsManager, createExtensionRuntime } from "@earendil-works/pi-coding-agent";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -133,6 +133,7 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   let firstViolations = "";
   let rendered = "";
   let answer: string | undefined;
+  let truncated = false;
 
   const finish = (code: number, prompt: string): Outcome => {
     record({ verb: name, dry: parsed.dry, calls, violations: firstViolations, exit: code,
@@ -163,6 +164,12 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
     cwd,
     model,
     sessionManager: SessionManager.inMemory(),
+    // A verb costs one model call and one deterministic retry, and both of the
+    // harness's own ways of spending more are on by default and read from the
+    // operator's settings file rather than from this repository: an auto-retry
+    // of three on a retryable error, and a compact-and-retry on an answer the
+    // budget cut short. Neither is counted by anything the runner can see.
+    settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
     resourceLoader: bareLoader as any,
     noTools: "all",
     tools: [name],
@@ -190,8 +197,14 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   });
 
   session.subscribe((e: any) => {
-    if (e.type === "turn_start") calls += 1;
-    if (e.type === "turn_end" && violations && attempts < MAX_CALLS) {
+    // One assistant message is one request to the model. A turn is not: the
+    // harness's own comment on resetting its retry counter says a turn holds
+    // several calls, and `calls` sits in the log beside what the run cost.
+    if (e.type === "message_end" && e.message?.role === "assistant") {
+      calls += 1;
+      if (e.message.stopReason === "length") truncated = true;
+    }
+    if (e.type === "turn_end" && violations && !truncated && attempts < MAX_CALLS) {
       session.agent.followUp({
         role: "user",
         content: [{ type: "text", text: `The previous attempt was rejected for these reasons. Fix them and call ${name} again:\n${violations}` }],
@@ -202,6 +215,13 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
 
   await session.prompt(prompt);
 
+  // Ahead of the other two, because a cut-off answer often still parses and
+  // still passes validate(), and because the exit code alone cannot tell this
+  // case from an answer that never arrived.
+  if (truncated) {
+    process.stderr.write("lm: the answer hit the token budget and is cut off\n");
+    return finish(5, prompt);
+  }
   if (attempts === 0) {
     process.stderr.write("lm: model returned no answer (a failure, not an empty answer)\n");
     return finish(5, prompt);

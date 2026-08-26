@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The run log's call count is now the number of requests the model served rather than the number of turns the harness took, and a verb no longer inherits the harness's automatic retry or its compact-and-retry: both are on by default, both read their settings from a file outside this repository, and either can spend model calls that nothing in the run log would show.
 - `--dry-run` on a verb now renders the output and stops, printing `--dry-run: no side effect`, rather than proceeding to the side effect.
 - A flag a verb does not declare, such as `--dry-runn`, is now an error naming the flag and listing the verb's known flags, rather than reaching the model as prompt text.
 - One command. `lm ship` and `lm stats` do what the separate `lm-ship` and `lm-stats` programs did, and `bin/` now holds `lm` and nothing else. A script calling `lm-ship` or `lm-stats` has to call `lm ship` or `lm stats` instead.
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A verb's answer is bounded by the token budget again. Through the chat harness the limit was sent in a field ollama does not read, so an answer could run past it and be treated as a finished one; it now goes in the field ollama honours, an answer cut short by it says so and exits 5 rather than being rendered, and a verb asks the model not to think, which is what makes an answer fit: the same `lm changelog` run spent 5290 output tokens and was cut off with reasoning on, and 117 with it off. The chat is unchanged and still thinks.
 - A mistyped or misplaced option in front of a verb, such as `lm --hlp` or `lm --dry-run`, is now refused by name and answered with the options `lm` itself takes. Before, it was reported as a missing verb and answered with the list of verbs, which cannot contain an option.
 - The contributor documentation claimed every tool reports three `shellcheck` findings. `changelog` reports four, and the page now says which one and why it is left alone.
 
