@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-08-26
+
 ### Changed
 
 - The `changelog` command now refuses a bullet that names a function only the source knows, such as one describing how a listing is formatted rather than what the listing looks like. The functions documented as the tool contract stay allowed.
@@ -98,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pr`, which writes a pull request description from `git log <default>..HEAD`
 - `issue`, which drafts a GitHub issue and picks its labels from the repository's own taxonomy
 
-[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/sergeyklay/lm/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/sergeyklay/lm/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/sergeyklay/lm/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/sergeyklay/lm/compare/v0.0.1...v0.0.2
