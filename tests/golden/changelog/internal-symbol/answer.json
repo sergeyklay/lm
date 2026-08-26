@@ -1,0 +1,1 @@
+{"entries":[{"category":"Added","bullet":"A `usage` function in the `lm` script that formats the command list"},{"category":"Changed","bullet":"`_render_body` now fills the pull request template"},{"category":"Added","bullet":"`lm --help` is recognised in any argument position"},{"category":"Changed","bullet":"`apply` asks through `confirm` before it acts"}]}
