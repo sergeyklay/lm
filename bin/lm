@@ -45,6 +45,13 @@ Environment:
   process.exit(0);
 }
 
+const OPTIONS = ["--list", "--which"];
+if (argv[0]?.startsWith("-") && !OPTIONS.includes(argv[0])) {
+  process.stderr.write(`lm: '${argv[0]}' is not an option of lm.\n`);
+  process.stderr.write(`    Known: ${OPTIONS.join(", ")}, -h, --help. A verb takes --dry-run.\n`);
+  process.exit(2);
+}
+
 if (argv[0] === "ship") hand("lm-ship", argv.slice(1));
 if (argv[0] === "stats") hand("lm-stats", argv.slice(1));
 if (argv.length > 0 && argv[0] !== "chat") hand("lm-verb", argv);

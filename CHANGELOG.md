@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A mistyped or misplaced option in front of a verb, such as `lm --hlp` or `lm --dry-run`, is now refused by name and answered with the options `lm` itself takes. Before, it was reported as a missing verb and answered with the list of verbs, which cannot contain an option.
 - The contributor documentation claimed every tool reports three `shellcheck` findings. `changelog` reports four, and the page now says which one and why it is left alone.
 
 ## [0.0.5] - 2026-08-26
