@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-08-26
+
 ### Added
 
-- A `tests/runner.sh` script that exercises the `bin/lm` runner around the model call with `curl` stubbed.
-- The `lm-ship` command, which runs `commit` then `pr` over the same text, opening a thematic branch named after the commit subject unless `--here` is used to commit on the current branch.
+- The `lm-ship` command, which stages the working tree, then runs `commit` and `pr` over the same text, opening a thematic branch named after the commit subject. A dirty tree ships without a separate `git add`, untracked files included and `.gitignore` still honoured. `--here` commits on the current branch, and `--no-stage` ships only what was staged by hand.
 
 ### Changed
 
@@ -22,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `pr` command now warns when the remote-tracking base branch is behind the local branch of the same name, indicating that some commits are already on the local branch and suggesting a fetch to ensure the description covers only the current branch's changes.
 - `lm --which` can now answer that no verb serves a request: it prints nothing, says so on stderr and exits 2, where before the answer was constrained to the registry's names and the nearest verb came back instead.
 - Each run record now carries the composition that produced it, so the two records `lm-ship` leaves are no longer indistinguishable from two verbs typed by hand; `lm-stats` reports how many runs came from a composition. A verb run directly records `null`.
-- The `lm-ship` command now stages the working tree before committing, so a dirty tree ships without a separate `git add`; untracked files are included and `.gitignore` is still honoured. `--no-stage` restores the previous behaviour of shipping only what was staged by hand.
 
 ### Removed
 
@@ -93,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pr`, which writes a pull request description from `git log <default>..HEAD`
 - `issue`, which drafts a GitHub issue and picks its labels from the repository's own taxonomy
 
-[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/sergeyklay/lm/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/sergeyklay/lm/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/sergeyklay/lm/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/sergeyklay/lm/releases/tag/v0.0.1
