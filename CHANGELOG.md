@@ -9,12 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A verb's `apply` function now runs after the model's answer is validated and rendered: it executes under `set -euo pipefail` so a failure stops it where it stands, and `confirm` inside it asks the human at the terminal, exiting 7 on a refusal. A `confirm` called from any other function is still refused, now naming the function rather than the bridge.
 - `lm stats` now reports the time the model itself spent beside the time a run took, and the two differ by however long you took to answer the confirmation prompt: the old column has your thinking in it and the new one does not. A verb with no run recorded that way shows `-` rather than being reported as instant. The run log keeps ollama's six numbers behind the column, summed over both calls when a run took the retry.
 - Every run now records a hash of its prompt, a hash of the answer and the answer's length, so a change in what a verb sends or gets back is visible without the log holding either text. A verb that refused before building a prompt leaves all three empty, while a run whose model returned nothing keeps its prompt hash and records a length of zero. `lm stats` does not report them.
 - `lm` with no arguments opens an interactive chat against the local model. The endpoint and the model come from the environment variables the verbs already read, so there is nothing to configure and nothing leaves the machine.
 
 ### Changed
 
+- `--dry-run` on a verb now renders the output and stops, printing `--dry-run: no side effect`, rather than proceeding to the side effect.
+- A flag a verb does not declare, such as `--dry-runn`, is now an error naming the flag and listing the verb's known flags, rather than reaching the model as prompt text.
 - One command. `lm ship` and `lm stats` do what the separate `lm-ship` and `lm-stats` programs did, and `bin/` now holds `lm` and nothing else. A script calling `lm-ship` or `lm-stats` has to call `lm ship` or `lm stats` instead.
 - `lm --help` describes the whole command: the chat, the verbs, `ship`, `stats`, the options and the environment variables it reads. It answers wherever `-h` or `--help` appears, so `lm commit --help` prints it too. Before, it listed the four verbs and nothing else.
 - The chat needs Node 24, with packages installed by `npm ci`; its file tools need `fd` and `ripgrep` on `PATH`; and under `tmux` it needs `extended-keys on`, or modified `Enter` keys never reach it. The verbs need none of this. Without `fd` and `ripgrep` the chat starts, tries to download them itself, and warns when that fails.

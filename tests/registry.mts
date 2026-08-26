@@ -1,10 +1,10 @@
 // node tests/registry.mts
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, realpathSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, realpathSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
-import { list, meta, call } from "../src/registry.mts";
+import { list, meta, call, apply } from "../src/registry.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const TOOLS = join(ROOT, "tools");
@@ -75,7 +75,25 @@ writeFileSync(join(work, "asks.sh"), [
 const asked = call(join(work, "asks.sh"), "collect");
 check("confirm stops the tool where it stands", "", asked.stdout.trim());
 check("and does not exit 0", "true", String(asked.status !== 0));
-check("and says why", "true", String(/confirm is unavailable/.test(asked.stderr)));
+check("and says why", "true", String(/confirm is available only inside apply/.test(asked.stderr)));
+
+// apply is the one function entitled to confirm, and the only one with a side
+// effect, so it runs under `set -e` and hands back nothing but its status.
+writeFileSync(join(work, "acts.sh"), [
+  'name="acts"', 'description="has a side effect"',
+  'apply() { local j; j=$(cat); printf %s "$j" > applied.txt; }',
+  "",
+].join("\n"));
+check("apply runs and reports its status", "0", String(apply(join(work, "acts.sh"), { cwd: work, stdin: "answer" })));
+check("and the tool saw the answer on stdin", "answer", readFileSync(join(work, "applied.txt"), "utf8"));
+
+writeFileSync(join(work, "halts.sh"), [
+  'name="halts"', 'description="fails halfway"',
+  'apply() { cat >/dev/null; false; echo "went on anyway" > went.txt; }',
+  "",
+].join("\n"));
+check("a body that fails halfway stops there", "1", String(apply(join(work, "halts.sh"), { cwd: work })));
+check("and does not go on to report success", "false", String(existsSync(join(work, "went.txt"))));
 
 rmSync(work, { recursive: true, force: true });
 
