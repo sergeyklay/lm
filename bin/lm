@@ -43,17 +43,24 @@ usage() { echo "usage: lm <verb> [--dry-run] [text] | lm --list | lm --which <te
 case "${1:-}" in
   --list) list; exit 0 ;;
   --which) shift
+      # The answer is drawn from the enum, so without a refusal member a request no
+      # verb serves comes back as the nearest verb and cannot be told from a real
+      # match. That is the surface §9.3 reads its third-front signal from.
       CAT=$(list | awk -F'\t' '{printf "- %s: %s\n",$1,$2}')
-      NAMES=$(list | cut -f1 | jq -R . | jq -sc .)
+      NAMES=$(list | cut -f1 | jq -R . | jq -sc '. + ["none"]')
       SCH=$(jq -n --argjson n "$NAMES" '{type:"object",properties:{tool:{type:"string",enum:$n}},required:["tool"]}')
       OUT=$(call "Available tools:
-$CAT
+$CAT- none: no tool above serves this request
 
 Request: $*
 
-Pick the single tool that serves this request." "$SCH")
+Pick the single tool that serves this request. Answer none when no tool above does." "$SCH")
       [ -n "$OUT" ] || { echo "lm: empty response from model" >&2; exit 5; }
-      jq -r '.tool' <<<"$OUT"; exit 0 ;;
+      WHICH=$(jq -r '.tool' <<<"$OUT")
+      if [ "$WHICH" = none ]; then
+        echo "lm: no verb serves that request" >&2; exit 2
+      fi
+      printf '%s\n' "$WHICH"; exit 0 ;;
   "") usage >&2; exit 2 ;;
 esac
 

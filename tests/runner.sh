@@ -162,5 +162,25 @@ lm stub refuse >/dev/null 2>&1
 check "a typed run names none"  "null"    "$(jq -r '.composition' "$work/log.jsonl" | tail -1)"
 teardown
 
+# --which can say that nothing serves the request. Without a refusal member the
+# enum forces a verb, and §9.3's «a task that cannot be named as a verb» signal has
+# no surface able to report it.
+setup "$(say '{"tool":"none"}')"
+err=$(lm --which "brew me a coffee" 2>&1 >"$work/out.txt"); rc=$?
+check "an unserved request exits 2"   "2" "$rc"
+check "it says so"                    "1" "$(grep -c 'no verb serves' <<<"$err")"
+check "and names no verb on stdout"   ""  "$(cat "$work/out.txt")"
+teardown
+
+setup "$(say '{"tool":"stub"}')"
+check "a served request still answers" "stub" "$(lm --which "exercise the runner" 2>/dev/null)"
+teardown
+
+# The refusal member is in the enum the model is given, not only in the prose.
+setup "$(say '{"tool":"stub"}')"
+lm --which "anything" >/dev/null 2>&1
+check "none is offered in the schema" "true" "$(jq -r '.format.properties.tool.enum|contains(["none"])' "$REPLIES/req.1")"
+teardown
+
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
 echo "all cases passed"
