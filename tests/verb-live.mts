@@ -3,7 +3,7 @@
 // Calls the real model, so it is gated and not part of the default suites.
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runVerb } from "../src/verb.mts";
@@ -99,6 +99,51 @@ const cli = spawnSync(join(ROOT, "bin/lm"), ["accepts", "--dry-run"], {
 check("the command renders the answer", true, /^(Added|Fixed|Changed): \S/m.test(cli.stdout ?? ""));
 check("and says the side effect was skipped", true, /--dry-run: no side effect/.test(cli.stdout ?? ""));
 check("and exits 0", 0, cli.status);
+
+// The chat's half: a session is asked for the work and runs the registered verb
+// rather than describing it. Print mode has no dialog, so `ctx.ui.confirm`
+// refuses, and a refusal is the case worth having on the real model: it proves
+// the verb ran, that the question reached the chat, and that nothing was
+// applied when the answer was no. The run log is the witness that it ran.
+writeFileSync(join(tools, "applies.sh"), [
+  'name="applies"',
+  'description="emit one changelog bullet and write it to a file"',
+  'collect() { echo "Write one changelog bullet for a change that renames a flag."; }',
+  'schema() { echo \'{"type":"object","properties":{"bullet":{"type":"string"}},"required":["bullet"]}\'; }',
+  "validate() { cat >/dev/null; }",
+  "render() { jq -r .bullet; }",
+  'apply() { local j; j=$(cat); confirm "write it? [y/N]"; printf %s "$j" > applied.txt; }',
+  "",
+].join("\n"));
+
+const chatLog = join(work, "chat-runs.jsonl");
+process.chdir(work);
+process.env.LM_TOOLS = tools;
+process.env.LM_LOG = chatLog;
+const { main } = await import("@earendil-works/pi-coding-agent");
+const { providerConfig, modelId } = await import("../src/provider.mts");
+const { registerVerbs } = await import("../src/chat.mts");
+await main(["--provider", "ollama", "--model", modelId(), "-p", "Run the applies tool. Pass no text."], {
+  extensionFactories: [
+    {
+      name: "lm",
+      factory: (pi: any) => {
+        pi.registerProvider("ollama", providerConfig());
+        registerVerbs(pi, tools);
+      },
+    },
+  ],
+});
+process.env.LM_LOG = "";
+process.chdir(ROOT);
+
+const records = existsSync(chatLog)
+  ? readFileSync(chatLog, "utf8").trim().split("\n").filter((l) => l).map((l) => JSON.parse(l))
+  : [];
+check("the chat ran the registered verb rather than answering about it", "applies", records[0]?.verb);
+check("and it cost the verb's own model call", 1, records[0]?.calls);
+check("and the refused confirmation exited 7", 7, records[0]?.exit);
+check("and nothing was applied", false, existsSync(join(work, "applied.txt")));
 
 rmSync(work, { recursive: true, force: true });
 

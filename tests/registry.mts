@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, realpathSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
-import { list, meta, call, apply } from "../src/registry.mts";
+import { list, meta, call, apply, applyAsk } from "../src/registry.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const TOOLS = join(ROOT, "tools");
@@ -94,6 +94,38 @@ writeFileSync(join(work, "halts.sh"), [
 ].join("\n"));
 check("a body that fails halfway stops there", "1", String(apply(join(work, "halts.sh"), { cwd: work })));
 check("and does not go on to report success", "false", String(existsSync(join(work, "went.txt"))));
+
+// The chat owns the terminal, so apply asks through a channel instead: the
+// question leaves with the wording the tool file gave it and one line of answer
+// comes back. The runner never composes the question, because asking about a
+// tool's own fields would mean knowing what they are.
+writeFileSync(join(work, "asks-twice.sh"), [
+  'name="askstwice"', 'description="asks for a line and a confirmation"',
+  'apply() { local j labels; j=$(cat); labels=$(ask "Labels (bug, ci):");'
+  + ' confirm "Create issue? [y/N]"; printf "%s|%s" "$j" "$labels" > asked.txt; echo created; }',
+  "",
+].join("\n"));
+
+const questions: string[] = [];
+const approved = await applyAsk(join(work, "asks-twice.sh"), { cwd: work, stdin: "answer" }, {
+  confirm: async (q) => { questions.push(`confirm: ${q}`); return true; },
+  input: async (q) => { questions.push(`input: ${q}`); return "docs, ci"; },
+});
+check("the questions arrive in the tool's own words, in order",
+  ["input: Labels (bug, ci):", "confirm: Create issue? [y/N]"], questions);
+check("an approved apply reports 0", "0", String(approved.status));
+check("and what the body printed comes back rather than being inherited",
+  "created", approved.output.trim());
+check("and the body read both the answer and the line",
+  "answer|docs, ci", readFileSync(join(work, "asked.txt"), "utf8"));
+
+rmSync(join(work, "asked.txt"));
+const declined = await applyAsk(join(work, "asks-twice.sh"), { cwd: work, stdin: "answer" }, {
+  confirm: async () => false,
+  input: async () => undefined,
+});
+check("a declined confirmation exits 7", "7", String(declined.status));
+check("and leaves no side effect", "false", String(existsSync(join(work, "asked.txt"))));
 
 rmSync(work, { recursive: true, force: true });
 

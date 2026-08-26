@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { homedir } from "node:os";
-import { call, apply, meta } from "./registry.mts";
+import { call, apply, applyAsk, meta, type Ask } from "./registry.mts";
 import { resolveModel } from "./model.mts";
 import { modelId } from "./provider.mts";
 
@@ -59,6 +59,21 @@ const bareLoader = {
 
 export type Outcome = { code: number; calls: number; attempts: number };
 
+// Where the run's two streams go and how it asks the human. The default is the
+// command line's answer: the artefact to stdout, diagnostics to stderr, and the
+// question to the terminal. Inside the chat none of the three is the runner's,
+// so all of them arrive here instead.
+export type Io = {
+  out: (s: string) => void;
+  err: (s: string) => void;
+  ask?: Ask;
+};
+
+const terminal: Io = {
+  out: (s) => process.stdout.write(s),
+  err: (s) => process.stderr.write(s),
+};
+
 // `date -Is`: local time to the second with a numeric offset, which is the
 // format every record in the log already carries. A silent switch to UTC would
 // retype the field, and a retyped field invalidates every number taken before it.
@@ -111,7 +126,7 @@ function record(r: {
   }
 }
 
-export async function runVerb(file: string, argv: string[], env: Record<string, string> = {}): Promise<Outcome> {
+export async function runVerb(file: string, argv: string[], env: Record<string, string> = {}, io: Io = terminal): Promise<Outcome> {
   const t0 = Date.now();
   const head0 = git("rev-parse", "HEAD");
   const info = meta(file);
@@ -122,7 +137,7 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   // shell runner arms its trap after this loop for the same reason.
   const parsed = parseArgs(name, info.flags, argv);
   if (!parsed.ok) {
-    process.stderr.write(parsed.message);
+    io.err(parsed.message);
     return { code: 2, calls: 0, attempts: 0 };
   }
 
@@ -142,19 +157,19 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   };
 
   const collected = call(file, "collect", { ...opts, args: parsed.text });
-  process.stderr.write(collected.stderr);
+  io.err(collected.stderr);
   if (collected.status !== 0) return finish(collected.status, "");
   const prompt = collected.stdout;
 
   for (const a of parsed.text) {
     if (a.startsWith("-")) continue;
-    if (!prompt.includes(a)) process.stderr.write(`lm: '${name}' made no use of the text you gave it\n`);
+    if (!prompt.includes(a)) io.err(`lm: '${name}' made no use of the text you gave it\n`);
     break;
   }
 
   const schema = call(file, "schema", opts);
   if (schema.status !== 0) {
-    process.stderr.write(schema.stderr);
+    io.err(schema.stderr);
     return finish(schema.status, prompt);
   }
 
@@ -219,26 +234,31 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   // still passes validate(), and because the exit code alone cannot tell this
   // case from an answer that never arrived.
   if (truncated) {
-    process.stderr.write("lm: the answer hit the token budget and is cut off\n");
+    io.err("lm: the answer hit the token budget and is cut off\n");
     return finish(5, prompt);
   }
   if (attempts === 0) {
-    process.stderr.write("lm: model returned no answer (a failure, not an empty answer)\n");
+    io.err("lm: model returned no answer (a failure, not an empty answer)\n");
     return finish(5, prompt);
   }
   if (violations) {
-    process.stderr.write("lm: validator rejected two attempts:\n");
-    process.stderr.write(violations.replace(/^/gm, "  - ") + "\n");
+    io.err("lm: validator rejected two attempts:\n");
+    io.err(violations.replace(/^/gm, "  - ") + "\n");
     return finish(4, prompt);
   }
 
-  process.stdout.write(rendered);
+  io.out(rendered);
   // The guard sits between render and apply, and the position is the contract: a
   // --dry-run that applies and then declines to mention it is indistinguishable
   // from a working one until the first time it writes something.
   if (parsed.dry) {
-    process.stdout.write("\n--dry-run: no side effect\n");
+    io.out("\n--dry-run: no side effect\n");
     return finish(0, prompt);
+  }
+  if (io.ask) {
+    const applied = await applyAsk(file, { ...opts, stdin: answer! }, io.ask);
+    io.out(applied.output);
+    return finish(applied.status, prompt);
   }
   return finish(apply(file, { ...opts, stdin: answer! }), prompt);
 }
