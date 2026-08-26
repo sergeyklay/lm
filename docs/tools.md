@@ -58,6 +58,18 @@ model: the prompt `collect` writes, the shape `schema` asks for, the violations 
 reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
 diff before committing them.
 
+Two checks here have been made to go red, and that record is what makes a green run of them
+worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
+kills a different subset of the six cases in `tests/runner.sh`: dropping the trap kills five,
+blanking the `which` argument kills three, and dropping the table's exclusion kills one. The
+`changelog` internal-symbol check reports nothing over every bullet the changelog has published —
+45 when it landed, 47 on 2026-08-26 by
+`awk '/^## \[Unreleased\]/{u=1;next} /^## \[/{u=0} !u&&/^- /' CHANGELOG.md | wc -l` — and it names
+the internal function the bullet that shipped in `v0.0.2` reached for, which
+`git log -S 'formats the command list' -- CHANGELOG.md` locates, while passing the replacement
+written by hand to fix it. Naming that function here in back quotes would publish it and turn the
+check off, which is why this paragraph does not.
+
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
 is honest — `libexec/lm-verb` sources it and never executes it — and `SC2034` twice, for `name` and

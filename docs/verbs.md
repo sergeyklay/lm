@@ -91,3 +91,7 @@ A composition stops on any of these. 7 is the one that is not a failure — it i
 | 4 | the validator rejected two answers |
 | 5 | the model returned nothing usable: empty content, or an answer cut off by the token budget |
 | 7 | you declined the confirmation |
+
+The gap at 6 is deliberate. It belonged to `lm fix` and went when that verb was removed, so the
+next verb that reverts its own work takes it back rather than inventing an eighth code;
+`grep -rn 'exit 6' bin/ libexec/ src/ tools/` finds nothing today.
