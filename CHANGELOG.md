@@ -9,15 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A second runner, written in TypeScript and running on Node without a build step, alongside the shell one. It reads the same registry: a tool stays a shell script, and the new runner sources it and calls one function per process, so a tool cannot tell which runner invoked it. Applying a result is not wired through it, so nothing a user already does behaves differently.
-- `lm-next`, the command that reaches the new runner. It serves `--list` and `--help`, resolves the verb, and applies the same argument rules as `lm` — a flag and free text in either order, text after `--` kept literally, an undeclared flag refused as a typo rather than passed to the model as words. Its usage line already names `lm`, which is the command it becomes.
-- `lm-next` runs a verb under `--dry-run`: it asks the model once, feeds the violations back for one further attempt, and prints the result the same way `lm` does. A clean answer costs one model call and a rejected one exactly two, after which it reports the violations and fails. Without `--dry-run` it refuses before calling the model, because applying a result is not wired through it yet.
-- The model endpoint, model name and context size are read from the same environment variables `lm` uses, so `lm-next` needs no configuration file of its own, and it reads none of the surrounding directory: no extensions, no skills and no context files, so a verb does not depend on where it was run from.
-- The runner documentation, covering the two runners, what the new one provides a tool and what it deliberately does not, and why every one of its tests is stated against what the shell runner produces.
+- `lm` with no arguments opens an interactive chat against the local model. The endpoint and the model come from the environment variables the verbs already read, so there is nothing to configure and nothing leaves the machine.
+
+### Changed
+
+- One command. `lm ship` and `lm stats` do what the separate `lm-ship` and `lm-stats` programs did, and `bin/` now holds `lm` and nothing else. A script calling `lm-ship` or `lm-stats` has to call `lm ship` or `lm stats` instead.
+- `lm --help` describes the whole command: the chat, the verbs, `ship`, `stats`, the options and the environment variables it reads. It answers wherever `-h` or `--help` appears, so `lm commit --help` prints it too. Before, it listed the four verbs and nothing else.
+- The chat needs Node, the version in `.tool-versions`, with packages installed by `npm ci`; its file tools need `fd` and `ripgrep` on `PATH`; and under `tmux` it needs `extended-keys on`, or modified `Enter` keys never reach it. The verbs need none of this. Without `fd` and `ripgrep` the chat starts, tries to download them itself, and warns when that fails.
 
 ### Fixed
 
-- The contributor documentation claimed every tool reports three `shellcheck` findings; `changelog` reports four. The fourth is a false positive and the page now says so and why, rather than reporting a count that no longer matches the command printed beside it.
+- The contributor documentation claimed every tool reports three `shellcheck` findings. `changelog` reports four, and the page now says which one and why it is left alone.
 
 ## [0.0.5] - 2026-08-26
 

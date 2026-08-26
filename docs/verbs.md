@@ -20,15 +20,15 @@ picks the verb for a request by reading the same one-line descriptions `lm --lis
 no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
 exits 2, so a composition that pipes it into `lm` stops rather than running the nearest match.
 Either answer is logged, so how often the registry has no verb for what you asked is a share
-`lm-stats` prints rather than something you have to remember.
+`lm stats` prints rather than something you have to remember.
 
 A drafted bullet is refused when it names something only the source knows: the functions
 `docs/tools.md` publishes as the tool contract are fair game, the project's other functions are
 not. Name what a user of the verb can see instead.
 
-## lm-ship
+## lm ship
 
-`lm-ship` runs `commit` then `pr` over the same text. It stages the working tree first, so a
+`lm ship` runs `commit` then `pr` over the same text. It stages the working tree first, so a
 dirty tree ships without a `git add` of your own: modified files and untracked ones both go
 in, and `.gitignore` is honoured. It then opens a thematic branch named
 `<type>/<kebab-description>` after the subject the model writes, so the branch you end up on
@@ -38,12 +38,12 @@ yourself. Declining the commit leaves neither a branch nor a commit, and leaves 
 place.
 
 ```bash
-lm-ship                        # stage, branch, commit, pull request
-lm-ship --here "what changed"  # same, on the branch you are on
-lm-ship --no-stage             # ship only what you staged yourself
+lm ship                        # stage, branch, commit, pull request
+lm ship --here "what changed"  # same, on the branch you are on
+lm ship --no-stage             # ship only what you staged yourself
 ```
 
-## lm-stats
+## lm stats
 
 Every run appends one JSON object to `$LM_LOG` — the verb, the repository, how many model
 calls it took, what the validator rejected, the exit code, whether `HEAD` moved, and which
@@ -51,7 +51,7 @@ composition the run belonged to, or `null` when you typed the verb yourself. A `
 run is logged in the same shape: it names `--which` where a run names its verb, and carries
 the verb it picked, or `none`, in a field every other run leaves `null`.
 
-`lm-stats` reads that log and nothing else: no model, no registry, no network. It reports a row
+`lm stats` reads that log and nothing else: no model, no registry, no network. It reports a row
 per verb — runs, how many were clean on the first answer, how many you declined, how many took
 the retry, how many failed, and the average time a run took with your own thinking in it —
 then how many `lm commit` runs actually moved `HEAD`, then how many runs came from a
@@ -62,8 +62,8 @@ failure. A `--dry-run` reaches the violations but not the rates. One log spans e
 repository `lm` has ever run in, so it counts the one you are in.
 
 ```bash
-lm-stats                       # this repository
-lm-stats --all                 # every repository the log has seen
+lm stats                       # this repository
+lm stats --all                 # every repository the log has seen
 ```
 
 ## Configuration
@@ -78,7 +78,7 @@ Environment only:
 | `LM_TOOLS` | `<repo>/tools` |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 
-Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= lm commit` writes no record, and `lm-stats` under the same setting reads none. That is what a fixture repository or a rehearsal wants, because one log spans every repository and `lm-stats` counts the one you are in.
+Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= lm commit` writes no record, and `lm stats` under the same setting reads none. That is what a fixture repository or a rehearsal wants, because one log spans every repository and `lm stats` counts the one you are in.
 
 ## Exit codes
 

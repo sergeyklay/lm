@@ -1,6 +1,6 @@
 # lm
 
-Local developer verbs backed by a local model. One file per tool, a thin runner, no agent loop.
+A local replacement for a hosted coding agent: a chat against a model on your own machine, this repository's verbs beside it, and the run log as a dashboard.
 
 Each tool collects its input from the repository, asks the model once under a JSON schema, validates the answer, shows it, and only then applies it.
 
@@ -8,7 +8,11 @@ Each tool collects its input from the repository, asks the model once under a JS
 
 `bash`, `jq`, `curl`, `git`, and a running [ollama](https://ollama.com) with a model that honours `format`. `gh` for `issue` and `pr`.
 
-`lm-next` additionally needs Node — the version in `.tool-versions` — and its packages installed. `lm` itself needs neither.
+Node, the version in `.tool-versions`, and its packages installed.
+
+The chat's file tools shell out to [`fd`](https://github.com/sharkdp/fd) and [`ripgrep`](https://github.com/BurntSushi/ripgrep). Install them yourself: the chat otherwise tries to fetch them from GitHub on first run, which fails on an unauthenticated rate limit and leaves the tools missing.
+
+Under `tmux`, add `set -g extended-keys on` to your configuration, or modified `Enter` keys do not reach the chat.
 
 ```bash
 ollama pull qwen3.8:27b
@@ -19,16 +23,19 @@ ollama pull qwen3.8:27b
 ```bash
 git clone https://github.com/sergeyklay/lm.git ~/lm
 export PATH="$HOME/lm/bin:$PATH"
-npm --prefix ~/lm ci        # only for lm-next
+npm --prefix ~/lm ci
 ```
 
 ## Use
 
 ```bash
+lm                 # chat with the local model
 lm commit          # Conventional Commits message from the staged diff
-lm changelog       # CHANGELOG.md entries for what changed, staged or not
-lm pr              # pull request description from the commits ahead of the default branch
-lm issue           # GitHub issue, labels taken from the repository
+lm changelog       # CHANGELOG.md entries from the staged diff
+lm issue "topic"   # a GitHub issue, labels picked from the repository
+lm pr              # a pull request description
+lm ship            # stage, branch, commit, pull request
+lm stats           # what the run log says about this repository
 ```
 
 A verb takes free text after its name, and `--dry-run` stops it before the side effect.
@@ -36,8 +43,8 @@ A verb takes free text after its name, and `--dry-run` stops it before the side 
 ```bash
 lm --list                      # every tool with its description, tab-separated
 lm --which "text"              # pick the verb that serves a request
-lm-ship                        # branch, commit and open the pull request
-lm-stats                       # what the run log says about this repository
+lm ship                        # stage, branch, commit and open the pull request
+lm stats                       # what the run log says about this repository
 ```
 
 ## Documentation

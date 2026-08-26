@@ -42,11 +42,7 @@ export async function runVerb(file: string, args: string[], env: Record<string, 
     return { code: schema.status, calls: 0, attempts: 0 };
   }
 
-  const { model } = await resolveModel(
-    process.env.LM_OLLAMA ?? "http://127.0.0.1:11434",
-    process.env.LM_MODEL ?? "qwen3.8:27b",
-    Number(process.env.LM_CTX ?? 32768),
-  );
+  const { model } = await resolveModel();
 
   let calls = 0;
   let attempts = 0;

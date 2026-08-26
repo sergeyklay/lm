@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The composition in bin/lm-ship, with the two verbs stubbed out. lm-ship makes no
+# The composition in libexec/lm-ship, with the two verbs stubbed out. lm-ship makes no
 # model call of its own, so all of it is testable: which branch the commit lands
 # on, what that branch ends up named, and what a refusal leaves behind.
 
@@ -17,9 +17,9 @@ check() { # name want got
 # which is what `lm commit` does when the human answers n.
 setup() {
   work=$(mktemp -d); bin=$work/bin; mkdir -p "$bin"
-  cp "$ROOT/bin/lm-ship" "$bin/lm-ship"
+  cp "$ROOT/libexec/lm-ship" "$bin/lm-ship"
   COMPLOG=$(mktemp); export COMPLOG
-  cat > "$bin/lm" <<EOF
+  cat > "$bin/lm-verb" <<EOF
 #!/usr/bin/env bash
 echo "\$1 \${LM_COMPOSITION:-none}" >> "\$COMPLOG"
 case "\$1" in
@@ -28,7 +28,7 @@ case "\$1" in
   pr)     echo "PR opened" ;;
 esac
 EOF
-  chmod +x "$bin/lm"
+  chmod +x "$bin/lm-verb"
   cd "$work" || exit 1
   git init -q -b main .; git config user.email t@t; git config user.name t
   echo seed > f.txt; git add .; git commit -qm "chore: seed"

@@ -44,13 +44,13 @@ leaves the verb's most interesting path untested and says so only in passing.
 ## Tests
 
 ```bash
+node tests/cli.mts                # what `lm` dispatches, and its help
 bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/golden.sh              # every verb except the model call
-bash tests/ship.sh                # the lm-ship composition, with the verbs stubbed
-bash tests/runner.sh              # bin/lm around the model call, with curl stubbed
+bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
+bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool
-node tests/args.mts               # lm-next's dispatch, against bin/lm
-LM_LIVE=1 node tests/verb-live.mts  # lm-next's retry guarantee, on the real model
+LM_LIVE=1 node tests/verb-live.mts  # the Node runner's retry guarantee, on the real model
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the
@@ -60,7 +60,7 @@ diff before committing them.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
-is honest — `bin/lm` sources it and never executes it — and `SC2034` twice, for `name` and
+is honest — `libexec/lm-verb` sources it and never executes it — and `SC2034` twice, for `name` and
 `description`, which the runner reads after sourcing and the file itself never uses. Measured
 2026-08-26 across the four tools with
 `for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: four, three, three, three. A
