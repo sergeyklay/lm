@@ -31,6 +31,8 @@ call() { # $1 prompt, $2 schema -> model JSON on stdout
 
 confirm() { local a; read -r -p "$1 " a </dev/tty; [ "$a" = y ] || exit 7; }
 
+sha() { [ -n "${1:-}" ] || return 0; printf '%s' "$1" | sha256sum | cut -d' ' -f1; }
+
 usage() { echo "usage: lm <verb> [--dry-run] [text] | lm --list | lm --which <text>"
   list | awk -F'\t' '
     { n[NR] = $1; d[NR] = $2; if (length($1) > w) w = length($1) }
@@ -48,14 +50,21 @@ log_run() { # $1 exit status. Never fails the run it is reporting on.
   [ -n "$LM_LOG" ] && mkdir -p "$(dirname "$LM_LOG")" 2>/dev/null || return 0
   local h moved=false; h=$(git rev-parse HEAD 2>/dev/null || true)
   { [ -n "$h" ] && [ "$h" != "$HEAD0" ] && moved=true; } || true
+  # A run that never reached the model has no answer, which is not the same as an
+  # answer of length zero: the model returning nothing is what exit 5 reports.
+  local alen=null; [ -n "${OUT+set}" ] && alen=${#OUT}
   jq -nc --arg ts "$(date -Is)" --arg repo "$REPO" --arg verb "$VERB" --arg model "$LM_MODEL" \
     --arg viol "$VIOL" --argjson dry "$DRY" --argjson calls "$CALLS" --argjson rc "$1" \
     --argjson ms "$(( $(date +%s%3N) - T0 ))" --argjson moved "$moved" \
     --arg comp "${LM_COMPOSITION:-}" --arg which "$WHICH" \
+    --arg phash "$(sha "${PROMPT:-}")" --arg ahash "$(sha "${OUT:-}")" --argjson alen "$alen" \
     '{ts:$ts,repo:$repo,verb:$verb,model:$model,dry:($dry==1),calls:$calls,
       violations:($viol|split("\n")|map(select(length>0))),exit:$rc,ms:$ms,head_moved:$moved,
       composition:(if $comp == "" then null else $comp end),
-      which:(if $which == "" then null else $which end)}' \
+      which:(if $which == "" then null else $which end),
+      prompt_hash:(if $phash == "" then null else $phash end),
+      answer_hash:(if $ahash == "" then null else $ahash end),
+      answer_len:$alen}' \
     >> "$LM_LOG" 2>/dev/null || true
 }
 T0=$(date +%s%3N); CALLS=0; VIOL=""; DRY=0; VERB=""; WHICH=""
@@ -80,12 +89,13 @@ case "${1:-}" in
       CAT=$(list | awk -F'\t' '{printf "- %s: %s\n",$1,$2}')
       NAMES=$(list | cut -f1 | jq -R . | jq -sc '. + ["none"]')
       SCH=$(jq -n --argjson n "$NAMES" '{type:"object",properties:{tool:{type:"string",enum:$n}},required:["tool"]}')
-      OUT=$(call "Available tools:
+      PROMPT="Available tools:
 $CAT- none: no tool above serves this request
 
 Request: $*
 
-Pick the single tool that serves this request. Answer none when no tool above does." "$SCH")
+Pick the single tool that serves this request. Answer none when no tool above does."
+      OUT=$(call "$PROMPT" "$SCH")
       [ -n "$OUT" ] || { echo "lm: empty response from model" >&2; exit 5; }
       WHICH=$(jq -r '.tool' <<<"$OUT")
       if [ "$WHICH" = none ]; then

@@ -51,6 +51,13 @@ composition the run belonged to, or `null` when you typed the verb yourself. A `
 run is logged in the same shape: it names `--which` where a run names its verb, and carries
 the verb it picked, or `none`, in a field every other run leaves `null`.
 
+Each record also carries a hash of the prompt, a hash of the answer and the answer's length, so
+a change in what a verb sends or gets back is visible without the log holding either text. Each is
+`null` when there was nothing to record, and the two halves fall separately: a verb that refused
+before building a prompt leaves all three empty, while a run whose model returned nothing keeps
+its prompt hash and reports a length of zero. That zero is not an absent answer. It is the model
+answering with nothing, and it exits 5.
+
 `lm stats` reads that log and nothing else: no model, no registry, no network. It reports a row
 per verb — runs, how many were clean on the first answer, how many you declined, how many took
 the retry, how many failed, and the average time a run took with your own thinking in it —
