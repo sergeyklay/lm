@@ -50,6 +50,7 @@ bash tests/ship.sh                # the lm-ship composition, with the verbs stub
 bash tests/runner.sh              # bin/lm around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool
 node tests/args.mts               # lm-next's dispatch, against bin/lm
+LM_LIVE=1 node tests/verb-live.mts  # lm-next's retry guarantee, on the real model
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the

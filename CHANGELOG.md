@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A second runner, written in TypeScript and running on Node without a build step or a dependency, alongside the shell one. It reads the same registry: a tool stays a shell script, and the new runner sources it and calls one function per process, so a tool cannot tell which runner invoked it. Applying a result is not wired through it, so nothing a user already does behaves differently.
-- `lm-next`, the command that reaches the new runner. It serves `--list` and `--help`, resolves the verb, and applies the same argument rules as `lm` — a flag and free text in either order, text after `--` kept literally, an undeclared flag refused as a typo rather than passed to the model as words. Where the model call would be it says so and stops. Its usage line already names `lm`, which is the command it becomes.
+- A second runner, written in TypeScript and running on Node without a build step, alongside the shell one. It reads the same registry: a tool stays a shell script, and the new runner sources it and calls one function per process, so a tool cannot tell which runner invoked it. Applying a result is not wired through it, so nothing a user already does behaves differently.
+- `lm-next`, the command that reaches the new runner. It serves `--list` and `--help`, resolves the verb, and applies the same argument rules as `lm` — a flag and free text in either order, text after `--` kept literally, an undeclared flag refused as a typo rather than passed to the model as words. Its usage line already names `lm`, which is the command it becomes.
+- `lm-next` runs a verb under `--dry-run`: it asks the model once, feeds the violations back for one further attempt, and prints the result the same way `lm` does. A clean answer costs one model call and a rejected one exactly two, after which it reports the violations and fails. Without `--dry-run` it refuses before calling the model, because applying a result is not wired through it yet.
+- The model endpoint, model name and context size are read from the same environment variables `lm` uses, so `lm-next` needs no configuration file of its own, and it reads none of the surrounding directory: no extensions, no skills and no context files, so a verb does not depend on where it was run from.
 - The runner documentation, covering the two runners, what the new one provides a tool and what it deliberately does not, and why every one of its tests is stated against what the shell runner produces.
 
 ### Fixed
