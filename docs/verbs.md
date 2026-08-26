@@ -16,7 +16,9 @@ when nothing has changed at all. `lm commit` reads the index and only the index,
 that is what it commits.
 
 `--dry-run` on any verb prints the result and stops before the side effect. `lm --which`
-picks the verb for a request by reading the same one-line descriptions `lm --list` prints.
+picks the verb for a request by reading the same one-line descriptions `lm --list` prints. When
+no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
+exits 2, so a composition that pipes it into `lm` stops rather than running the nearest match.
 
 ## lm-ship
 
