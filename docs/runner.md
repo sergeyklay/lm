@@ -1,8 +1,16 @@
 # The runner
 
-Two runners exist while the runner moves off bash. `bin/lm` ships; the Node one under `src/` is
-built beside it and is not wired to a command yet. Both read the same registry, so a tool file
-does not know which one called it.
+Two runners exist while the runner moves off bash. `bin/lm` ships; `bin/lm-next` is the Node one
+being built beside it. Both read the same registry, so a tool file does not know which one
+called it.
+
+`lm-next` serves `--list`, `--help` and the argument handling, and stops with a message where
+the model call would be. Its usage line names `lm`, not `lm-next`, because that is the command
+it becomes when the shell runner goes away.
+
+Node runs the TypeScript directly: no build step, no dependency, and `.tool-versions` pins the
+version that does it. `package.json` exists only to make the extensionless executable in `bin/`
+load as a module.
 
 ## The bridge to a bash tool
 
@@ -39,10 +47,21 @@ returned, since `apply()` in every tool file puts the side effect on the next li
 deliberately none of the ones in [`verbs.md`](verbs.md) — borrowing 7 would tell `lm-stats` a
 human declined.
 
+## Arguments
+
+`src/args.mts` holds the rules `bin/lm` applies by scanning, so a flag and free text coexist in
+either order: `--dry-run` belongs to the runner, `--` makes everything after it text, a flag the
+tool declared in `flags` arrives as `LM_<NAME>` with `-` becoming `_`, and anything else that
+looks like a flag is a typo and refused. A typo must not reach the prompt as words.
+
+No shipped tool declares a flag, so the differential tests below cannot reach that path through
+either binary and it is covered against the parser directly.
+
 ## Tests
 
 ```bash
 node tests/registry.mts       # the bridge, against bash itself
+node tests/args.mts           # lm-next against bin/lm, plus the parser alone
 ```
 
 Every case is differential: `bin/lm` reads the same registry through a sourced subshell, so

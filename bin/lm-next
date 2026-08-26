@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+import { dirname, join, resolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { list, meta } from "../src/registry.mts";
+import { usage, noSuchTool, parse } from "../src/args.mts";
+
+const here = dirname(realpathSync(process.argv[1]));
+const toolsDir = process.env.LM_TOOLS ? resolve(process.env.LM_TOOLS) : join(here, "..", "tools");
+
+const files = list(toolsDir);
+const tools = files.map(meta);
+const argv = process.argv.slice(2);
+
+if (argv[0] === "--list") {
+  process.stdout.write(tools.map((t) => `${t.name}\t${t.description}`).join("\n") + "\n");
+  process.exit(0);
+}
+if (argv[0] === "--which") {
+  process.stderr.write("lm-next: --which is not wired here yet\n");
+  process.exit(2);
+}
+if (argv.length === 0) {
+  process.stderr.write(usage(tools));
+  process.exit(2);
+}
+if (argv.includes("-h") || argv.includes("--help")) {
+  process.stdout.write(usage(tools));
+  process.exit(0);
+}
+
+const verb = argv[0];
+const file = join(toolsDir, `${verb}.sh`);
+if (!existsSync(file)) {
+  process.stderr.write(noSuchTool(verb, tools));
+  process.exit(2);
+}
+
+const parsed = parse(argv.slice(1), verb, meta(file).flags);
+if (!parsed.ok) {
+  process.stderr.write(parsed.message);
+  process.exit(2);
+}
+
+process.stderr.write(`lm-next: '${verb}' parsed, but no model path is wired here yet\n`);
+process.exit(2);
