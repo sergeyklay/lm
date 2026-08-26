@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Every run now records a hash of its prompt, a hash of the answer and the answer's length, so a change in what a verb sends or gets back is visible without the log holding either text. A verb that refused before building a prompt leaves all three empty, while a run whose model returned nothing keeps its prompt hash and records a length of zero. `lm stats` does not report them.
 - `lm` with no arguments opens an interactive chat against the local model. The endpoint and the model come from the environment variables the verbs already read, so there is nothing to configure and nothing leaves the machine.
 
 ### Changed

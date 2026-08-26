@@ -72,7 +72,14 @@ check off, which is why this paragraph does not. A third: deleting the option gu
 `bin/lm`, a mutation `node --check` accepts, kills four of the six `tests/cli.mts` cases that
 cover it and leaves the two asserting only the exit status, because the argument then reaches the
 shell runner as a tool name and is refused with 2 there instead. The status was never the
-property at risk.
+property at risk. A fourth, over the three hashes the record carries. Seven mutations of
+`log_run` and of the `--which` prompt that `bash -n` accepts were run against the eight cases
+covering them, and five discriminate to a single case: hashing a constant kills only the case
+that edits `collect`, the empty string in place of `null` kills only the run that never asked, a
+length of `0` for a missing answer kills only its own case, dropping the `--which` prompt kills
+only that one, and hashing an empty answer rather than nulling it kills only its own. Two are
+broad and worth knowing as such: pinning the length to `null` kills both length cases, and
+dropping the prompt hash kills four. Every one of the eight has been observed red.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

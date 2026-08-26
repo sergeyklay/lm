@@ -107,6 +107,13 @@ setup "$(say '')"
 lm stub >/dev/null 2>&1; rc=$?
 check "empty content exits 5"  "5" "$rc"
 check "and is not retried"     "1" "$(calls)"
+# The two halves of the record fall separately. A run that asked and got nothing
+# keeps its prompt hash, so the log tells it from a verb that refused before there
+# was a prompt at all, and a length of zero is the answer rather than its absence.
+e1=$(jq -r '.prompt_hash' "$work/log.jsonl")
+check "an empty answer still hashes the prompt" "64"   "${#e1}"
+check "and reports a length of zero"            "0"    "$(jq -r '.answer_len' "$work/log.jsonl")"
+check "with no answer to hash"                  "null" "$(jq -r '.answer_hash' "$work/log.jsonl")"
 teardown
 
 setup "$(say bad)" "$(say '')"
@@ -203,6 +210,43 @@ teardown
 setup
 lm stub refuse >/dev/null 2>&1
 check "a verb run names no which" "null" "$(jq -r '.which' "$work/log.jsonl")"
+teardown
+
+# The prompt hash is a function of what collect() wrote, so a repository that did
+# not change hashes the same and an edit to the tool moves it. Storing the prompt
+# would drag the diff along; a hash drags nothing.
+setup "$(say ok)" "$(say ok)" "$(say ok)"
+lm stub --dry-run >/dev/null 2>&1
+lm stub --dry-run >/dev/null 2>&1
+p1=$(jq -r '.prompt_hash' "$work/log.jsonl" | head -1)
+check "the prompt hash is a sha256"        "64" "${#p1}"
+check "an unchanged tool hashes the same"  "$p1" "$(jq -r '.prompt_hash' "$work/log.jsonl" | tail -1)"
+check "the answer's length is recorded"    "2"  "$(jq -r '.answer_len' "$work/log.jsonl" | head -1)"
+a1=$(jq -r '.answer_hash' "$work/log.jsonl" | head -1)
+check "and the answer is hashed too"       "64" "${#a1}"
+sed -i 's/echo PROMPT/echo OTHER/' "$work/tools/stub.sh"
+# sed exits 0 having matched nothing, and an edit that did not happen would leave
+# the hash equal for the right reason and the case red for the wrong one.
+check "the tool was really edited" "1" "$(grep -c 'echo OTHER' "$work/tools/stub.sh")"
+lm stub --dry-run >/dev/null 2>&1
+check "an edit to collect moves the hash" "moved" \
+  "$([ "$p1" = "$(jq -r '.prompt_hash' "$work/log.jsonl" | tail -1)" ] && echo same || echo moved)"
+teardown
+
+# A run that never asked has no prompt and no answer, and null says so. An answer
+# of length zero is a different thing and exit 5 is what reports it.
+setup
+lm stub refuse >/dev/null 2>&1
+check "a refused run hashes no prompt" "null" "$(jq -r '.prompt_hash' "$work/log.jsonl")"
+check "and records no answer length"   "null" "$(jq -r '.answer_len' "$work/log.jsonl")"
+teardown
+
+# --which carries the three fields too: its prompt is the catalogue, so the hash
+# moves when the registry does, and one shape means no reader has to branch.
+setup "$(say '{"tool":"stub"}')"
+lm --which "exercise the runner" >/dev/null 2>&1
+w1=$(jq -r '.prompt_hash' "$work/log.jsonl")
+check "a --which run hashes its prompt" "64" "${#w1}"
 teardown
 
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
