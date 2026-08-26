@@ -105,7 +105,10 @@ schema() {
 }
 
 validate() {
-  local j n i catg bullet
+  local j n i catg bullet tok _root
+  # The contract and the source both live in lm's own tree, not in the repository
+  # the verb is drafting for, so the root comes from where the registry was found.
+  _root=$(dirname "${LM_TOOLS:-$(dirname "${BASH_SOURCE[0]}")}")
   j=$(cat)
 
   jq -e . >/dev/null 2>&1 <<<"$j" || { echo "output is not valid JSON"; return 0; }
@@ -132,6 +135,20 @@ validate() {
   esac
 
   [[ "$bullet" =~ (No\ migration|Nothing\ to\ do) ]] && echo "entry $((i + 1)): bullet documents a non-event (absence of a change)"
+
+  # A bullet may name what a user can see. The functions docs/tools.md publishes
+  # are legitimate — a tool author writes against them — but the project's other
+  # functions are not: `usage` formats the listing a user reads, and the user has
+  # no word for it. Both halves are read rather than listed here, so publishing a
+  # seventh contract function needs no edit to this file. A leading underscore is
+  # this project's own mark for a private helper, and docs/tools.md naming one as
+  # an example of a seam does not publish it.
+  while IFS= read -r tok; do
+    case "$tok" in ""|*[!a-zA-Z0-9_]*) continue ;; esac
+    grep -qE "^$tok\(\)" "$_root"/bin/* "$_root"/tools/*.sh 2>/dev/null || continue
+    case "$tok" in _*) ;; *) grep -qE "\`$tok([^a-zA-Z0-9_]|\$)" "$_root/docs/tools.md" 2>/dev/null && continue ;; esac
+    echo "entry $((i + 1)): bullet names '$tok', which is internal to the source; name what the user sees instead"
+  done < <(grep -oE '`[^`]+`' <<<"$bullet" | tr -d '`')
   done
 
   return 0

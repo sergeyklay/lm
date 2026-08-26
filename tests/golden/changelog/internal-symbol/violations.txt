@@ -1,0 +1,2 @@
+entry 1: bullet names 'usage', which is internal to the source; name what the user sees instead
+entry 2: bullet names '_render_body', which is internal to the source; name what the user sees instead

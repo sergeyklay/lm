@@ -1,0 +1,11 @@
+Proposed for CHANGELOG.md under [Unreleased]:
+
+### Added
+
+- A `usage` function in the `lm` script that formats the command list
+- `lm --help` is recognised in any argument position
+
+### Changed
+
+- `_render_body` now fills the pull request template
+- `apply` asks through `confirm` before it acts

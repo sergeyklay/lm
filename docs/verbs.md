@@ -20,6 +20,10 @@ picks the verb for a request by reading the same one-line descriptions `lm --lis
 no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
 exits 2, so a composition that pipes it into `lm` stops rather than running the nearest match.
 
+A drafted bullet is refused when it names something only the source knows: the functions
+`docs/tools.md` publishes as the tool contract are fair game, the project's other functions are
+not. Name what a user of the verb can see instead.
+
 ## lm-ship
 
 `lm-ship` runs `commit` then `pr` over the same text. It stages the working tree first, so a

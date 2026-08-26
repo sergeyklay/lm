@@ -1,0 +1,45 @@
+The changelog this project has published so far. It records what this project considers
+worth telling its users, and by omission what it does not. Match both:
+# Changelog
+
+## [Unreleased]
+
+### Added
+
+- An earlier entry
+
+## [0.0.1] - 2026-01-01
+
+### Added
+
+- The first release
+
+Files changed:
+demo.sh
+
+Staged diff to document:
+diff --git a/demo.sh b/demo.sh
+index 5da2ae8..5c1ebf5 100644
+--- a/demo.sh
++++ b/demo.sh
+@@ -1 +1,2 @@
+ name="demo"
++description="one line"
+
+Write an entry for each change a person could notice by installing this project and running it.
+If they could not notice it that way there is no entry, and a diff often yields fewer entries than it has files.
+One entry per observable change, not one per file.
+Categories, as Keep a Changelog defines them:
+  Added for new features.
+  Changed for changes in existing functionality.
+  Deprecated for soon-to-be removed features.
+  Removed for now removed features.
+  Fixed for any bug fixes.
+  Security in case of vulnerabilities.
+Each entry must make plain what changed for the person on the other side of it.
+Length follows the change: one sentence usually, two when one would leave the reader guessing.
+An entry is not a manual and not a design note: no usage instructions, no rationale, no implementation detail.
+Unless this repository is plainly a library or a framework, its internals are out of scope: describe what someone running it observes, not what a script defines.
+Start with the thing that changed, never with the category name:
+write "Support for X in the Y command", not "Added support for X".
+Write each entry as one unwrapped line, with no line breaks.
