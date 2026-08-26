@@ -8,7 +8,7 @@ Each tool collects its input from the repository, asks the model once under a JS
 
 `bash`, `jq`, `curl`, `git`, and a running [ollama](https://ollama.com) with a model that honours `format`. `gh` for `issue` and `pr`.
 
-Node, the version in `.tool-versions`, and its packages installed.
+Node 24, new enough to run TypeScript without a build step, and its packages installed.
 
 The chat's file tools shell out to [`fd`](https://github.com/sharkdp/fd) and [`ripgrep`](https://github.com/BurntSushi/ripgrep). Install them yourself: the chat otherwise tries to fetch them from GitHub on first run, which fails on an unauthenticated rate limit and leaves the tools missing.
 

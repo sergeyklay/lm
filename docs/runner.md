@@ -16,8 +16,8 @@ configuration file outside the repository is read.
 the half being built to replace it, and it reads the same registry, so a tool file does not know
 which one called it.
 
-Node runs the TypeScript directly, with no build step; `.tool-versions` pins the version that
-does it. `bin/lm` itself carries no type annotations, because a file without an extension is not
+Node runs the TypeScript directly, with no build step, which Node 24 is new enough to do.
+`bin/lm` itself carries no type annotations, because a file without an extension is not
 stripped.
 
 ## The bridge to a bash tool
@@ -73,7 +73,6 @@ already stands in the repository and a child inherits it, so removing `cwd` from
 leaves all four green; the case that tests it runs against a temporary directory. That was found
 by perturbing the bridge, not by reading it.
 
-No dependency and no build step: Node strips the types and runs the file, and `.tool-versions`
-pins the version that does. `node --check` is this half of the repository's `bash -n` — run it
+No dependency and no build step: Node strips the types and runs the file. `node --check` is this half of the repository's `bash -n` — run it
 on a mutant before believing what the mutant killed, and confirm it rejects a deliberately
 broken file first.

@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - One command. `lm ship` and `lm stats` do what the separate `lm-ship` and `lm-stats` programs did, and `bin/` now holds `lm` and nothing else. A script calling `lm-ship` or `lm-stats` has to call `lm ship` or `lm stats` instead.
 - `lm --help` describes the whole command: the chat, the verbs, `ship`, `stats`, the options and the environment variables it reads. It answers wherever `-h` or `--help` appears, so `lm commit --help` prints it too. Before, it listed the four verbs and nothing else.
-- The chat needs Node, the version in `.tool-versions`, with packages installed by `npm ci`; its file tools need `fd` and `ripgrep` on `PATH`; and under `tmux` it needs `extended-keys on`, or modified `Enter` keys never reach it. The verbs need none of this. Without `fd` and `ripgrep` the chat starts, tries to download them itself, and warns when that fails.
+- The chat needs Node 24, with packages installed by `npm ci`; its file tools need `fd` and `ripgrep` on `PATH`; and under `tmux` it needs `extended-keys on`, or modified `Enter` keys never reach it. The verbs need none of this. Without `fd` and `ripgrep` the chat starts, tries to download them itself, and warns when that fails.
 
 ### Fixed
 
