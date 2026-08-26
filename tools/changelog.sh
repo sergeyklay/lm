@@ -145,7 +145,7 @@ validate() {
   # an example of a seam does not publish it.
   while IFS= read -r tok; do
     case "$tok" in ""|*[!a-zA-Z0-9_]*) continue ;; esac
-    grep -qE "^$tok\(\)" "$_root"/bin/* "$_root"/tools/*.sh 2>/dev/null || continue
+    grep -qE "^$tok\(\)" "$_root"/libexec/* "$_root"/tools/*.sh 2>/dev/null || continue
     case "$tok" in _*) ;; *) grep -qE "\`$tok([^a-zA-Z0-9_]|\$)" "$_root/docs/tools.md" 2>/dev/null && continue ;; esac
     echo "entry $((i + 1)): bullet names '$tok', which is internal to the source; name what the user sees instead"
   done < <(grep -oE '`[^`]+`' <<<"$bullet" | tr -d '`')

@@ -13,7 +13,7 @@ for a in "$@"; do
   esac
 done
 
-LM=$(dirname "$(readlink -f "$0")")/lm
+LM=$(dirname "$(readlink -f "$0")")/lm-verb
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; exit 2; }
 
 # lm writes one record per verb, so without this the two records this run leaves

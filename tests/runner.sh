@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bin/lm with curl stubbed. What the tools cannot pin: dispatch, the single
+# libexec/lm-verb with curl stubbed. What the tools cannot pin: dispatch, the single
 # retry, and the exit code each failure leaves behind.
 
 set -uo pipefail
@@ -52,9 +52,9 @@ EOF
 teardown() { cd /; rm -rf "$work"; }
 
 calls() { cat "$REPLIES/n" 2>/dev/null || echo 0; }
-lm() { "$ROOT/bin/lm" "$@"; }
+lm() { "$ROOT/libexec/lm-verb" "$@"; }
 # script owns the terminal it lends to confirm, and echoes back through it.
-tty_lm() { local a=$1; shift; script -qec "$ROOT/bin/lm $*" /dev/null <<<"$a" | tr -d '\r'; }
+tty_lm() { local a=$1; shift; script -qec "$ROOT/libexec/lm-verb $*" /dev/null <<<"$a" | tr -d '\r'; }
 
 # Dispatch: an unknown verb says what there is, and reaches nothing.
 setup
@@ -192,7 +192,7 @@ check "both --which runs are logged"  "2"        "$(wc -l < "$work/log.jsonl")"
 check "a match names the verb it found" "stub"   "$(jq -r '.which' "$work/log.jsonl" | head -1)"
 check "a refusal is told from a match"  "none"   "$(jq -r '.which' "$work/log.jsonl" | tail -1)"
 check "the record is not a verb"        "--which" "$(jq -r '.verb' "$work/log.jsonl" | head -1)"
-out=$("$ROOT/bin/lm-stats" 2>&1)
+out=$("$ROOT/libexec/lm-stats" 2>&1)
 check "the verb table excludes it"  "0" "$(sed -n '2,/^$/p' <<<"$out" | grep -c -- --which)"
 check "lm-stats reports the share"  "1 of 2" \
   "$(grep -A1 'found no verb for' <<<"$out" | tail -1 | tr -s ' ' | sed 's/^ //')"

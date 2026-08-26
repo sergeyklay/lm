@@ -1,167 +1,62 @@
-#!/usr/bin/env bash
-# lm — thin runner over a tool registry. One file per tool in $LM_TOOLS.
+#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { realpathSync } from "node:fs";
 
-set -euo pipefail
+const libexec = join(dirname(realpathSync(process.argv[1])), "..", "libexec");
+const argv = process.argv.slice(2);
 
-: "${LM_OLLAMA:=http://127.0.0.1:11434}"
-: "${LM_MODEL:=qwen3.8:27b}"
-: "${LM_CTX:=32768}"
-: "${LM_LOG=$HOME/.lm/runs.jsonl}"     # one JSON object per run; empty disables
-
-LM_TOOLS="${LM_TOOLS:-$(dirname "$(readlink -f "$0")")/../tools}"
-
-list() { for f in "$LM_TOOLS"/*.sh; do [ -f "$f" ] || continue
-  ( . "$f"; printf '%s\t%s\n' "$name" "$description" ); done; }
-
-call() { # $1 prompt, $2 schema -> model JSON on stdout
-  local resp
-  resp=$(jq -n --arg m "$LM_MODEL" --arg p "$1" --argjson s "$2" --argjson c "$LM_CTX" \
-    '{model:$m,stream:false,think:false,messages:[{role:"user",content:$p}],format:$s,
-      options:{num_ctx:$c,num_predict:3000,temperature:0},keep_alive:"30m"}' \
-  | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @-)
-  # A cut-off answer often still parses and still passes validate(), so nothing
-  # downstream would notice. Measured: the budget is 3000 and a commit message
-  # costs 44, but lm pr on a long branch has no such margin.
-  if [ "$(jq -r '.done_reason // empty' <<<"$resp")" = length ]; then
-    echo "lm: the answer hit the token budget and is cut off" >&2
-    return 5
-  fi
-  jq -r '.message.content' <<<"$resp"
+function hand(program, args) {
+  const r = spawnSync(join(libexec, program), args, { stdio: "inherit" });
+  process.exit(r.status ?? 1);
 }
 
-confirm() { local a; read -r -p "$1 " a </dev/tty; [ "$a" = y ] || exit 7; }
+if (argv.includes("-h") || argv.includes("--help")) {
+  const { list, meta } = await import("../src/registry.mts");
+  const toolsDir = process.env.LM_TOOLS ?? join(libexec, "..", "tools");
+  const verbs = list(toolsDir).map(meta);
+  const w = Math.max(...verbs.map((v) => v.name.length));
+  const rows = verbs.map((v) => `  ${v.name.padEnd(w + 2)}  ${v.description}`).join("\n");
+  process.stdout.write(`lm - local developer verbs and a chat, against a model on your own machine
 
-usage() { echo "usage: lm <verb> [--dry-run] [text] | lm --list | lm --which <text>"
-  list | awk -F'\t' '
-    { n[NR] = $1; d[NR] = $2; if (length($1) > w) w = length($1) }
-    END { printf "\nCommands:\n\n"
-          f = "  %-" (w + 4) "s%s\n"
-          for (i = 1; i <= NR; i++) printf f, n[i], d[i]
-          print "" }'; }
+Usage:
+  lm                            open a chat with the local model
+  lm <verb> [options] [text]    run one verb
+  lm ship [options] [text]      commit the working tree and open a pull request
+  lm stats [--all]              what the run log says about this repository
 
+Verbs:
+${rows}
 
-# The log has to be armed before the first branch that reaches the model, and
-# --which is such a branch: it returns at its own exit long before a verb is
-# resolved. So the record is built here and each branch that calls the model
-# arms the trap itself. --list, usage and --help call nothing and stay out.
-log_run() { # $1 exit status. Never fails the run it is reporting on.
-  [ -n "$LM_LOG" ] && mkdir -p "$(dirname "$LM_LOG")" 2>/dev/null || return 0
-  local h moved=false; h=$(git rev-parse HEAD 2>/dev/null || true)
-  { [ -n "$h" ] && [ "$h" != "$HEAD0" ] && moved=true; } || true
-  jq -nc --arg ts "$(date -Is)" --arg repo "$REPO" --arg verb "$VERB" --arg model "$LM_MODEL" \
-    --arg viol "$VIOL" --argjson dry "$DRY" --argjson calls "$CALLS" --argjson rc "$1" \
-    --argjson ms "$(( $(date +%s%3N) - T0 ))" --argjson moved "$moved" \
-    --arg comp "${LM_COMPOSITION:-}" --arg which "$WHICH" \
-    '{ts:$ts,repo:$repo,verb:$verb,model:$model,dry:($dry==1),calls:$calls,
-      violations:($viol|split("\n")|map(select(length>0))),exit:$rc,ms:$ms,head_moved:$moved,
-      composition:(if $comp == "" then null else $comp end),
-      which:(if $which == "" then null else $which end)}' \
-    >> "$LM_LOG" 2>/dev/null || true
+Options:
+  --dry-run                     print the result and stop before the side effect
+  --                            treat everything after it as text, dashes and all
+  --list                        every verb with its description, tab-separated
+  --which <text>                name the verb that serves a request
+  -h, --help                    print this help
+
+Environment:
+  LM_OLLAMA                     where ollama listens (http://127.0.0.1:11434)
+  LM_MODEL                      the model to ask (qwen3.8:27b)
+  LM_CTX                        context window in tokens (32768)
+  LM_TOOLS                      the registry directory (<repo>/tools)
+  LM_LOG                        the run log, empty to disable ($HOME/.lm/runs.jsonl)
+`);
+  process.exit(0);
 }
-T0=$(date +%s%3N); CALLS=0; VIOL=""; DRY=0; VERB=""; WHICH=""
-HEAD0=$(git rev-parse HEAD 2>/dev/null || true)
-# A run outside a repository still happened somewhere, and "-" names nothing
-# lm-stats can scope to, so the working directory stands in for the repository.
-REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 
+if (argv[0] === "ship") hand("lm-ship", argv.slice(1));
+if (argv[0] === "stats") hand("lm-stats", argv.slice(1));
+if (argv.length > 0 && argv[0] !== "chat") hand("lm-verb", argv);
 
-case "${1:-}" in
-  --list) list; exit 0 ;;
-  --which) shift
-      # The answer is drawn from the enum, so without a refusal member a request no
-      # verb serves comes back as the nearest verb and cannot be told from a real
-      # match. That is the surface §9.3 reads its third-front signal from.
-      #
-      # The signal is the refusal share, so a match has to reach the log beside a
-      # refusal: counting only refusals gives a numerator and no denominator.
-      # --which is not a verb, and the record says so rather than borrowing one,
-      # because a refusal exits 2 and would read as a failure in the verb table.
-      VERB="--which"; CALLS=1; trap 'log_run $?' EXIT
-      CAT=$(list | awk -F'\t' '{printf "- %s: %s\n",$1,$2}')
-      NAMES=$(list | cut -f1 | jq -R . | jq -sc '. + ["none"]')
-      SCH=$(jq -n --argjson n "$NAMES" '{type:"object",properties:{tool:{type:"string",enum:$n}},required:["tool"]}')
-      OUT=$(call "Available tools:
-$CAT- none: no tool above serves this request
+const { main } = await import("@earendil-works/pi-coding-agent");
+const { providerConfig, modelId } = await import("../src/provider.mts");
 
-Request: $*
-
-Pick the single tool that serves this request. Answer none when no tool above does." "$SCH")
-      [ -n "$OUT" ] || { echo "lm: empty response from model" >&2; exit 5; }
-      WHICH=$(jq -r '.tool' <<<"$OUT")
-      if [ "$WHICH" = none ]; then
-        echo "lm: no verb serves that request" >&2; exit 2
-      fi
-      printf '%s\n' "$WHICH"; exit 0 ;;
-  "") usage >&2; exit 2 ;;
-esac
-
-# Help wins wherever it appears: GNU Coding Standards 4.8.2 says other options
-# and arguments are ignored once it is seen, and the program does not do its
-# normal work. Scanned after --which, whose arguments are a query and not flags.
-for a in "$@"; do
-  case "$a" in -h|--help) usage; exit 0 ;; esac
-done
-
-
-VERB=$1; shift
-TOOL="$LM_TOOLS/$VERB.sh"
-[ -f "$TOOL" ] || { echo "lm: no such tool '$VERB'. Available:" >&2; list | cut -f1 | sed 's/^/  /' >&2; exit 2; }
-. "$TOOL"
-
-# Flags are found by scanning, so a flag and free text coexist in either order.
-# A tool declares the ones it takes in $flags; anything else that looks like a
-# flag is a typo, and a typo must not become prompt text: '--dry-runn' silently
-# read as words is a real commit where a rehearsal was asked for. Text after
-# '--' is text, dashes and all. A flag the tool declared becomes LM_<NAME>, so
-# collect() reads a variable instead of parsing, and only text reaches "$@".
-ARGS=(); TEXT=0
-for a in "$@"; do
-  if (( TEXT )); then ARGS+=("$a"); continue; fi
-  case "$a" in
-    --dry-run) DRY=1 ;;
-    --)        TEXT=1 ;;
-    -*)        case " ${flags:-} " in
-                 *" $a "*) printf -v "LM_$(tr 'a-z-' 'A-Z_' <<<"${a#--}")" 1 ;;
-                 *) echo "lm: '$VERB' takes no flag '$a'." >&2
-                    echo "    Known: --dry-run${flags:+ $flags}. Put text after -- to pass it literally." >&2
-                    exit 2 ;;
-               esac ;;
-    *)         ARGS+=("$a") ;;
-  esac
-done
-
-
-trap 'log_run $?' EXIT
-
-
-PROMPT=$(collect "${ARGS[@]}") || exit $?
-# A verb that reads no arguments would drop what the human typed without a word.
-# The runner cannot ask the tool, but it can look: text a tool used is text that
-# reached the prompt.
-for a in "${ARGS[@]}"; do
-  case "$a" in -*) continue ;; esac
-  [[ $PROMPT == *"$a"* ]] || echo "lm: '$VERB' made no use of the text you gave it" >&2
-  break
-done
-SCHEMA=$(schema)
-CALLS=1
-OUT=$(call "$PROMPT" "$SCHEMA")
-[ -n "$OUT" ] || { echo "lm: model returned empty content (a failure, not an empty answer)" >&2; exit 5; }
-ERRS=$(printf '%s' "$OUT" | validate) || true
-VIOL="$ERRS"
-if [ -n "$ERRS" ]; then
-  CALLS=2
-  OUT=$(call "$PROMPT
-
-The previous attempt was rejected for these reasons. Fix them and answer again:
-$ERRS" "$SCHEMA")
-  [ -n "$OUT" ] || { echo "lm: model returned empty content on retry" >&2; exit 5; }
-  ERRS=$(printf '%s' "$OUT" | validate) || true
-fi
-if [ -n "$ERRS" ]; then
-  echo "lm: validator rejected two attempts:" >&2; sed 's/^/  - /' <<<"$ERRS" >&2
-  echo "--- draft ---" >&2; echo "$OUT" >&2; exit 4
-fi
-printf '%s' "$OUT" | render
-(( DRY )) && { echo; echo "--dry-run: no side effect"; exit 0; }
-printf '%s' "$OUT" | apply
+await main(["--provider", "ollama", "--model", modelId(), ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
+  extensionFactories: [
+    {
+      name: "lm",
+      factory: (pi) => pi.registerProvider("ollama", providerConfig()),
+    },
+  ],
+});

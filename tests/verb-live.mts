@@ -62,7 +62,7 @@ check("and costs exactly one model call", 1, good.calls);
 check("and called the tool once", 1, good.attempts);
 
 process.chdir(ROOT);
-const cli = spawnSync(join(ROOT, "bin/lm-next"), ["accepts", "--dry-run"], {
+const cli = spawnSync(join(ROOT, "bin/lm"), ["accepts", "--dry-run"], {
   encoding: "utf8",
   cwd: work,
   env: { ...process.env, LM_TOOLS: tools, LM_LOG: "" },

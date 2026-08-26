@@ -27,9 +27,9 @@ function viaBash(file: string, script: string, cwd = ROOT): string {
 }
 
 const files = list(TOOLS);
-const fromBash = spawnSync(join(ROOT, "bin/lm"), ["--list"], { encoding: "utf8", cwd: ROOT })
+const fromBash = spawnSync(join(ROOT, "libexec/lm-verb"), ["--list"], { encoding: "utf8", cwd: ROOT })
   .stdout.trim().split("\n").map((l) => l.split("\t")[0]).sort();
-check("the registry lists what bin/lm lists", fromBash, files.map((f) => basename(f, ".sh")).sort());
+check("the registry lists what lm-verb lists", fromBash, files.map((f) => basename(f, ".sh")).sort());
 
 for (const f of files) {
   const m = meta(f);
