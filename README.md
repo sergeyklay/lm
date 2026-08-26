@@ -42,6 +42,7 @@ lm-stats                       # what the run log says about this repository
 - [What each verb does](docs/verbs.md) — per-verb behaviour, the two compositions,
   configuration and exit codes.
 - [Adding a tool](docs/tools.md) — the registry contract, and the tests that pin it.
+- [The runner](docs/runner.md) — the two runners, and how the Node one reaches a bash tool.
 
 ## License
 

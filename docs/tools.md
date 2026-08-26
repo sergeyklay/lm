@@ -48,6 +48,7 @@ bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the lm-ship composition, with the verbs stubbed
 bash tests/runner.sh              # bin/lm around the model call, with curl stubbed
+node tests/registry.mts           # the Node runner's bridge to a bash tool
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the
@@ -60,5 +61,11 @@ defect to fix. Every tool reports exactly three: `SC2148` because it carries no 
 is honest — `bin/lm` sources it and never executes it — and `SC2034` twice, for `name` and
 `description`, which the runner reads after sourcing and the file itself never uses. Measured
 2026-08-26 across the four tools with
-`for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: three, three, three, three. A
+`for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: four, three, three, three. A
 tool reporting a fourth carries something the others do not, and that is what to look at.
+
+`changelog` is the one, and its fourth is a false positive worth leaving. Its validator matches
+the backticked spans in a drafted bullet, so the regex contains literal backticks inside single
+quotes, and `SC2016` reads those as a command substitution that will not expand. Quoting it any
+other way changes what the pattern matches. `shellcheck -f gcc tools/changelog.sh` names the
+line.
