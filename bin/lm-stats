@@ -22,13 +22,16 @@ REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
 SCOPE=(--arg repo "$REPO" --argjson all "$ALL")
 MINE='($all == 1 or .repo == $repo)'
 RUN="((.dry | not) and .calls > 0 and $MINE)"
+# --which is a run and not a verb: its refusal exits 2, which the verb table
+# would count as a failure. It gets its own line, below the table.
+VERBRUN="($RUN and .verb != \"--which\")"
 
 [ "$(jq -s "${SCOPE[@]}" "map(select($MINE)) | length" "$LM_LOG")" -gt 0 ] || {
   echo "lm-stats: nothing logged for $REPO; --all reads every repository" >&2; exit 2; }
 
 printf '%-10s %5s %7s %9s %8s %7s %8s\n' verb runs clean declined retried failed "avg ms"
 jq -s -r "${SCOPE[@]}" "
-  map(select($RUN)) | group_by(.verb)[] |"'
+  map(select($VERBRUN)) | group_by(.verb)[] |"'
   [ .[0].verb, length,
     (map(select(.calls == 1 and .exit == 0)) | length),
     (map(select(.exit == 7)) | length),
@@ -49,6 +52,13 @@ echo
 echo "runs from a composition:"
 jq -s -r "${SCOPE[@]}" "map(select($RUN))"'
   | "  \(map(select(.composition)) | length) of \(length)"' "$LM_LOG"
+
+echo
+# The share, not the count: a refusal rate needs the calls that found a verb in
+# its denominator, and a --which run the model failed is in neither number.
+echo "requests --which found no verb for:"
+jq -s -r "${SCOPE[@]}" "map(select(.verb == \"--which\" and $RUN))"'
+  | "  \(map(select(.which == "none")) | length) of \(length)"' "$LM_LOG"
 
 echo
 echo "validator violations:"

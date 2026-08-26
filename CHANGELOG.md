@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `changelog` command now refuses a bullet that names a function only the source knows, such as one describing how a listing is formatted rather than what the listing looks like. The functions documented as the tool contract stay allowed.
+- A `--which` request is now recorded in the run log whether it names a verb or refuses, and `lm-stats` reports how many requests found no verb at all. The record carries the verb that was picked, or `none`, in a field the other runs leave empty, and is kept out of the per-verb table so a refusal is not counted as a failure.
 
 ## [0.0.4] - 2026-08-26
 
