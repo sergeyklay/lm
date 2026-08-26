@@ -34,6 +34,13 @@ call before it ships.
 A tool refuses with `return 3` when there is nothing to work on. The other codes are the
 runner's; [`verbs.md`](verbs.md) lists them.
 
+When `collect()` needs something the machine running the tests may not have, put the call
+behind a function so a fixture can replace it. `tools/issue.sh` reads the repository's labels
+through `_labels()` for that reason, and the three `issue` cases — `ls tests/golden/*/*/env`
+names them — define their own `_labels()` in `env`, so `gh` is never reached and the enum the
+case exists to pin is still built. Stubbing the seam beats skipping the case: a skipped case
+leaves the verb's most interesting path untested and says so only in passing.
+
 ## Tests
 
 ```bash
@@ -47,3 +54,11 @@ bash tests/runner.sh              # bin/lm around the model call, with curl stub
 model: the prompt `collect` writes, the shape `schema` asks for, the violations `validate`
 reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
 diff before committing them.
+
+`shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
+defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
+is honest — `bin/lm` sources it and never executes it — and `SC2034` twice, for `name` and
+`description`, which the runner reads after sourcing and the file itself never uses. Measured
+2026-08-26 across the four tools with
+`for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: three, three, three, three. A
+tool reporting a fourth carries something the others do not, and that is what to look at.
