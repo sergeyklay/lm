@@ -109,7 +109,7 @@ apply() {
   echo "---"
   echo ""
   local labels_input
-  read -r -p "Labels (${suggested_labels:-none}): " labels_input </dev/tty
+  labels_input=$(ask "Labels (${suggested_labels:-none}):")
 
   local final_labels=()
   if [ -z "$labels_input" ]; then

@@ -14,9 +14,16 @@ and `--which` are the shell runner's and pass through. `--dry-run` belongs to a 
 refusal says so rather than listing it as though `lm` took it.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
-extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`. It keeps
-its settings, its credentials and its session history in the harness's own directory under the
-home directory, outside this repository, and writes there as you use it.
+extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`, and every
+verb in the registry beside it. A verb offered that way takes what a human types — free text and
+`--dry-run` — and nothing about its own answer: it still writes its own prompt from the
+repository and asks the model itself, so what it commits is what `lm commit` commits, at the cost
+of the chat's own call to choose it. Its questions reach the chat's dialogs rather than the
+terminal, and a mode with no dialog to show, such as the harness's print mode, refuses on the
+human's behalf and applies nothing.
+
+The chat keeps its settings, its credentials and its session history in the harness's own
+directory under the home directory, outside this repository, and writes there as you use it.
 
 `libexec/lm-verb` is the shell runner and still runs every verb. The Node side under `src/` is
 the half being built to replace it, and it reads the same registry, so a tool file does not know
@@ -43,6 +50,8 @@ next call; `libexec/lm-verb` gets the same isolation for `list()` from a subshel
 | `list(dir)` | The index: the `*.sh` files in `dir`, sorted. Adding a tool changes no file here. |
 | `meta(file)` | The declared `name`, `description` and `flags`. |
 | `call(file, fn, opts)` | Calls one function. `opts` carries `args`, `stdin`, `cwd` and `env`. |
+| `apply(file, opts)` | The side effect, for a caller that owns the terminal. Returns the status. |
+| `applyAsk(file, opts, ask)` | The side effect for a caller that does not: the status and everything the body wrote. |
 
 A call returns `stdout`, `stderr` and `status`, and the status is the shell function's own: a
 tool refusing with `return 3` is telling the runner there is nothing to work on, and that has to
@@ -51,18 +60,26 @@ survive the trip.
 `meta` separates its fields with a NUL rather than a tab, because a description is prose written
 for the router and prose may contain a tab.
 
-## What the bridge does not do
+## How apply differs
 
-`apply` is not callable through it. `apply` is the only one of the five functions that calls
-`confirm`, `confirm` reads `/dev/tty`, and which process owns the terminal once a harness is in
-the loop is unsettled.
+`apply` is the only function with a side effect and the only one that talks to the human, so it
+does not go through the same call as the other four. It runs under `set -euo pipefail`, because a
+body that fails halfway must not carry on and report success, and it reads the model's answer on
+stdin like `render` does.
 
-`confirm` is still defined, because a tool is entitled to assume its runner provides the name.
-It prints why it is unavailable and `exit`s rather than returning: no tool tests what `confirm`
-returned, since `apply()` in every tool file puts the side effect on the next line, so a
-`return` performs the effect the refusal was meant to prevent. The code it leaves is
-deliberately none of the ones in [`verbs.md`](verbs.md) — borrowing 7 would tell `lm stats` a
-human declined.
+Where its questions go is the caller's to decide, and there are two callers. On the command line
+`apply` inherits the terminal and `confirm` and `ask` read `/dev/tty`. Inside the chat the
+harness owns the terminal, so `applyAsk` gives the tool a pair of file descriptors instead: the
+question goes out on one with the wording the tool file gave it, one line of answer comes back on
+the other, and a closed channel is a refusal rather than a default. Everything the body writes
+comes back to the caller in both cases except the first, where it is simply inherited.
+
+`confirm` and `ask` are defined in the four read-only phases too, because a tool is entitled to
+assume its runner provides the names. There they print why they are unavailable and `exit` rather
+than returning: no tool tests what `confirm` returned, since `apply()` in every tool file puts
+the side effect on the next line, so a `return` performs the effect the refusal was meant to
+prevent. The code they leave is deliberately none of the ones in [`verbs.md`](verbs.md) —
+borrowing 7 would tell `lm stats` a human declined.
 
 ## Tests
 

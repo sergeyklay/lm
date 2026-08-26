@@ -29,7 +29,9 @@ passes. Worse than either is a pattern the compiler neither rejects nor supports
 `^(?=.*z).*$` returns 200 and constrains nothing — so a new `pattern` is worth one throwaway
 call before it ships.
 
-`validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry. `apply` asks through `confirm "text"`, which exits 7 when the human refuses. Any other prompt in `apply` must read from `/dev/tty`, because stdin carries the model's answer.
+`validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry.
+
+`apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses. `ask "text"` prints one line of answer, empty when there is none, so `labels=$(ask "Labels (bug, ci):")` works. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
 
 A tool refuses with `return 3` when there is nothing to work on. The other codes are the
 runner's; [`verbs.md`](verbs.md) lists them.
@@ -49,9 +51,10 @@ bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
-node tests/registry.mts           # the Node runner's bridge to a bash tool
+node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
+node tests/chat.mts               # which verbs the chat is offered, and on what terms
 node tests/request.mts            # what the Node runner asks the model for, off the wire
-LM_LIVE=1 node tests/verb-live.mts  # the Node runner's retry and its budget, on the real model
+LM_LIVE=1 node tests/verb-live.mts  # the runner's retry, its budget and a verb inside the chat, on the real model
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the
@@ -97,7 +100,14 @@ from the other side, and its three truncation cases were confirmed red both ways
 budget field the answer completes and none of the three fires, and without the runner's own
 truncation arm the exit code is still 5, from the answer that never arrived, so only the case
 reading the message goes red. The code alone cannot tell the two apart, which is why a case
-reads the message.
+reads the message. A seventh, over the verbs inside the chat: replacing the registration's walk
+over the registry with a filter naming the four tool files leaves every case green except the one
+that drops a fifth file in, which is the case that exists for it; making the channel's
+confirmation always answer yes turns the two declining cases in `tests/registry.mts` red and
+leaves the approving ones green; and unwiring the channel from the chat's side, so a verb falls
+back to the terminal, turns the live case reading exit 7 red while the case asserting nothing was
+applied stays green, because a question no one can answer fails the run anyway. Only the pair
+distinguishes a refusal the human made from a refusal the plumbing made.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
