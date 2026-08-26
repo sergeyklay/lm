@@ -4,13 +4,39 @@ Two runners exist while the runner moves off bash. `bin/lm` ships; `bin/lm-next`
 being built beside it. Both read the same registry, so a tool file does not know which one
 called it.
 
-`lm-next` serves `--list`, `--help` and the argument handling, and stops with a message where
-the model call would be. Its usage line names `lm`, not `lm-next`, because that is the command
-it becomes when the shell runner goes away.
+`lm-next` runs a verb under `--dry-run` and refuses without it, because applying is not wired.
+Its usage line names `lm`, not `lm-next`, because that is the command it becomes when the shell
+runner goes away.
 
-Node runs the TypeScript directly: no build step, no dependency, and `.tool-versions` pins the
-version that does it. `package.json` exists only to make the extensionless executable in `bin/`
-load as a module.
+Node runs the TypeScript directly, with no build step; `.tool-versions` pins the version that
+does it. The harness the runner sits on is a dependency, so `lm-next` needs `npm ci` and `lm`
+does not.
+
+## The model call
+
+`collect` builds the prompt and `schema` becomes the parameter schema of a single tool named
+after the verb. The model answers by calling that tool, so its arguments are the answer, and
+`validate` and `render` run inside the call against exactly the JSON `lm` would have piped them.
+
+The provider is registered from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX` at startup, so no
+configuration file outside the repository is read. Discovery is off: no extensions, no skills, no
+context files, and a one-line system prompt. A verb has to be reproducible, and anything picked
+up from the surrounding directory would make it depend on where it was run.
+
+The guarantee `lm` owns is rebuilt from three parts, and none of them is obvious:
+
+- Every tool result ends the batch. Without that the loop takes a further turn on its own and
+  the model spends it narrating, so a clean answer costs two model calls instead of one — and,
+  worse, the retry cap stops binding, because the model can call the tool again inside the same
+  run without the queue the cap watches.
+- Violations are queued back as a follow-up message, which is what buys the second turn.
+- The cap is the runner's refusal to queue a third time. The harness has a hook that looks like
+  the cap and is not one: it ends a run, and the session starts another while the queue is not
+  empty.
+
+A clean answer costs one model call and a rejected one costs exactly two, after which the run
+exits 4 with the violations. **Assert the call count, never the exit code alone** — removing the
+retry, or removing the batch termination, leaves the code at 4 while the retry is gone.
 
 ## The bridge to a bash tool
 
@@ -62,6 +88,7 @@ either binary and it is covered against the parser directly.
 ```bash
 node tests/registry.mts       # the bridge, against bash itself
 node tests/args.mts           # lm-next against bin/lm, plus the parser alone
+LM_LIVE=1 node tests/verb-live.mts   # the retry guarantee, against the real model
 ```
 
 Every case is differential: `bin/lm` reads the same registry through a sourced subshell, so

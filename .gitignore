@@ -2,3 +2,6 @@
 # They survive an interrupted run, and neither belongs in a commit.
 CHANGELOG.tmp
 *.lmbak
+
+# 136 packages the Node runner needs; package-lock.json pins them.
+node_modules/

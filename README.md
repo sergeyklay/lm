@@ -8,6 +8,8 @@ Each tool collects its input from the repository, asks the model once under a JS
 
 `bash`, `jq`, `curl`, `git`, and a running [ollama](https://ollama.com) with a model that honours `format`. `gh` for `issue` and `pr`.
 
+`lm-next` additionally needs Node — the version in `.tool-versions` — and its packages installed. `lm` itself needs neither.
+
 ```bash
 ollama pull qwen3.8:27b
 ```
@@ -17,6 +19,7 @@ ollama pull qwen3.8:27b
 ```bash
 git clone https://github.com/sergeyklay/lm.git ~/lm
 export PATH="$HOME/lm/bin:$PATH"
+npm --prefix ~/lm ci        # only for lm-next
 ```
 
 ## Use

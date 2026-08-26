@@ -41,5 +41,12 @@ if (!parsed.ok) {
   process.exit(2);
 }
 
-process.stderr.write(`lm-next: '${verb}' parsed, but no model path is wired here yet\n`);
-process.exit(2);
+if (!parsed.dry) {
+  process.stderr.write(`lm-next: applying is not wired here yet; add --dry-run\n`);
+  process.exit(2);
+}
+
+const { runVerb } = await import("../src/verb.mts");
+const outcome = await runVerb(file, parsed.args, parsed.env);
+if (outcome.code === 0) process.stdout.write("\n--dry-run: no side effect\n");
+process.exit(outcome.code);
