@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A second runner, written in TypeScript and running on Node without a build step or a dependency, alongside the shell one. It reads the same registry: a tool stays a shell script, and the new runner sources it and calls one function per process, so a tool cannot tell which runner invoked it. No command reaches it yet, and applying a result is not wired, so nothing a user does behaves differently.
+- The runner documentation, covering the two runners, what the new one provides a tool and what it deliberately does not, and why every one of its tests is stated against what the shell runner produces.
+
+### Fixed
+
+- The contributor documentation claimed every tool reports three `shellcheck` findings; `changelog` reports four. The fourth is a false positive and the page now says so and why, rather than reporting a count that no longer matches the command printed beside it.
+
 ## [0.0.5] - 2026-08-26
 
 ### Changed

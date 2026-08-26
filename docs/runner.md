@@ -2,8 +2,7 @@
 
 Two runners exist while the runner moves off bash. `bin/lm` ships; the Node one under `src/` is
 built beside it and is not wired to a command yet. Both read the same registry, so a tool file
-does not know which one called it. The reasoning for the move is in
-`kb/Local Agents Stack.md`.
+does not know which one called it.
 
 ## The bridge to a bash tool
 
