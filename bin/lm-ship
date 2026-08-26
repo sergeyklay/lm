@@ -4,11 +4,12 @@
 
 set -euo pipefail
 
-HERE=0; ARGS=()
+HERE=0; STAGE=1; ARGS=()
 for a in "$@"; do
   case "$a" in
-    --here) HERE=1 ;;
-    *)      ARGS+=("$a") ;;
+    --here)     HERE=1 ;;
+    --no-stage) STAGE=0 ;;
+    *)          ARGS+=("$a") ;;
   esac
 done
 
@@ -35,6 +36,23 @@ TMP=""
 if (( ! HERE )); then
   TMP="lm-ship-$$"
   git switch -q -c "$TMP"
+fi
+
+# The operator should not have to stage what they are already shipping. The verb
+# cannot do it for them: collect() in tools/commit.sh reads the index and refuses
+# an empty one, which is right, because it cannot describe a change it is not
+# committing. So the opinion lives here, in the composition, and --no-stage takes
+# it back off. git add sees more of the tree than reading it does: a modified file
+# shows in git diff and in git add, an untracked one only in git add, and
+# .gitignore is honoured either way. Staging survives a refusal, the way it
+# already did when the operator typed it.
+if (( STAGE )); then
+  if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+    # Having staged nothing is now the surprising case, so it is the one that speaks.
+    echo "lm: nothing to stage; shipping the index as it stands" >&2
+  else
+    git add -A
+  fi
 fi
 
 rc=0

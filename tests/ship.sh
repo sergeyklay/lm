@@ -69,5 +69,32 @@ check "--here passes the refusal through" "7"    "$rc"
 check "--here made no commit"             "chore: seed" "$(git log -1 --format='%s')"
 teardown
 
+# An unstaged tree ships without a git add. g.txt is untracked on purpose: git diff
+# never reports one and git add takes it, which is the difference the composition
+# rests on. Silence is the assertion too — staging is the expected case now.
+setup 0
+git reset -q
+echo more > g.txt
+out=$("$bin/lm-ship" 2>&1)
+check "the unstaged change was shipped" "f.txt,g.txt" "$(git show --name-only --format= HEAD | paste -sd,)"
+check "and staging said nothing"        "0" "$(grep -c 'nothing to stage' <<<"$out")"
+teardown
+
+# --no-stage gets today's behaviour back: nothing is staged, and the verb's own
+# refusal passes through untouched.
+setup 3
+git reset -q
+"$bin/lm-ship" --no-stage >/dev/null 2>&1; rc=$?
+check "--no-stage passes the refusal through" "3" "$rc"
+check "--no-stage staged nothing"             ""  "$(git diff --cached --name-only)"
+teardown
+
+# Nothing to stage is the surprising case, so that is the one that speaks.
+setup 3
+git reset -q --hard
+out=$("$bin/lm-ship" 2>&1)
+check "a clean tree is named" "1" "$(grep -c 'nothing to stage' <<<"$out")"
+teardown
+
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
 echo "all cases passed"

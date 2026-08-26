@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `changelog` command now exits with an error if `CHANGELOG.md` lacks an `## [Unreleased]` section, preventing a wasted model call when there is no target section to draft into.
 - An answer cut short by the token budget is now a failure instead of a result: every verb exits 5 and says the answer was cut off, where before a truncated answer that still parsed was rendered and applied as a finished one.
 - The `pr` command now warns when the remote-tracking base branch is behind the local branch of the same name, indicating that some commits are already on the local branch and suggesting a fetch to ensure the description covers only the current branch's changes.
+- The `lm-ship` command now stages the working tree before committing, so a dirty tree ships without a separate `git add`; untracked files are included and `.gitignore` is still honoured. `--no-stage` restores the previous behaviour of shipping only what was staged by hand.
 
 ### Removed
 

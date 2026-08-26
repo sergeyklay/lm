@@ -20,14 +20,19 @@ picks the verb for a request by reading the same one-line descriptions `lm --lis
 
 ## lm-ship
 
-`lm-ship` runs `commit` then `pr` over the same text. It opens a thematic branch first,
-named `<type>/<kebab-description>` after the subject the model writes, so the branch you end
-up on follows the work rather than the other way round. `--here` commits where you already
-are. Declining the commit leaves neither a branch nor a commit.
+`lm-ship` runs `commit` then `pr` over the same text. It stages the working tree first, so a
+dirty tree ships without a `git add` of your own: modified files and untracked ones both go
+in, and `.gitignore` is honoured. It then opens a thematic branch named
+`<type>/<kebab-description>` after the subject the model writes, so the branch you end up on
+follows the work rather than the other way round. `--here` commits where you already are.
+`--no-stage` leaves the index alone, which is what you want when you have staged a subset
+yourself. Declining the commit leaves neither a branch nor a commit, and leaves the staging in
+place.
 
 ```bash
-lm-ship                        # stage, then this: branch, commit, pull request
+lm-ship                        # stage, branch, commit, pull request
 lm-ship --here "what changed"  # same, on the branch you are on
+lm-ship --no-stage             # ship only what you staged yourself
 ```
 
 ## lm-stats
