@@ -153,5 +153,14 @@ HOME="$work" LM_LOG='' lm stub refuse >/dev/null 2>&1
 check "an emptied LM_LOG logs nothing" "" "$(cat "$work/.lm/runs.jsonl" 2>/dev/null)"
 teardown
 
+# The runner copies the composition into the record, and records none when there
+# was none. This is the half tests/ship.sh cannot see: there the verb is stubbed.
+setup
+LM_COMPOSITION=ship-42 lm stub refuse >/dev/null 2>&1
+check "a composed run names it" "ship-42" "$(jq -r '.composition' "$work/log.jsonl")"
+lm stub refuse >/dev/null 2>&1
+check "a typed run names none"  "null"    "$(jq -r '.composition' "$work/log.jsonl" | tail -1)"
+teardown
+
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
 echo "all cases passed"

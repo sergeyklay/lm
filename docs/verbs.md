@@ -38,13 +38,15 @@ lm-ship --no-stage             # ship only what you staged yourself
 ## lm-stats
 
 Every run appends one JSON object to `$LM_LOG` — the verb, the repository, how many model
-calls it took, what the validator rejected, the exit code, and whether `HEAD` moved.
+calls it took, what the validator rejected, the exit code, whether `HEAD` moved, and which
+composition the run belonged to, or `null` when you typed the verb yourself.
 
 `lm-stats` reads that log and nothing else: no model, no registry, no network. It reports a row
 per verb — runs, how many were clean on the first answer, how many you declined, how many took
 the retry, how many failed, and the average time a run took with your own thinking in it —
-then how many `lm commit` runs actually moved `HEAD`, then the violations the validators
-printed most often. A `--dry-run` reaches the violations but not the rates. One log spans every
+then how many `lm commit` runs actually moved `HEAD`, then how many runs came from a
+composition rather than from your hands, then the violations the validators printed most
+often. A `--dry-run` reaches the violations but not the rates. One log spans every
 repository `lm` has ever run in, so it counts the one you are in.
 
 ```bash

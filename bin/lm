@@ -100,8 +100,10 @@ log_run() { # $1 exit status. Never fails the run it is reporting on.
   jq -nc --arg ts "$(date -Is)" --arg repo "$REPO" --arg verb "$VERB" --arg model "$LM_MODEL" \
     --arg viol "$VIOL" --argjson dry "$DRY" --argjson calls "$CALLS" --argjson rc "$1" \
     --argjson ms "$(( $(date +%s%3N) - T0 ))" --argjson moved "$moved" \
+    --arg comp "${LM_COMPOSITION:-}" \
     '{ts:$ts,repo:$repo,verb:$verb,model:$model,dry:($dry==1),calls:$calls,
-      violations:($viol|split("\n")|map(select(length>0))),exit:$rc,ms:$ms,head_moved:$moved}' \
+      violations:($viol|split("\n")|map(select(length>0))),exit:$rc,ms:$ms,head_moved:$moved,
+      composition:(if $comp == "" then null else $comp end)}' \
     >> "$LM_LOG" 2>/dev/null || true
 }
 T0=$(date +%s%3N); CALLS=0; VIOL=""
