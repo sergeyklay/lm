@@ -17,6 +17,11 @@ check() { # name want got
 }
 
 say() { jq -nc --arg c "$1" '{message:{content:$c},done_reason:"stop"}'; }
+# The same reply with the numbers ollama sends beside it. 1.5 s of model time is
+# chosen to be tellable from any wall clock a case here can produce.
+say_timed() { jq -nc --arg c "$1" '{message:{content:$c},done_reason:"stop",
+  total_duration:1500000000,load_duration:5000000,prompt_eval_count:26,
+  prompt_eval_duration:237000000,eval_count:45,eval_duration:458000000}'; }
 # The same reply the budget cut short: it parses, so only done_reason tells.
 say_cut() { jq -nc --arg c "$1" '{message:{content:$c},done_reason:"length"}'; }
 
@@ -247,6 +252,49 @@ setup "$(say '{"tool":"stub"}')"
 lm --which "exercise the runner" >/dev/null 2>&1
 w1=$(jq -r '.prompt_hash' "$work/log.jsonl")
 check "a --which run hashes its prompt" "64" "${#w1}"
+teardown
+
+# ms is wall clock and the log_run trap fires after apply(), where the tool waits
+# on /dev/tty, so the operator's deliberation is inside it. The model's own time
+# is not, and the gap is what this pins: apply sleeps, ms moves, the model time
+# does not budge from what the reply itself reported.
+setup "$(say_timed ok)"
+sed -i 's/^apply() { confirm/apply() { sleep 1.2; confirm/' "$work/tools/stub.sh"
+check "the stub really sleeps in apply" "1" "$(grep -c 'sleep 1.2' "$work/tools/stub.sh")"
+tty_lm y stub >/dev/null
+check "the model time is the reply's own"    "1500000000" "$(jq -r '.total_duration' "$work/log.jsonl")"
+check "and the token counts came through"    "26 45" \
+  "$(jq -r '[.prompt_eval_count, .eval_count] | @tsv' "$work/log.jsonl" | tr '\t' ' ')"
+check "while the wall clock carries the wait" "yes" \
+  "$([ "$(jq -r '.ms' "$work/log.jsonl")" -ge 1200 ] && echo yes || echo no)"
+teardown
+
+# A retry is two lots of model work, and one record has to say so: the numbers
+# are summed over the calls a run made, not taken from the last one.
+setup "$(say_timed bad)" "$(say_timed ok)"
+tty_lm y stub >/dev/null
+check "a retried run counts two calls"   "2"          "$(jq -r '.calls' "$work/log.jsonl")"
+check "and sums both lots of model time" "3000000000" "$(jq -r '.total_duration' "$work/log.jsonl")"
+check "and both lots of tokens"          "90"         "$(jq -r '.eval_count' "$work/log.jsonl")"
+teardown
+
+# A reply that carries no numbers leaves them null rather than zero: zero
+# nanoseconds of model work would be a claim, and none was made.
+setup "$(say ok)"
+lm stub --dry-run >/dev/null 2>&1
+check "an untimed reply records no model time" "null" "$(jq -r '.total_duration' "$work/log.jsonl")"
+check "and no token counts"                    "null" "$(jq -r '.eval_count' "$work/log.jsonl")"
+teardown
+
+# lm-stats reports the model time in a column of its own, and says so rather
+# than averaging in the runs that predate the field.
+# A --dry-run is kept out of the table by design, so these have to be real runs.
+setup "$(say_timed ok)" "$(say ok)"
+tty_lm y stub >/dev/null
+tty_lm y stub >/dev/null
+out=$("$ROOT/libexec/lm-stats" --all 2>&1)
+check "the table has a model column"  "1" "$(head -1 <<<"$out" | grep -c 'avg model')"
+check "and reports the reply's time"  "1500" "$(awk '/^stub /{print $NF}' <<<"$out")"
 teardown
 
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }

@@ -13,12 +13,22 @@ LM_TOOLS="${LM_TOOLS:-$(dirname "$(readlink -f "$0")")/../tools}"
 list() { for f in "$LM_TOOLS"/*.sh; do [ -f "$f" ] || continue
   ( . "$f"; printf '%s\t%s\n' "$name" "$description" ); done; }
 
-call() { # $1 prompt, $2 schema -> model JSON on stdout
+# Assigns rather than echoing: a command substitution is a subshell, and the six
+# numbers ollama returns beside the answer cannot come back through one.
+call() { # $1 prompt, $2 schema -> sets OUT, adds this call to the model totals
   local resp
   resp=$(jq -n --arg m "$LM_MODEL" --arg p "$1" --argjson s "$2" --argjson c "$LM_CTX" \
     '{model:$m,stream:false,think:false,messages:[{role:"user",content:$p}],format:$s,
       options:{num_ctx:$c,num_predict:3000,temperature:0},keep_alive:"30m"}' \
   | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @-)
+  # Added before the budget check, because a cut-off answer cost the model the
+  # same work as one that fits and the log should say what it cost. A reply that
+  # carries no numbers leaves them null: zero nanoseconds of model work is a
+  # claim, and the absence of a claim is what null is for.
+  if [ "$(jq -r 'has("total_duration")' <<<"$resp")" = true ]; then
+    MODEL_SUM=$(jq -c --argjson a "$MODEL_SUM" '. as $r | $a | with_entries(.value += ($r[.key] // 0))' <<<"$resp")
+    MODEL_N=$((MODEL_N + 1))
+  fi
   # A cut-off answer often still parses and still passes validate(), so nothing
   # downstream would notice. Measured: the budget is 3000 and a commit message
   # costs 44, but lm pr on a long branch has no such margin.
@@ -26,7 +36,7 @@ call() { # $1 prompt, $2 schema -> model JSON on stdout
     echo "lm: the answer hit the token budget and is cut off" >&2
     return 5
   fi
-  jq -r '.message.content' <<<"$resp"
+  OUT=$(jq -r '.message.content' <<<"$resp")
 }
 
 confirm() { local a; read -r -p "$1 " a </dev/tty; [ "$a" = y ] || exit 7; }
@@ -58,16 +68,24 @@ log_run() { # $1 exit status. Never fails the run it is reporting on.
     --argjson ms "$(( $(date +%s%3N) - T0 ))" --argjson moved "$moved" \
     --arg comp "${LM_COMPOSITION:-}" --arg which "$WHICH" \
     --arg phash "$(sha "${PROMPT:-}")" --arg ahash "$(sha "${OUT:-}")" --argjson alen "$alen" \
+    --argjson msum "$([ "$MODEL_N" -gt 0 ] && echo "$MODEL_SUM" || echo null)" \
     '{ts:$ts,repo:$repo,verb:$verb,model:$model,dry:($dry==1),calls:$calls,
       violations:($viol|split("\n")|map(select(length>0))),exit:$rc,ms:$ms,head_moved:$moved,
       composition:(if $comp == "" then null else $comp end),
       which:(if $which == "" then null else $which end),
       prompt_hash:(if $phash == "" then null else $phash end),
       answer_hash:(if $ahash == "" then null else $ahash end),
-      answer_len:$alen}' \
+      answer_len:$alen}
+     + ($msum // {total_duration:null,load_duration:null,prompt_eval_count:null,
+                  prompt_eval_duration:null,eval_count:null,eval_duration:null})' \
     >> "$LM_LOG" 2>/dev/null || true
 }
 T0=$(date +%s%3N); CALLS=0; VIOL=""; DRY=0; VERB=""; WHICH=""
+# ollama's own numbers, in its own names and its own nanoseconds, summed over the
+# calls a run made: a retry is two lots of model work and the record says so.
+MODEL_N=0
+MODEL_SUM='{"total_duration":0,"load_duration":0,"prompt_eval_count":0,
+            "prompt_eval_duration":0,"eval_count":0,"eval_duration":0}'
 HEAD0=$(git rev-parse HEAD 2>/dev/null || true)
 # A run outside a repository still happened somewhere, and "-" names nothing
 # lm-stats can scope to, so the working directory stands in for the repository.
@@ -95,7 +113,7 @@ $CAT- none: no tool above serves this request
 Request: $*
 
 Pick the single tool that serves this request. Answer none when no tool above does."
-      OUT=$(call "$PROMPT" "$SCH")
+      call "$PROMPT" "$SCH"
       [ -n "$OUT" ] || { echo "lm: empty response from model" >&2; exit 5; }
       WHICH=$(jq -r '.tool' <<<"$OUT")
       if [ "$WHICH" = none ]; then
@@ -155,16 +173,16 @@ for a in "${ARGS[@]}"; do
 done
 SCHEMA=$(schema)
 CALLS=1
-OUT=$(call "$PROMPT" "$SCHEMA")
+call "$PROMPT" "$SCHEMA"
 [ -n "$OUT" ] || { echo "lm: model returned empty content (a failure, not an empty answer)" >&2; exit 5; }
 ERRS=$(printf '%s' "$OUT" | validate) || true
 VIOL="$ERRS"
 if [ -n "$ERRS" ]; then
   CALLS=2
-  OUT=$(call "$PROMPT
+  call "$PROMPT
 
 The previous attempt was rejected for these reasons. Fix them and answer again:
-$ERRS" "$SCHEMA")
+$ERRS" "$SCHEMA"
   [ -n "$OUT" ] || { echo "lm: model returned empty content on retry" >&2; exit 5; }
   ERRS=$(printf '%s' "$OUT" | validate) || true
 fi

@@ -79,7 +79,14 @@ that edits `collect`, the empty string in place of `null` kills only the run tha
 length of `0` for a missing answer kills only its own case, dropping the `--which` prompt kills
 only that one, and hashing an empty answer rather than nulling it kills only its own. Two are
 broad and worth knowing as such: pinning the length to `null` kills both length cases, and
-dropping the prompt hash kills four. Every one of the eight has been observed red.
+dropping the prompt hash kills four. Every one of the eight has been observed red. A fifth, over the model's own numbers: five
+mutations that `bash -n` accepts cover the twelve cases holding them, and the one the task itself
+named — feeding the column the wall clock instead of the reply's `total_duration` — turns four
+red at once, including the two that read `lm stats`. Replacing the accumulator instead of adding
+to it turns exactly the two summing cases red, treating an absent number as zero turns the two
+null cases red, averaging the missing in as zero turns only the `lm stats` case red, and pinning
+`ms` to zero turns only the case that says the operator's wait is inside it. All twelve have been
+observed red.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

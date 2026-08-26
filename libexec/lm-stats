@@ -29,7 +29,12 @@ VERBRUN="($RUN and .verb != \"--which\")"
 [ "$(jq -s "${SCOPE[@]}" "map(select($MINE)) | length" "$LM_LOG")" -gt 0 ] || {
   echo "lm-stats: nothing logged for $REPO; --all reads every repository" >&2; exit 2; }
 
-printf '%-10s %5s %7s %9s %8s %7s %8s\n' verb runs clean declined retried failed "avg ms"
+# Two times, and the gap between them is the point: ms is wall clock and the
+# log_run trap fires after apply(), where every tool waits on /dev/tty, so it
+# carries the operator's deliberation. avg model is what ollama itself reported.
+# A record written before the runner asked for those numbers has none, and the
+# column says so rather than averaging a zero in and reporting a faster model.
+printf '%-10s %5s %7s %9s %8s %7s %8s %9s\n' verb runs clean declined retried failed "avg ms" "avg model"
 jq -s -r "${SCOPE[@]}" "
   map(select($VERBRUN)) | group_by(.verb)[] |"'
   [ .[0].verb, length,
@@ -37,8 +42,11 @@ jq -s -r "${SCOPE[@]}" "
     (map(select(.exit == 7)) | length),
     (map(select(.calls == 2)) | length),
     (map(select(.exit != 0 and .exit != 7)) | length),
-    (map(.ms) | add / length | floor) ] | @tsv' "$LM_LOG" \
-| awk -F'\t' '{printf "%-10s %5d %6d%% %9d %8d %7d %8d\n", $1, $2, ($2 ? 100*$3/$2 : 0), $4, $5, $6, $7}'
+    (map(.ms) | add / length | floor),
+    (map(select(.total_duration != null) | .total_duration)
+     | if length == 0 then null else (add / length / 1000000 | floor) end) ] | @tsv' "$LM_LOG" \
+| awk -F'\t' '{printf "%-10s %5d %6d%% %9d %8d %7d %8d %9s\n",
+    $1, $2, ($2 ? 100*$3/$2 : 0), $4, $5, $6, $7, ($8 == "" ? "-" : $8)}'
 
 echo
 echo "commits created by lm commit:"
