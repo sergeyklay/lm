@@ -18,8 +18,10 @@ check() { # name want got
 setup() {
   work=$(mktemp -d); bin=$work/bin; mkdir -p "$bin"
   cp "$ROOT/bin/lm-ship" "$bin/lm-ship"
+  COMPLOG=$(mktemp); export COMPLOG
   cat > "$bin/lm" <<EOF
 #!/usr/bin/env bash
+echo "\$1 \${LM_COMPOSITION:-none}" >> "\$COMPLOG"
 case "\$1" in
   commit) [ "${1:-0}" -eq 0 ] || exit ${1:-0}
           git commit -qm "feat: scope the widget to one repository" ;;
@@ -33,7 +35,7 @@ EOF
   echo change > f.txt; git add f.txt
 }
 
-teardown() { cd /; rm -rf "$work"; }
+teardown() { cd /; rm -rf "$work" "$COMPLOG"; }
 
 # A thematic branch is what happens when nothing is said, named from the subject.
 setup 0
@@ -94,6 +96,15 @@ setup 3
 git reset -q --hard
 out=$("$bin/lm-ship" 2>&1)
 check "a clean tree is named" "1" "$(grep -c 'nothing to stage' <<<"$out")"
+teardown
+
+# Both verbs of one composition carry the same name, and it is not empty. The log
+# cannot tell a composed run from a typed one without it: lm writes one record per
+# verb, so lm-ship leaves two that look like two the operator typed.
+setup 0
+"$bin/lm-ship" >/dev/null 2>&1
+check "both verbs saw a composition" "2" "$(grep -cv ' none$' "$COMPLOG")"
+check "and it was the same one"      "1" "$(cut -d' ' -f2 "$COMPLOG" | sort -u | wc -l)"
 teardown
 
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }

@@ -16,6 +16,12 @@ done
 LM=$(dirname "$(readlink -f "$0")")/lm
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; exit 2; }
 
+# lm writes one record per verb, so without this the two records this run leaves
+# are indistinguishable from two the operator typed, and the only way to count a
+# composition afterwards is to infer it from adjacency. The pid ties this run's
+# records to each other; the name says which composition wrote them.
+export LM_COMPOSITION="ship-$$"
+
 # <type>/<kebab-description>, from the subject the model just wrote. Four words is
 # where a branch name stops being read and starts being scrolled past.
 _name() {
