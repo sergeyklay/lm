@@ -182,5 +182,28 @@ lm --which "anything" >/dev/null 2>&1
 check "none is offered in the schema" "true" "$(jq -r '.format.properties.tool.enum|contains(["none"])' "$REPLIES/req.1")"
 teardown
 
+# A --which run reaches the log whichever way it answers, because the signal is a
+# share: refusals alone are a numerator without a denominator. The record names
+# no verb, so lm-stats keeps it out of the verb table and counts it on its own.
+setup "$(say '{"tool":"stub"}')" "$(say '{"tool":"none"}')"
+lm --which "exercise the runner" >/dev/null 2>&1
+lm --which "brew me a coffee"    >/dev/null 2>&1
+check "both --which runs are logged"  "2"        "$(wc -l < "$work/log.jsonl")"
+check "a match names the verb it found" "stub"   "$(jq -r '.which' "$work/log.jsonl" | head -1)"
+check "a refusal is told from a match"  "none"   "$(jq -r '.which' "$work/log.jsonl" | tail -1)"
+check "the record is not a verb"        "--which" "$(jq -r '.verb' "$work/log.jsonl" | head -1)"
+out=$("$ROOT/bin/lm-stats" 2>&1)
+check "the verb table excludes it"  "0" "$(sed -n '2,/^$/p' <<<"$out" | grep -c -- --which)"
+check "lm-stats reports the share"  "1 of 2" \
+  "$(grep -A1 'found no verb for' <<<"$out" | tail -1 | tr -s ' ' | sed 's/^ //')"
+teardown
+
+# A verb run carries the field too, empty: one shape, so nothing has to know
+# which kind of record it is holding before it can read one.
+setup
+lm stub refuse >/dev/null 2>&1
+check "a verb run names no which" "null" "$(jq -r '.which' "$work/log.jsonl")"
+teardown
+
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
 echo "all cases passed"

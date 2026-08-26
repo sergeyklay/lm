@@ -19,6 +19,8 @@ that is what it commits.
 picks the verb for a request by reading the same one-line descriptions `lm --list` prints. When
 no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
 exits 2, so a composition that pipes it into `lm` stops rather than running the nearest match.
+Either answer is logged, so how often the registry has no verb for what you asked is a share
+`lm-stats` prints rather than something you have to remember.
 
 A drafted bullet is refused when it names something only the source knows: the functions
 `docs/tools.md` publishes as the tool contract are fair game, the project's other functions are
@@ -45,14 +47,18 @@ lm-ship --no-stage             # ship only what you staged yourself
 
 Every run appends one JSON object to `$LM_LOG` — the verb, the repository, how many model
 calls it took, what the validator rejected, the exit code, whether `HEAD` moved, and which
-composition the run belonged to, or `null` when you typed the verb yourself.
+composition the run belonged to, or `null` when you typed the verb yourself. A `lm --which`
+run is logged in the same shape: it names `--which` where a run names its verb, and carries
+the verb it picked, or `none`, in a field every other run leaves `null`.
 
 `lm-stats` reads that log and nothing else: no model, no registry, no network. It reports a row
 per verb — runs, how many were clean on the first answer, how many you declined, how many took
 the retry, how many failed, and the average time a run took with your own thinking in it —
 then how many `lm commit` runs actually moved `HEAD`, then how many runs came from a
-composition rather than from your hands, then the violations the validators printed most
-often. A `--dry-run` reaches the violations but not the rates. One log spans every
+composition rather than from your hands, then how many `lm --which` requests found no verb at
+all, then the violations the validators printed most often. `--which` is kept out of the table,
+because it is a run and not a verb and its refusal exits 2, which the table would count as a
+failure. A `--dry-run` reaches the violations but not the rates. One log spans every
 repository `lm` has ever run in, so it counts the one you are in.
 
 ```bash
