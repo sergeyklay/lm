@@ -50,7 +50,8 @@ bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool
-LM_LIVE=1 node tests/verb-live.mts  # the Node runner's retry guarantee, on the real model
+node tests/request.mts            # what the Node runner asks the model for, off the wire
+LM_LIVE=1 node tests/verb-live.mts  # the Node runner's retry and its budget, on the real model
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the
@@ -86,7 +87,17 @@ red at once, including the two that read `lm stats`. Replacing the accumulator i
 to it turns exactly the two summing cases red, treating an absent number as zero turns the two
 null cases red, averaging the missing in as zero turns only the `lm stats` case red, and pinning
 `ms` to zero turns only the case that says the operator's wait is inside it. All twelve have been
-observed red.
+observed red. A sixth, over the two settings that carry the answer budget and stop the model
+thinking, which `tests/request.mts` reads off a recording server rather than from a reply.
+Neither is in the runner's control flow, so a run without them still succeeds and simply grows
+past the budget again: removing the field that names the budget turns two of the four cases red
+and leaves the reasoning case green, and removing the reasoning setting turns that one red and
+leaves the budget cases green. On the real model the budget is what `tests/verb-live.mts` covers
+from the other side, and its three truncation cases were confirmed red both ways — without the
+budget field the answer completes and none of the three fires, and without the runner's own
+truncation arm the exit code is still 5, from the answer that never arrived, so only the case
+reading the message goes red. The code alone cannot tell the two apart, which is why a case
+reads the message.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
