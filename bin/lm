@@ -14,10 +14,19 @@ list() { for f in "$LM_TOOLS"/*.sh; do [ -f "$f" ] || continue
   ( . "$f"; printf '%s\t%s\n' "$name" "$description" ); done; }
 
 call() { # $1 prompt, $2 schema -> model JSON on stdout
-  jq -n --arg m "$LM_MODEL" --arg p "$1" --argjson s "$2" --argjson c "$LM_CTX" \
+  local resp
+  resp=$(jq -n --arg m "$LM_MODEL" --arg p "$1" --argjson s "$2" --argjson c "$LM_CTX" \
     '{model:$m,stream:false,think:false,messages:[{role:"user",content:$p}],format:$s,
       options:{num_ctx:$c,num_predict:3000,temperature:0},keep_alive:"30m"}' \
-  | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @- | jq -r '.message.content'
+  | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @-)
+  # A cut-off answer often still parses and still passes validate(), so nothing
+  # downstream would notice. Measured: the budget is 3000 and a commit message
+  # costs 44, but lm pr on a long branch has no such margin.
+  if [ "$(jq -r '.done_reason // empty' <<<"$resp")" = length ]; then
+    echo "lm: the answer hit the token budget and is cut off" >&2
+    return 5
+  fi
+  jq -r '.message.content' <<<"$resp"
 }
 
 confirm() { local a; read -r -p "$1 " a </dev/tty; [ "$a" = y ] || exit 7; }
