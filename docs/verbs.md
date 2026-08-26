@@ -59,6 +59,8 @@ Environment only:
 | `LM_TOOLS` | `<repo>/tools` |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 
+Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= lm commit` writes no record, and `lm-stats` under the same setting reads none. That is what a fixture repository or a rehearsal wants, because one log spans every repository and `lm-stats` counts the one you are in.
+
 ## Exit codes
 
 A composition stops on any of these. 7 is the one that is not a failure — it is you saying no.

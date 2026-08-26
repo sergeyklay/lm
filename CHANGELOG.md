@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `fix` command, which repaired mechanical build errors using the Go compiler as the oracle
 
+### Fixed
+
+- An empty `LM_LOG` now keeps a run out of the log, as the configuration documents. Before, `LM_LOG=` fell through to the default path and every such run was appended to `$HOME/.lm/runs.jsonl`, so `lm-stats` counted rehearsals and fixture repositories alongside real work.
+
 ## [0.0.3] - 2026-08-25
 
 ### Added

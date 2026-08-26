@@ -142,5 +142,16 @@ check "it rendered the answer" "ok" "$(head -1 <<<"$out")"
 check "it applied nothing"     "0" "$(grep -c APPLIED <<<"$out")"
 teardown
 
+# An emptied LM_LOG keeps a run out of the log. HOME is set so that a regression
+# lands inside the fixture instead of the operator's own log, which is where the
+# default path sent it. The first run is the control: without it the case would
+# pass on a runner that never logs at all.
+setup
+lm stub refuse >/dev/null 2>&1
+check "a run is logged"                "1" "$(wc -l < "$work/log.jsonl")"
+HOME="$work" LM_LOG='' lm stub refuse >/dev/null 2>&1
+check "an emptied LM_LOG logs nothing" "" "$(cat "$work/.lm/runs.jsonl" 2>/dev/null)"
+teardown
+
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
 echo "all cases passed"

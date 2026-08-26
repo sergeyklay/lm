@@ -3,7 +3,10 @@
 # Dry runs are excluded from the rates and kept in the violation histogram.
 
 set -euo pipefail
-: "${LM_LOG:=$HOME/.lm/runs.jsonl}"
+: "${LM_LOG=$HOME/.lm/runs.jsonl}"
+# An emptied LM_LOG turns logging off in bin/lm, so the reader has to say that
+# rather than name a path it was never given.
+[ -n "$LM_LOG" ] || { echo "lm-stats: LM_LOG is empty, so no run was recorded" >&2; exit 2; }
 [ -s "$LM_LOG" ] || { echo "lm-stats: nothing logged in $LM_LOG" >&2; exit 2; }
 
 # One log spans every repository lm has run in, and the fixture repositories the
