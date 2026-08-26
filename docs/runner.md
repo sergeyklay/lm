@@ -8,6 +8,11 @@ dispatches to lives in `libexec/`, which is not on anyone's `PATH`.
 runner it hands a verb to knows nothing about the chat, `ship` or `stats`. It answers wherever
 `-h` or `--help` appears, so `lm commit --help` prints it too.
 
+An argument in the first position that starts with a dash and is none of `lm`'s own options is
+refused by name, with the options it could have meant, before anything is dispatched. `--list`
+and `--which` are the shell runner's and pass through. `--dry-run` belongs to a verb, and the
+refusal says so rather than listing it as though `lm` took it.
+
 The chat is the harness's own interactive mode, driven through its entry point with an inline
 extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`. No
 configuration file outside the repository is read.

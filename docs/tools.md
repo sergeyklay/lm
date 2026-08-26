@@ -68,7 +68,11 @@ blanking the `which` argument kills three, and dropping the table's exclusion ki
 the internal function the bullet that shipped in `v0.0.2` reached for, which
 `git log -S 'formats the command list' -- CHANGELOG.md` locates, while passing the replacement
 written by hand to fix it. Naming that function here in back quotes would publish it and turn the
-check off, which is why this paragraph does not.
+check off, which is why this paragraph does not. A third: deleting the option guard from
+`bin/lm`, a mutation `node --check` accepts, kills four of the six `tests/cli.mts` cases that
+cover it and leaves the two asserting only the exit status, because the argument then reaches the
+shell runner as a tool name and is refused with 2 there instead. The status was never the
+property at risk.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

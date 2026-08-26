@@ -47,6 +47,18 @@ const unknown = run(LM, ["nosuch"]);
 check("a subcommand's exit status arrives", 2, unknown.code);
 check("and its message arrives", true, /no such tool 'nosuch'/.test(unknown.err));
 
+// A mistyped option is not a verb name, and the verb list is a set that cannot
+// contain it, so answering with that list answers a question nobody asked.
+const mistyped = run(LM, ["--hlp"]);
+check("a mistyped option exits 2", 2, mistyped.code);
+check("and is named back", true, /'--hlp' is not an option of lm/.test(mistyped.err));
+check("and is not reported as a missing verb", false, /no such tool/.test(mistyped.err));
+check("and the options it could have meant are listed", true, /--list, --which, -h, --help/.test(mistyped.err));
+
+const misplaced = run(LM, ["--dry-run"]);
+check("a verb flag ahead of its verb exits 2", 2, misplaced.code);
+check("and is told where the flag goes", true, /A verb takes --dry-run/.test(misplaced.err));
+
 const stats = spawnSync(LM, ["stats"], { encoding: "utf8", cwd: ROOT });
 check("stats reaches the run log", true, /^verb\s+runs\s+clean/m.test(stats.stdout ?? ""));
 
