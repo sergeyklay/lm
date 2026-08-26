@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `issue` command now fails immediately if repository labels cannot be retrieved, preventing a model call that would lack a valid label set.
 - The `issue` command now includes the user-provided topic in the prompt context when supplied alongside staged changes.
 - The `changelog` command now exits with an error if `CHANGELOG.md` lacks an `## [Unreleased]` section, preventing a wasted model call when there is no target section to draft into.
+- An answer cut short by the token budget is now a failure instead of a result: every verb exits 5 and says the answer was cut off, where before a truncated answer that still parsed was rendered and applied as a finished one.
 - The `pr` command now warns when the remote-tracking base branch is behind the local branch of the same name, indicating that some commits are already on the local branch and suggesting a fetch to ensure the description covers only the current branch's changes.
 
 ### Removed

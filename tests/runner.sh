@@ -17,6 +17,8 @@ check() { # name want got
 }
 
 say() { jq -nc --arg c "$1" '{message:{content:$c},done_reason:"stop"}'; }
+# The same reply the budget cut short: it parses, so only done_reason tells.
+say_cut() { jq -nc --arg c "$1" '{message:{content:$c},done_reason:"length"}'; }
 
 # Each argument is one model reply, taken in order. The stub keeps the request it
 # was handed beside the reply it returned, so a case can assert what the retry was
@@ -110,6 +112,19 @@ teardown
 setup "$(say bad)" "$(say '')"
 lm stub >/dev/null 2>&1; rc=$?
 check "empty on the retry exits 5" "5" "$rc"
+teardown
+
+# A cut-off answer is a failure even when it parses and would have validated.
+setup "$(say_cut ok)"
+out=$(lm stub 2>&1); rc=$?
+check "a cut-off answer exits 5"   "5" "$rc"
+check "and says it was cut off"    "1" "$(grep -c 'cut off' <<<"$out")"
+check "and is not retried"         "1" "$(calls)"
+teardown
+
+setup "$(say bad)" "$(say_cut ok)"
+lm stub >/dev/null 2>&1; rc=$?
+check "cut off on the retry exits 5" "5" "$rc"
 teardown
 
 # Declining is exit 7, and it is not a failure: nothing was applied.

@@ -68,5 +68,5 @@ A composition stops on any of these. 7 is the one that is not a failure — it i
 | 2 | no such verb, an undeclared flag, or not a git repository |
 | 3 | the verb has nothing to work on |
 | 4 | the validator rejected two answers |
-| 5 | the model returned empty content |
+| 5 | the model returned nothing usable: empty content, or an answer cut off by the token budget |
 | 7 | you declined the confirmation |
