@@ -58,10 +58,20 @@ before building a prompt leaves all three empty, while a run whose model returne
 its prompt hash and reports a length of zero. That zero is not an absent answer. It is the model
 answering with nothing, and it exits 5.
 
+It carries the numbers ollama reports beside the answer too, under ollama's own names and in its
+own nanoseconds: `total_duration`, `load_duration`, `prompt_eval_count`, `prompt_eval_duration`,
+`eval_count` and `eval_duration`. They are summed over the calls a run made, so a run that took
+the retry shows two lots of model work rather than the second lot alone. A reply carrying none of
+them leaves all six `null`: zero nanoseconds of model work is a claim, and none was made.
+
 `lm stats` reads that log and nothing else: no model, no registry, no network. It reports a row
 per verb — runs, how many were clean on the first answer, how many you declined, how many took
-the retry, how many failed, and the average time a run took with your own thinking in it —
-then how many `lm commit` runs actually moved `HEAD`, then how many runs came from a
+the retry, how many failed, the average time a run took with your own thinking in it, and the
+average the model itself reported, which has none of your thinking in it. The two differ because
+a run is recorded after the verb applies and every verb waits for your answer at the terminal
+first, so the wait is inside the one and outside the other. A run whose record holds no model
+time is left out of that average, and a verb with no such run shows `-` rather than being
+reported as instant. Then how many `lm commit` runs actually moved `HEAD`, then how many runs came from a
 composition rather than from your hands, then how many `lm --which` requests found no verb at
 all, then the violations the validators printed most often. `--which` is kept out of the table,
 because it is a run and not a verb and its refusal exits 2, which the table would count as a
