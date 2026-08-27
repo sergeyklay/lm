@@ -1,8 +1,8 @@
 export const endpoint = () => (process.env.LM_OLLAMA ?? "http://127.0.0.1:11434").replace(/\/$/, "");
 export const modelId = () => process.env.LM_MODEL ?? "qwen3.8:27b";
-export const CONTEXT_TOKENS = 32768;
+export const SERVED_CONTEXT_TOKENS = 65536;
 export const MAX_TOKENS = 3000;
-export const contextWindow = () => Number(process.env.LM_CTX ?? CONTEXT_TOKENS);
+export const contextWindow = () => Number(process.env.LM_CTX ?? SERVED_CONTEXT_TOKENS);
 export const maxTokens = () => Number(process.env.LM_MAX_TOKENS ?? MAX_TOKENS);
 
 export function providerConfig() {

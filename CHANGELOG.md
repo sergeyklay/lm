@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The default context window is now 65536 tokens, matching what this machine's ollama serves, so the chat no longer compacts early against a window the server does not hold and a conversation can grow to what ollama actually keeps.
 - `LM_CTX` now reaches only the chat and `lm ship`: a verb's answer budget no longer follows the window, so a window sized for a smaller card no longer shortens a verb's answer, and the budget is `LM_MAX_TOKENS` whatever the window says.
 - The chat now hands the model a shell beside the verbs, so it can stage, commit and push without reaching a verb at all, and `lm chat` takes `--exclude-tools bash` to take the shell away, after which the same request stops at the verb and its record is the only trace.
 - Verb answers are now sampled greedily: the runner pins temperature 0 on every request, so the same diff produces the same message again, where before the model's own default of 1 decided and answers varied between identical runs.

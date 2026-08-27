@@ -120,7 +120,7 @@ check("and stays the variable's under a narrow window", 64, both.body.max_tokens
 process.env.LM_CTX = "5000";
 check("the chat accounts against the window the operator set", 5000, providerConfig().models[0].contextWindow);
 delete process.env.LM_CTX;
-check("and against the declared one when they set nothing", 32768, providerConfig().models[0].contextWindow);
+check("and against the declared one when they set nothing", 65536, providerConfig().models[0].contextWindow);
 
 rmSync(work, { recursive: true, force: true });
 

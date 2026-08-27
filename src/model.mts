@@ -1,5 +1,5 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { providerConfig, endpoint, modelId, CONTEXT_TOKENS } from "./provider.mts";
+import { providerConfig, endpoint, modelId, SERVED_CONTEXT_TOKENS } from "./provider.mts";
 
 // A verb is one call under a budget, so four fields the chat does not want are
 // added here rather than in the shared provider: ollama's /v1 ignores the
@@ -24,7 +24,7 @@ export async function resolveModel() {
     models: [{
       ...cfg.models[0],
       compat: { ...cfg.models[0].compat, maxTokensField: "max_tokens" as const },
-      contextWindow: CONTEXT_TOKENS,
+      contextWindow: SERVED_CONTEXT_TOKENS,
       samplingParams: { reasoning_effort: "none", temperature: 0 },
     }],
   });

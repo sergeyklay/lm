@@ -5,7 +5,7 @@ set -euo pipefail
 
 : "${LM_OLLAMA:=http://127.0.0.1:11434}"
 : "${LM_MODEL:=qwen3.8:27b}"
-: "${LM_CTX:=32768}"
+: "${LM_CTX:=65536}"
 : "${LM_MAX_TOKENS:=3000}"
 : "${LM_LOG=$HOME/.lm/runs.jsonl}"     # one JSON object per run; empty disables
 
