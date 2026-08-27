@@ -48,6 +48,7 @@ leaves the verb's most interesting path untested and says so only in passing.
 ```bash
 node tests/cli.mts                # what `lm` dispatches, and its help
 bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
+bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh` stubbed
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
@@ -123,6 +124,16 @@ middle, and dropping the version reddens the case that reads the name. The suite
 `theme`'s level rather than at the terminal's, so the check that the terminal shows this and not
 the harness's own header is a capture through a pseudo-terminal, killed with `SIGKILL` so the
 harness cannot restore its chrome on the way out and paint a last frame that reads like a defect.
+
+A tenth, over the one `apply` whose command line nothing else sees. Every other verb hands its
+command what `render` already printed, so the golden fixtures cover it without `git` or `gh` being
+called; `issue` assembles a `--label` list from what the human typed, and that list had only ever
+been read by eye. Four mutations of `tools/issue.sh` that `bash -n` accepts and that run: dropping
+the trim reddens only the case with a space after the comma, reading an empty reply as no labels
+reddens only the case that keeps what the model proposed, taking the word `none` literally reddens
+only its own case, and removing the confirmation reddens two — the exit code and the absence of
+the call — which is the pair worth having, because a verb that creates the issue and then asks is
+indistinguishable from one that asks first until the first time someone says no.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
