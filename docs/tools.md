@@ -57,7 +57,7 @@ node tests/registry.mts           # the Node runner's bridge to a bash tool, and
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
 node tests/chrome.mts             # what the chat's header and status rows say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
-LM_LIVE=1 node tests/verb-live.mts  # the runner's retry, its budget and a verb inside the chat, on the real model
+LM_LIVE=1 node tests/verb-live.mts  # the retry, the budget, a verb inside the chat and the shell beside it, on the real model
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the
@@ -194,6 +194,20 @@ signature of a mutant that never reached the code the cases read. And the empty-
 asserted the exit code alone, which the very next guard produces as well, so removing the guard
 under test left the case green — a case that reads a status two lines can produce has to read the
 words too, or it cannot tell which line answered.
+
+The last group in the live suite covers the shell the chat carries beside the verbs, and its shape
+is a concession rather than a preference. Asked plainly to commit, this model reached for the shell
+in 3 of 4 sessions measured on 2026-08-27, so an assertion that it does would be red about a fifth
+of the time with nothing wrong in the repository. What the two arms assert instead is the capability
+the page claims: with the shell, `HEAD` moves and no record the log holds accounts for it; with
+`--exclude-tools bash`, the same request reaches the verb, stops there and leaves `HEAD` where it
+started. Three mutations, each killing exactly one case and each confirmed by the row it printed:
+rewording the sentence out of `docs/verbs.md` reddens the case that reads the page; handing the
+shell arm `--exclude-tools bash` reddens the case that claims the shell moved `HEAD`; and blanking
+`LM_LOG` for the session reddens the case that asserts a record exists. That third one is why the
+record count is asserted separately from the records' exit codes: with an empty log the check that
+every record is non-zero passes over no records at all, and under the mutation it passed in exactly
+that way.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

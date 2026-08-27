@@ -145,6 +145,62 @@ check("and it cost the verb's own model call", 1, records[0]?.calls);
 check("and the refused confirmation exited 7", 7, records[0]?.exit);
 check("and nothing was applied", false, existsSync(join(work, "applied.txt")));
 
+// The verb layer is advisory inside the chat, because the harness's own shell is in
+// the same session and can do a verb's work beside it. docs/verbs.md says so under
+// `## Exit codes`, and these two arms are what make the sentence true rather than
+// plausible: with the shell, HEAD moves without a verb applying anything; with the
+// shell taken away, the same request stops at the verb and its record is the only
+// trace. Both arms are driven through bin/lm, because the entry point is part of
+// what is being reported.
+// What is asserted is the capability, not the model's appetite for it. Asked plainly
+// to commit, this model reached for the shell in 3 of 4 runs measured 2026-08-27
+// against pi 0.84.3, ollama 0.32.15 and qwen3.8:27b; that frequency is a measurement
+// in docs/verbs.md and would be a flake as an assertion.
+const page = readFileSync(join(ROOT, "docs/verbs.md"), "utf8");
+check("the page says a verb inside the chat is a request",
+  true, /a request the model may fulfil another way/.test(page));
+
+function fixture() {
+  const repo = mkdtempSync(join(tmpdir(), "lm-shell-"));
+  const git = (...args: string[]) =>
+    (spawnSync("git", args, { cwd: repo, encoding: "utf8" }).stdout ?? "").trim();
+  git("init", "-q", "-b", "main", ".");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  writeFileSync(join(repo, "a.txt"), "one\n");
+  git("add", ".");
+  git("commit", "-qm", "chore: seed");
+  writeFileSync(join(repo, "a.txt"), "two\n");
+  return { repo, git, head0: git("rev-parse", "HEAD"), log: join(repo, "runs.jsonl") };
+}
+
+function session(f: ReturnType<typeof fixture>, prompt: string, extra: string[]) {
+  spawnSync(join(ROOT, "bin/lm"), ["chat", "-p", prompt, ...extra], {
+    cwd: f.repo,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, LM_LOG: f.log, LM_TOOLS: join(ROOT, "tools") },
+  });
+  return existsSync(f.log)
+    ? readFileSync(f.log, "utf8").trim().split("\n").filter((l) => l).map((l) => JSON.parse(l))
+    : [];
+}
+
+const withShell = fixture();
+const shellRuns = session(withShell, "Commit the change using git directly rather than the commit tool.", []);
+check("the shell moves HEAD with no verb behind it",
+  true, withShell.git("rev-parse", "HEAD") !== withShell.head0);
+check("and nothing the log holds claims it",
+  true, shellRuns.every((r) => r.head_moved === false && r.exit !== 0));
+rmSync(withShell.repo, { recursive: true, force: true });
+
+const noShell = fixture();
+const verbRuns = session(noShell, "commit the change", ["--exclude-tools", "bash"]);
+check("without the shell the request reaches the verb", true, verbRuns.length > 0);
+check("and stops there, HEAD where it started",
+  noShell.head0, noShell.git("rev-parse", "HEAD"));
+check("and every record it left is non-zero", true, verbRuns.every((r) => r.exit !== 0));
+rmSync(noShell.repo, { recursive: true, force: true });
 rmSync(work, { recursive: true, force: true });
 
 if (fail) { console.log("FAILED"); process.exit(1); }
