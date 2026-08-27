@@ -31,7 +31,7 @@ call before it ships.
 
 `validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry.
 
-`apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses. `ask "text"` prints one line of answer, so `labels=$(ask "Labels (bug, ci):")` works; an empty line is an answer and the tool decides what it means, while no answer at all exits 7 like a refused confirmation. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
+`apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses. `ask "text"` prints one line of answer, so `labels=$(ask "Labels (bug, ci):")` works; an empty line is an answer and the tool decides what it means, while no answer at all exits 7 like a refused confirmation. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. A tool file that calls one anyway is stopped there and the run exits 1 naming the function, because that is a defect in the tool file and not an answer the human withheld. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
 
 A tool refuses with `return 3` when there is nothing to work on. The other codes are the
 runner's; [`verbs.md`](verbs.md) lists them.
@@ -64,7 +64,7 @@ model: the prompt `collect` writes, the shape `schema` asks for, the violations 
 reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
 diff before committing them.
 
-Eleven groups of checks here have been made to go red, and that record is what makes a green run of
+Twelve groups of checks here have been made to go red, and that record is what makes a green run of
 them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
 kills a different subset of the six cases in `tests/runner.sh`: dropping the trap kills five,
 blanking the `which` argument kills three, and dropping the table's exclusion kills one. The
@@ -152,6 +152,17 @@ reddens the declining cases here too. The first attempt at these is the warning 
 case that cleans up the approved run's artefact removed it without `force`, so a mutant that
 suppressed the side effect crashed the suite at that line rather than reddening a case, and a
 suite that dies partway prints a plausible run of `ok` lines and proves nothing.
+
+A twelfth, over the one code no page carried. Three sites reach exit 1 and each now has a case
+asserting the digit rather than its inequality with zero: the `REFUSE` prelude spending it on a
+diagnostic, a body whose command fails, and a body killed before it can return a status. Three
+mutations of `src/registry.mts` that `node --check` accepts and that run, each reddening a
+different one — `REFUSE` exiting 2 reddens only the read-only case; `apply()` falling back to
+`r.status ?? 0` reddens only the killed case and leaves the failing body green, because that
+body's status was never null; and dropping `-e` from the shell `apply` runs under reddens the
+failing body and its sibling. The negative control is the part worth keeping: written as
+`status !== 0`, the read-only case survives `REFUSE` exiting 2 with no failure reported at all,
+so an assertion against zero cannot notice a code that changed to another non-zero one.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

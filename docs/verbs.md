@@ -103,11 +103,16 @@ A composition stops on any of these. 7 is the one that is not a failure — it i
 
 | Code | Meaning |
 | --- | --- |
+| 1 | the side effect failed: the command `apply` ran returned 1, the tool file asked a question outside `apply`, or its body was killed |
 | 2 | no such verb, an undeclared flag, or not a git repository |
 | 3 | the verb has nothing to work on |
 | 4 | the validator rejected two answers |
 | 5 | the model returned nothing usable: empty content, or an answer cut off by the token budget |
 | 7 | you declined the confirmation |
+
+From `lm commit` this most often means a hook rejected the commit, and the hook's own code is not
+recoverable: `git commit` reports 1 whatever the hook exited with, so what the hook printed is the
+only thing that says why.
 
 Inside the chat a verb has no exit status to hand anyone, so the tool result says the same
 thing in words: a refused confirmation reads `Declined. Nothing was applied.` and any other

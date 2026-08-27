@@ -74,7 +74,7 @@ writeFileSync(join(work, "asks.sh"), [
 ].join("\n"));
 const asked = call(join(work, "asks.sh"), "collect");
 check("confirm stops the tool where it stands", "", asked.stdout.trim());
-check("and does not exit 0", "true", String(asked.status !== 0));
+check("and exits 1, the code the runner spends on the diagnostic", "1", String(asked.status));
 check("and says why", "true", String(/confirm is available only inside apply/.test(asked.stderr)));
 
 // apply is the one function entitled to confirm, and the only one with a side
@@ -94,6 +94,16 @@ writeFileSync(join(work, "halts.sh"), [
 ].join("\n"));
 check("a body that fails halfway stops there", "1", String(apply(join(work, "halts.sh"), { cwd: work })));
 check("and does not go on to report success", "false", String(existsSync(join(work, "went.txt"))));
+
+// The third way to arrive at 1, and the only one where no child chose it: a
+// killed body reports no status at all, so the fallback in apply() is what
+// names the code.
+writeFileSync(join(work, "killed.sh"), [
+  'name="killed"', 'description="is killed mid-apply"',
+  "apply() { cat >/dev/null; kill -KILL $$; }",
+  "",
+].join("\n"));
+check("a body killed by a signal exits 1 as well", "1", String(apply(join(work, "killed.sh"), { cwd: work })));
 
 // The chat owns the terminal, so apply asks through a channel instead: the
 // question leaves with the wording the tool file gave it and one line of answer

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The exit code table omitted 1, which `lm` returns whenever a verb's side effect fails: a commit a hook rejected, a tool file that asks a question outside `apply`, or a body killed before it could return a status. It is listed now, with the note that `git commit` reports 1 whatever code the hook itself exited with, so what the hook printed is the only thing that says why.
+
 ## [0.1.0] - 2026-08-27
 
 ### Added
