@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-27
+
 ### Added
 
 - The chat introduces itself as this project rather than as the harness it is built on: its own mark, name and version on top, one dim row naming what to type, and two status rows carrying the working directory, the branch, what the session has spent, the context against its window and the model. The harness's own extension list is no longer printed, because the only extension in it is this program.
@@ -126,7 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pr`, which writes a pull request description from `git log <default>..HEAD`
 - `issue`, which drafts a GitHub issue and picks its labels from the repository's own taxonomy
 
-[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sergeyklay/lm/compare/v0.0.5...v0.1.0
 [0.0.5]: https://github.com/sergeyklay/lm/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/sergeyklay/lm/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/sergeyklay/lm/compare/v0.0.2...v0.0.3
