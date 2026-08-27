@@ -105,6 +105,37 @@ writeFileSync(join(work, "killed.sh"), [
 ].join("\n"));
 check("a body killed by a signal exits 1 as well", "1", String(apply(join(work, "killed.sh"), { cwd: work })));
 
+// The run that declares itself unattended. Nothing here reads a terminal, which is
+// what a test has none of: the same tool refuses at exit 7 without the capability
+// because /dev/tty cannot be opened, and runs to its side effect with it. `ask`
+// answers an empty line, and what an empty line means stays the tool's to decide -
+// `issue` reads it as keeping the labels the model proposed.
+writeFileSync(join(work, "asks.sh"), [
+  'name="asks"',
+  'description="confirms, then asks, and writes down what it was told"',
+  "collect() { :; }",
+  "schema() { echo '{}'; }",
+  "validate() { cat >/dev/null; }",
+  "render() { cat; }",
+  'apply() { local a; cat >/dev/null; confirm "go? [y/N]"; a=$(ask "labels:");'
+  + ' printf "[%s]" "$a" > answered.txt; }',
+  "",
+].join("\n"));
+const asks = join(work, "asks.sh");
+
+rmSync(join(work, "answered.txt"), { force: true });
+check("without the capability a verb with no terminal still refuses", "7",
+  String(apply(asks, { cwd: work })));
+check("and applies nothing", false, existsSync(join(work, "answered.txt")));
+
+check("under the capability the same verb runs to its side effect", "0",
+  String(apply(asks, { cwd: work }, true)));
+// Read through existsSync: a mutant that suppresses the side effect would otherwise
+// crash the suite at this line instead of reddening the case above it, and a suite
+// that dies partway prints a plausible run of ok lines and proves nothing.
+check("and the unasked question answered an empty line", "[]",
+  existsSync(join(work, "answered.txt")) ? readFileSync(join(work, "answered.txt"), "utf8") : "no file");
+
 // The chat owns the terminal, so apply asks through a channel instead: the
 // question leaves with the wording the tool file gave it and one line of answer
 // comes back. The runner never composes the question, because asking about a

@@ -15,7 +15,25 @@ tree otherwise, so an entry can be drafted before anything is staged, or from th
 when nothing has changed at all. `lm commit` reads the index and only the index, because
 that is what it commits.
 
-`--dry-run` on any verb prints the result and stops before the side effect. `lm --which`
+`--dry-run` on any verb prints the result and stops before the side effect. `--yes` on any verb
+answers the verb's own question, for a run with nobody at the terminal to answer it: the
+confirmation is taken as given and a question the tool asks with `ask` gets an empty line, which
+each tool already reads its own way - `lm issue` reads it as keeping the labels the model proposed.
+`LM_YES=1` is the same thing through the environment, which is what a script
+or a cron entry sets rather than threading a flag through. The flag goes after the verb, like
+`--dry-run`: `lm commit --yes` runs, and `lm --yes commit` is refused, because nothing before the
+verb is a verb's flag. `lm ship --yes` takes it as well and carries it to both verbs it runs, so a
+whole delivery goes through with nobody at the terminal. What neither reaches is a chat session: a
+chat has a person in it by construction, and its dialog is still asked.
+
+Exit 7 is what a declined confirmation reports, so a run under `--yes` stops producing it rather
+than producing it for a different reason.
+
+A confirmation nobody answers is not a run that waits for ever. `lm` waits 120 seconds for the
+answer and then stops, exits 7 and says so, applying nothing - the case it exists for is the
+terminal left open on a desk somebody walked away from, where the wait had no bound at all. A run
+with no terminal at all does not reach that wait: it exits 7 at once, because there is no
+`/dev/tty` to read. `lm --which`
 picks the verb for a request by reading the same one-line descriptions `lm --list` prints. When
 no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
 exits 2, so a composition that pipes it into `lm` stops rather than running the nearest match.
@@ -50,6 +68,13 @@ calls it took, what the validator rejected, the exit code, whether `HEAD` moved,
 composition the run belonged to, or `null` when you typed the verb yourself. A `lm --which`
 run is logged in the same shape: it names `--which` where a run names its verb, and carries
 the verb it picked, or `none`, in a field every other run leaves `null`.
+
+Each record says what happened to the question the verb asked, under `consent`: `given` when you
+answered it, `withheld` when you declined or let the wait run out, `assumed` when the run carried
+`--yes` and nobody was asked, and `null` when the run never got that far - a rehearsal, a verb with
+nothing to work on, an answer the validator would not take. It is read from the mode the run asked
+for and the status it ended on, so a body that fails before it reaches its own question is recorded
+as `given`.
 
 Each record also carries a hash of the prompt, a hash of the answer and the answer's length, so
 a change in what a verb sends or gets back is visible without the log holding either text. Each is
@@ -117,6 +142,7 @@ Environment only:
 | `LM_CTX` | `32768` |
 | `LM_TOOLS` | `<repo>/tools` |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
+| `LM_YES` | unset |
 
 Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= lm commit` writes no record, and `lm stats` under the same setting reads none. That is what a fixture repository or a rehearsal wants, because one log spans every repository and `lm stats` counts the one you are in.
 
@@ -146,9 +172,11 @@ above are what it reports when it does call one. The chat hands the model a shel
 verbs, so it can stage the tree, write the commit and push it without reaching a verb at all, and
 then the confirmation you answer, the validator, the message shaped after the ones already in the
 log and the run record are bypassed together while the log still shows a verb run. Asked plainly to
-commit, the model reached for the shell in three of four sessions measured on 2026-08-27; in one of
-them `HEAD` moved to a subject no validator had seen while both records that session wrote read
-exit 7, so the log says you declined twice and the repository has a new commit. This is why
+commit, the model went past the refusal in four of six sessions measured on 2026-08-27, each in a
+repository of its own: `HEAD` moved to a subject no validator had seen while every record those
+sessions wrote read exit 7 or 3, so the log says you declined and the repository has a new commit.
+In the other two it took the refusal at its word, said so, and offered you the `git commit` line to
+run yourself - which is the same capability used the other way and not a guarantee of anything. This is why
 `lm stats` counts the work that went through a verb rather than the work that was done.
 
 Taking the shell away is one flag, and the same request then stops at the verb: nothing is staged,

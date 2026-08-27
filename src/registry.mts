@@ -21,9 +21,31 @@ export type Ask = {
 const REFUSE =
   'confirm() { echo "lm: confirm is available only inside apply" >&2; exit 1; }; '
   + 'ask() { echo "lm: ask is available only inside apply" >&2; exit 1; }; ';
+// A confirmation with a terminal open and nobody typing at it blocks with no bound
+// at all: measured 2026-08-27 under a pty held open by a fifo, the run reported 124
+// from the harness that killed it rather than any exit of its own. The bound is here
+// rather than spelled into the line, because the same number belongs in the shell
+// runner's copy of it and a person who wants to argue with it should find it first.
+export const CONFIRM_TIMEOUT_SECONDS = 120;
+
+// The timeout is not a refusal the human made, so it says why before it exits: bash
+// returns above 128 when a read times out and 1 at end of input, which is what tells
+// the operator who walked away from an open terminal apart from a run that never had
+// one and has already been told so by the shell.
+const timedRead = (after: string) =>
+  `local a rc=0; read -r -t ${CONFIRM_TIMEOUT_SECONDS} -p "$1 " a </dev/tty || rc=$?; `
+  + `[ "$rc" -le 128 ] || printf "\nlm: no answer in ${CONFIRM_TIMEOUT_SECONDS}s, nothing was applied\n" >&2; `
+  + `[ "$rc" = 0 ] || exit 7; ${after}`;
 const ASK =
-  'confirm() { local a; read -r -p "$1 " a </dev/tty || exit 7; [ "$a" = y ] || exit 7; }; '
-  + 'ask() { local a; read -r -p "$1 " a </dev/tty || exit 7; printf "%s" "$a"; }; ';
+  `confirm() { ${timedRead('[ "$a" = y ] || exit 7; ')}}; `
+  + `ask() { ${timedRead('printf "%s" "$a"; ')}}; `;
+
+// The run that declares itself unattended, through --yes or LM_YES. confirm answers
+// yes and ask answers an empty line, which is not a new design but the answer
+// docs/tools.md already fixes the meaning of: an empty line is an answer and the tool
+// decides what it means, so an unasked ask is a vote for what the model proposed.
+// Nothing here reads a terminal, so exit 7 stops appearing rather than changing sense.
+const YES = 'confirm() { :; }; ask() { :; }; ';
 // The same two functions over a pair of file descriptors instead of the
 // terminal: fd 3 carries the tool's own question out, fd 4 carries one line of
 // answer back. No answer at all is a refusal and exits 7, for both: a human who
@@ -72,8 +94,8 @@ export function call(file: string, fn: Fn, opts: Opts = {}): Result {
 // halfway must not carry on and report success; and it inherits the terminal,
 // because `confirm` reads /dev/tty and `issue` reads it again for its labels.
 // Only the status comes back: everything it says has already been said.
-export function apply(file: string, opts: Opts = {}): number {
-  const r = spawnSync("bash", ["-euo", "pipefail", "-c", ASK + SOURCE, "bash", file, "apply"], {
+export function apply(file: string, opts: Opts = {}, yes = false): number {
+  const r = spawnSync("bash", ["-euo", "pipefail", "-c", (yes ? YES : ASK) + SOURCE, "bash", file, "apply"], {
     input: opts.stdin ?? "",
     stdio: ["pipe", "inherit", "inherit"],
     cwd: opts.cwd,

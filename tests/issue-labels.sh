@@ -78,5 +78,18 @@ out=$(run "$TWO" "" n)
 check "a declined confirmation exits 7" "7" "$(cat "$WORK/status")"
 check "and gh is never called" "" "$out"
 
+# The same apply under the capability, where the runner supplies the YES prelude
+# instead: nobody is asked, so the empty answer is what the tool reads, and what an
+# empty answer means stays its own decision - here, keeping what the model proposed.
+export GH_ARGS="$WORK/args"; : > "$GH_ARGS"
+ANSWER=$TWO bash -euo pipefail -c '
+  confirm() { :; }; ask() { :; }
+  . "'"$ROOT"'/../tools/issue.sh"
+  printf "%s" "$ANSWER" | apply
+' >/dev/null 2>&1
+unattended=$?
+check "an unattended run reaches gh"        "0"      "$unattended"
+check "and keeps the labels the model proposed" "bug,ci" "$(labels_of < "$GH_ARGS")"
+
 if [ "$fail" -ne 0 ]; then echo FAILED; exit 1; fi
 echo "all cases passed"

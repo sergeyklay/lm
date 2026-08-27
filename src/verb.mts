@@ -11,26 +11,43 @@ import { modelId } from "./provider.mts";
 const MAX_CALLS = 2;
 
 export type Args =
-  | { ok: true; dry: boolean; text: string[]; env: Record<string, string> }
+  | { ok: true; dry: boolean; yes: boolean; text: string[]; env: Record<string, string> }
   | { ok: false; message: string };
+
+// The third grain the record carries about a run, beside who invoked it and what
+// it did: whether the human's consent was given, withheld, or never sought at all.
+// null is a run that never reached the question - a rehearsal, a refusal before the
+// prompt, an answer the validator would not take - and it reads back on every record
+// written before the field existed, which is what makes appending one free.
+export type Consent = "given" | "withheld" | "assumed" | null;
+
+// The flag is the interface and the variable is the transport: a person types the
+// flag, and a composition either forwards it or exports the variable the way it
+// already exports LM_COMPOSITION. It is a function rather than an inline `||` so
+// that both affordances have a case; a chat session is not covered either way,
+// because it has a person in it by construction and its dialog is R14's.
+export function unattended(flag: boolean, env: NodeJS.ProcessEnv = process.env): boolean {
+  return flag || env.LM_YES === "1";
+}
 
 // A flag and free text coexist in either order, so flags are found by scanning.
 // A flag the tool never declared is a typo, and a typo must not become prompt
 // text: '--dry-runn' read silently as words is a real commit where a rehearsal
 // was asked for. Text after '--' is text, dashes and all.
 export function parseArgs(verb: string, declared: string[], argv: string[]): Args {
-  const out = { ok: true as const, dry: false, text: [] as string[], env: {} as Record<string, string> };
+  const out = { ok: true as const, dry: false, yes: false, text: [] as string[], env: {} as Record<string, string> };
   let literal = false;
   for (const a of argv) {
     if (literal) { out.text.push(a); continue; }
     if (a === "--dry-run") { out.dry = true; continue; }
+    if (a === "--yes") { out.yes = true; out.env.LM_YES = "1"; continue; }
     if (a === "--") { literal = true; continue; }
     if (!a.startsWith("-")) { out.text.push(a); continue; }
     if (!declared.includes(a)) {
       return {
         ok: false,
         message: `lm: '${verb}' takes no flag '${a}'.\n`
-          + `    Known: --dry-run${declared.length ? " " + declared.join(" ") : ""}.`
+          + `    Known: --dry-run --yes${declared.length ? " " + declared.join(" ") : ""}.`
           + " Put text after -- to pass it literally.\n",
       };
     }
@@ -92,6 +109,7 @@ function localIso(d: Date): string {
 function record(r: {
   verb: string; dry: boolean; calls: number; violations: string; exit: number;
   ms: number; head0: string | null; prompt: string; answer: string | undefined;
+  consent: Consent;
 }): void {
   const log = process.env.LM_LOG ?? `${homedir()}/.lm/runs.jsonl`;
   if (!log) return;
@@ -120,6 +138,7 @@ function record(r: {
       prompt_eval_duration: null,
       eval_count: null,
       eval_duration: null,
+      consent: r.consent,
     }) + "\n");
   } catch {
     // Never fails the run it is reporting on.
@@ -150,9 +169,12 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   let answer: string | undefined;
   let truncated = false;
 
-  const finish = (code: number, prompt: string): Outcome => {
+  // Consent is read off the mode and the status because the question is the tool's
+  // to ask: under the capability nobody was asked, exit 7 is the answer being no,
+  // and any other status from a body that reached its question means it was yes.
+  const finish = (code: number, prompt: string, consent: Consent = null): Outcome => {
     record({ verb: name, dry: parsed.dry, calls, violations: firstViolations, exit: code,
-             ms: Date.now() - t0, head0, prompt, answer });
+             ms: Date.now() - t0, head0, prompt, answer, consent });
     return { code, calls, attempts };
   };
 
@@ -258,7 +280,9 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   if (io.ask) {
     const applied = await applyAsk(file, { ...opts, stdin: answer! }, io.ask);
     io.out(applied.output);
-    return finish(applied.status, prompt);
+    return finish(applied.status, prompt, applied.status === 7 ? "withheld" : "given");
   }
-  return finish(apply(file, { ...opts, stdin: answer! }), prompt);
+  const yes = unattended(parsed.yes);
+  const status = apply(file, { ...opts, stdin: answer! }, yes);
+  return finish(status, prompt, yes ? "assumed" : status === 7 ? "withheld" : "given");
 }

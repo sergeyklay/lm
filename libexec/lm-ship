@@ -9,6 +9,11 @@ for a in "$@"; do
   case "$a" in
     --here)     HERE=1 ;;
     --no-stage) STAGE=0 ;;
+    # Consent is the composition's to carry, not an argument to pass on: the flag
+    # belongs to a verb, and both verbs here are run by this script rather than
+    # typed. It travels the way LM_COMPOSITION does, so a run says once that
+    # nobody will be answering and both verbs hear it.
+    --yes)      export LM_YES=1 ;;
     *)          ARGS+=("$a") ;;
   esac
 done
