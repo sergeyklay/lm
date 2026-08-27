@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- A tool asks the human through `confirm "text"` and `ask "text"`, and no tool file reads `/dev/tty` itself. `lm issue` takes its labels line through `ask`, which is what lets it run inside the chat as well as on the command line; the wording of every question stays in the tool file, because a runner that composed the question would have to know what a tool's fields mean.
+- A tool asks the human through `confirm "text"` and `ask "text"`, and no tool file reads `/dev/tty` itself. `lm issue` takes its labels line through `ask`, which is what lets it run inside the chat as well as on the command line; the wording of every question stays in the tool file, because a runner that composed the question would have to know what a tool's fields mean. A question that goes unanswered, such as a dialog you close, stops the verb with the same exit 7 a refused confirmation gives, while an empty answer is an answer: pressing Enter at `lm issue`'s labels line keeps the labels it proposed.
 - The run log's call count is now the number of requests the model served rather than the number of turns the harness took, and a verb no longer inherits the harness's automatic retry or its compact-and-retry: both are on by default, both read their settings from a file outside this repository, and either can spend model calls that nothing in the run log would show.
 - `--dry-run` on a verb now renders the output and stops, printing `--dry-run: no side effect`, rather than proceeding to the side effect.
 - A flag a verb does not declare, such as `--dry-runn`, is now an error naming the flag and listing the verb's known flags, rather than reaching the model as prompt text.

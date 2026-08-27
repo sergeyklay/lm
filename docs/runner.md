@@ -70,8 +70,11 @@ stdin like `render` does.
 Where its questions go is the caller's to decide, and there are two callers. On the command line
 `apply` inherits the terminal and `confirm` and `ask` read `/dev/tty`. Inside the chat the
 harness owns the terminal, so `applyAsk` gives the tool a pair of file descriptors instead: the
-question goes out on one with the wording the tool file gave it, one line of answer comes back on
-the other, and a closed channel is a refusal rather than a default. Everything the body writes
+question goes out on one with the wording the tool file gave it and one line of answer comes back
+on the other. No answer at all is a refusal and exits 7, whichever function asked: a human who
+closed the dialog decided nothing, and a channel deciding on their behalf is what this shape
+exists to avoid. An empty line is an answer, and what it means belongs to the tool — `lm issue`
+reads it as keeping the labels it proposed. Everything the body writes
 comes back to the caller in both cases except the first, where it is simply inherited.
 
 `confirm` and `ask` are defined in the four read-only phases too, because a tool is entitled to

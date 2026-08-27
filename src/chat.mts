@@ -52,6 +52,8 @@ export function registerVerbs(pi: any, toolsDir: string): string[] {
               ctx.hasUI
                 ? ctx.ui.confirm(info.name, `${said.trim()}\n\n${question}`.trim())
                 : Promise.resolve(false),
+            // undefined is no answer, which the bridge turns into a refusal.
+            // Without a dialog to show there is no answer to be had.
             input: (question) =>
               ctx.hasUI ? ctx.ui.input(info.name, question) : Promise.resolve(undefined),
           },

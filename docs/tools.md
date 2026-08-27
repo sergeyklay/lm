@@ -31,7 +31,7 @@ call before it ships.
 
 `validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry.
 
-`apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses. `ask "text"` prints one line of answer, empty when there is none, so `labels=$(ask "Labels (bug, ci):")` works. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
+`apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses. `ask "text"` prints one line of answer, so `labels=$(ask "Labels (bug, ci):")` works; an empty line is an answer and the tool decides what it means, while no answer at all exits 7 like a refused confirmation. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
 
 A tool refuses with `return 3` when there is nothing to work on. The other codes are the
 runner's; [`verbs.md`](verbs.md) lists them.
@@ -62,8 +62,8 @@ model: the prompt `collect` writes, the shape `schema` asks for, the violations 
 reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
 diff before committing them.
 
-Two checks here have been made to go red, and that record is what makes a green run of them
-worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
+Eight groups of checks here have been made to go red, and that record is what makes a green run of
+them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
 kills a different subset of the six cases in `tests/runner.sh`: dropping the trap kills five,
 blanking the `which` argument kills three, and dropping the table's exclusion kills one. The
 `changelog` internal-symbol check reports nothing over every bullet the changelog has published —
@@ -107,7 +107,14 @@ confirmation always answer yes turns the two declining cases in `tests/registry.
 leaves the approving ones green; and unwiring the channel from the chat's side, so a verb falls
 back to the terminal, turns the live case reading exit 7 red while the case asserting nothing was
 applied stays green, because a question no one can answer fails the run anyway. Only the pair
-distinguishes a refusal the human made from a refusal the plumbing made.
+distinguishes a refusal the human made from a refusal the plumbing made. An eighth, over the
+difference between no answer and an empty one: sending an empty line where the channel should
+close turns both unanswered cases red and leaves both empty-answer cases green. The first attempt
+at that mutation is the warning worth keeping — restoring the swallowed `read` failure in the
+bridge crashed the suite with `ERR_STREAM_WRITE_AFTER_END` instead of failing a case, because a
+body that had already asked its next question was answered into a pipe the refusal had closed.
+That is a mutant that parses and does not run, and it also named a hole in the channel: it now
+tolerates being answered after it closes.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
