@@ -73,7 +73,7 @@ teardown
 
 # An unstaged tree ships without a git add. g.txt is untracked on purpose: git diff
 # never reports one and git add takes it, which is the difference the composition
-# rests on. Silence is the assertion too — staging is the expected case now.
+# rests on. Silence is the assertion too: staging is the expected case now.
 setup 0
 git reset -q
 echo more > g.txt

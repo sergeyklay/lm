@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lm — thin runner over a tool registry. One file per tool in $LM_TOOLS.
+# lm: thin runner over a tool registry. One file per tool in $LM_TOOLS.
 
 set -euo pipefail
 

@@ -29,7 +29,7 @@ const ASK =
 // answer back. No answer at all is a refusal and exits 7, for both: a human who
 // closed the dialog decided nothing, and a channel deciding on their behalf is
 // the defect this shape exists to avoid. An empty line is an answer, and what it
-// means belongs to the tool — `issue` reads it as keeping the labels it proposed.
+// means belongs to the tool: `issue` reads it as keeping the labels it proposed.
 const BRIDGE =
   'confirm() { printf "confirm\t%s\n" "$1" >&3; IFS= read -r a <&4 || exit 7; [ "$a" = y ] || exit 7; }; '
   + 'ask() { printf "input\t%s\n" "$1" >&3; IFS= read -r a <&4 || exit 7; printf "%s" "$a"; }; ';

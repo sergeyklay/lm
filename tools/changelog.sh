@@ -137,7 +137,7 @@ validate() {
   [[ "$bullet" =~ (No\ migration|Nothing\ to\ do) ]] && echo "entry $((i + 1)): bullet documents a non-event (absence of a change)"
 
   # A bullet may name what a user can see. The functions docs/tools.md publishes
-  # are legitimate — a tool author writes against them — but the project's other
+  # are legitimate, since a tool author writes against them, but the project's other
   # functions are not: `usage` formats the listing a user reads, and the user has
   # no word for it. Both halves are read rather than listed here, so publishing a
   # seventh contract function needs no edit to this file. A leading underscore is

@@ -3,7 +3,7 @@
 // What the runner asks the model for, read off the wire rather than off the
 // source: the answer budget and the field that carries it, and the switch that
 // stops this model thinking. Both are settings of the model the harness sends
-// for us, so nothing in the runner's own control flow would notice their loss —
+// for us, so nothing in the runner's own control flow would notice their loss:
 // the answer would simply grow past the budget again, on a machine with a GPU.
 //
 // The server answers 400, because the request is the whole subject. The run
