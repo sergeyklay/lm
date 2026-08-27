@@ -49,7 +49,7 @@ side effect, which is the safe way to meet a verb for the first time:
 lm commit --dry-run
 ```
 
-Two options answer questions about the registry rather than running a verb:
+`--list` and `--which` answer questions about the registry rather than running a verb:
 
 ```bash
 lm --list                      # every tool with its description, tab-separated

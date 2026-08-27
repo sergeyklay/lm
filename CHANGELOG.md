@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `lm stats` now withholds the clean share when a verb has fewer than fourteen runs, printing `n<14` instead of a percentage, and prints the percentage again from the fourteenth run on: at smaller samples no outcome can put the edit share below one in five, so a figure no sample can contradict is not a measurement.
+- `lm stats` and `lm ship` now describe themselves with a colon in their comment line, and the docs, `--help` text and the validator's messages match, as a matter of the project's own style.
+
 ### Fixed
 
 - The exit code table omitted 1, which `lm` returns whenever a verb's side effect fails: a commit a hook rejected, a tool file that asks a question outside `apply`, or a body killed before it could return a status. It is listed now, with the note that `git commit` reports 1 whatever code the hook itself exited with, so what the hook printed is the only thing that says why.

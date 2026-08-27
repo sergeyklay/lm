@@ -1,7 +1,7 @@
 # What each verb does
 
 [Installing lm](install.md) lists the verbs and how to meet them; this page says how each one
-behaves, and what the two compositions and the configuration around them do.
+behaves, and what `ship`, `stats` and the configuration around them do.
 
 ## The verbs
 
@@ -45,7 +45,7 @@ lm ship --no-stage             # ship only what you staged yourself
 
 ## lm stats
 
-Every run appends one JSON object to `$LM_LOG` — the verb, the repository, how many model
+Every run appends one JSON object to `$LM_LOG`: the verb, the repository, how many model
 calls it took, what the validator rejected, the exit code, whether `HEAD` moved, and which
 composition the run belonged to, or `null` when you typed the verb yourself. A `lm --which`
 run is logged in the same shape: it names `--which` where a run names its verb, and carries
@@ -54,7 +54,7 @@ the verb it picked, or `none`, in a field every other run leaves `null`.
 Each record also carries a hash of the prompt, a hash of the answer and the answer's length, so
 a change in what a verb sends or gets back is visible without the log holding either text. Each is
 `null` when there was nothing to record, and the two halves fall separately: a verb that refused
-before building a prompt leaves all three empty, while a run whose model returned nothing keeps
+before building a prompt leaves all of them empty, while a run whose model returned nothing keeps
 its prompt hash and reports a length of zero. That zero is not an absent answer. It is the model
 answering with nothing, and it exits 5.
 
@@ -62,10 +62,10 @@ It carries the numbers ollama reports beside the answer too, under ollama's own 
 own nanoseconds: `total_duration`, `load_duration`, `prompt_eval_count`, `prompt_eval_duration`,
 `eval_count` and `eval_duration`. They are summed over the calls a run made, so a run that took
 the retry shows two lots of model work rather than the second lot alone. A reply carrying none of
-them leaves all six `null`: zero nanoseconds of model work is a claim, and none was made.
+them leaves them all `null`: zero nanoseconds of model work is a claim, and none was made.
 
 `lm stats` reads that log and nothing else: no model, no registry, no network. It reports a row
-per verb — runs, how many were clean on the first answer, how many you declined, how many took
+per verb: runs, how many were clean on the first answer, how many you declined, how many took
 the retry, how many failed, the average time a run took with your own thinking in it, and the
 average the model itself reported, which has none of your thinking in it. The two differ because
 a run is recorded after the verb applies and every verb waits for your answer at the terminal
@@ -77,6 +77,18 @@ all, then the violations the validators printed most often. `--which` is kept ou
 because it is a run and not a verb and its refusal exits 2, which the table would count as a
 failure. A `--dry-run` reaches the violations but not the rates. One log spans every
 repository `lm` has ever run in, so it counts the one you are in.
+
+The clean column is the one figure here that is read against a threshold, so it carries the
+sample that threshold needs and prints `n<14` until the verb has fourteen runs. It counts the
+runs whose first answer passed the validator and was accepted as it stood, and the number to
+read it against is manual edits staying under one in five. Fourteen is the smallest sample that
+reading is reachable from at all: at 95% one-sided confidence a verb with no edits whatever in
+thirteen runs still admits an edit rate of 20.6%, and fourteen brings it to 19.3%, which is
+`ceil(ln 0.05 / ln 0.8)`. Below fourteen every possible sample confirms the threshold, and a
+figure no sample can contradict is not a measurement. Fourteen runs say the figure may be read,
+not that the reading is settled. A message accepted here and rewritten afterwards with
+`git commit --amend` still counts as accepted, so the column is an upper bound on what went
+through untouched.
 
 ```bash
 lm stats                       # this repository
@@ -99,7 +111,7 @@ Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= 
 
 ## Exit codes
 
-A composition stops on any of these. 7 is the one that is not a failure — it is you saying no.
+A composition stops on any of these. 7 is the one that is not a failure: it is you saying no.
 
 | Code | Meaning |
 | --- | --- |

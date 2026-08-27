@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lm-stats — read the run log that lm appends to. No model, no registry.
+# lm-stats: read the run log that lm appends to. No model, no registry.
 # Dry runs are excluded from the rates and kept in the violation histogram.
 
 set -euo pipefail
@@ -34,6 +34,10 @@ VERBRUN="($RUN and .verb != \"--which\")"
 # carries the operator's deliberation. avg model is what ollama itself reported.
 # A record written before the runner asked for those numbers has none, and the
 # column says so rather than averaging a zero in and reporting a faster model.
+# clean is the one column read against a threshold, so it carries the sample it
+# needs: under fourteen runs no outcome can put the edit share below one in five,
+# and a figure every sample confirms is not a figure. Derived in docs/verbs.md.
+CLEAN_N=14
 printf '%-10s %5s %7s %9s %8s %7s %8s %9s\n' verb runs clean declined retried failed "avg ms" "avg model"
 jq -s -r "${SCOPE[@]}" "
   map(select($VERBRUN)) | group_by(.verb)[] |"'
@@ -45,8 +49,9 @@ jq -s -r "${SCOPE[@]}" "
     (map(.ms) | add / length | floor),
     (map(select(.total_duration != null) | .total_duration)
      | if length == 0 then null else (add / length / 1000000 | floor) end) ] | @tsv' "$LM_LOG" \
-| awk -F'\t' '{printf "%-10s %5d %6d%% %9d %8d %7d %8d %9s\n",
-    $1, $2, ($2 ? 100*$3/$2 : 0), $4, $5, $6, $7, ($8 == "" ? "-" : $8)}'
+| awk -F'\t' -v min="$CLEAN_N" '{printf "%-10s %5d %7s %9d %8d %7d %8d %9s\n",
+    $1, $2, ($2 < min ? "n<" min : sprintf("%d%%", 100*$3/$2)),
+    $4, $5, $6, $7, ($8 == "" ? "-" : $8)}'
 
 echo
 echo "commits created by lm commit:"

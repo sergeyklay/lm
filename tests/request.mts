@@ -3,7 +3,7 @@
 // What the runner asks the model for, read off the wire rather than off the
 // source: the answer budget and the field that carries it, and the switch that
 // stops this model thinking. Both are settings of the model the harness sends
-// for us, so nothing in the runner's own control flow would notice their loss —
+// for us, so nothing in the runner's own control flow would notice their loss:
 // the answer would simply grow past the budget again, on a machine with a GPU.
 //
 // The server answers 400, because the request is the whole subject. The run
@@ -76,6 +76,10 @@ check("the runner reached the completions endpoint", true, paths.some((p) => p.i
 check("and asked for a budget", 3000, body.max_tokens);
 check("under the name ollama honours", false, "max_completion_tokens" in body);
 check("and asked the model not to think", "none", body.reasoning_effort);
+// Greedy sampling is what makes the same prompt give the same answer, which is
+// what the golden fixtures and the authorship gate both rest on. The model's own
+// modelfile asks for temperature 1, so silence here is not a neutral default.
+check("and pinned the sampling", 0, body.temperature);
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");

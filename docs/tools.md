@@ -21,12 +21,12 @@ read as words. A flag the tool declared arrives as a variable, not as an argumen
 dashes and all.
 
 `schema()` is compiled to a GBNF grammar before the model is called, so a shape the
-compiler rejects costs the whole request — `HTTP 400 failed to parse grammar`, ahead of any
+compiler rejects costs the whole request: `HTTP 400 failed to parse grammar`, ahead of any
 prefill. Two limits bind every schema, at any depth. A `pattern` opens with `^` and closes
 with `$`, and uses no PCRE shorthand: `\d`, `\w` and `\s` all fail, including inside a
 character class, so write `[0-9]`. A `maxLength` of 2000 or more fails the same way; 1999
-passes. Worse than either is a pattern the compiler neither rejects nor supports —
-`^(?=.*z).*$` returns 200 and constrains nothing — so a new `pattern` is worth one throwaway
+passes. Worse than either is a pattern the compiler neither rejects nor supports:
+`^(?=.*z).*$` returns 200 and constrains nothing, so a new `pattern` is worth one throwaway
 call before it ships.
 
 `validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry.
@@ -38,8 +38,8 @@ runner's; [`verbs.md`](verbs.md) lists them.
 
 When `collect()` needs something the machine running the tests may not have, put the call
 behind a function so a fixture can replace it. `tools/issue.sh` reads the repository's labels
-through `_labels()` for that reason, and the three `issue` cases — `ls tests/golden/*/*/env`
-names them — define their own `_labels()` in `env`, so `gh` is never reached and the enum the
+through `_labels()` for that reason, and the three `issue` cases, which `ls tests/golden/*/*/env`
+names, define their own `_labels()` in `env`, so `gh` is never reached and the enum the
 case exists to pin is still built. Stubbing the seam beats skipping the case: a skipped case
 leaves the verb's most interesting path untested and says so only in passing.
 
@@ -64,59 +64,60 @@ model: the prompt `collect` writes, the shape `schema` asks for, the violations 
 reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
 diff before committing them.
 
-Twelve groups of checks here have been made to go red, and that record is what makes a green run of
+Every group of checks below has been made to go red, and that record is what makes a green run of
 them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
 kills a different subset of the six cases in `tests/runner.sh`: dropping the trap kills five,
 blanking the `which` argument kills three, and dropping the table's exclusion kills one. The
-`changelog` internal-symbol check reports nothing over every bullet the changelog has published —
+`changelog` internal-symbol check reports nothing over every bullet the changelog has published:
 45 when it landed, 47 on 2026-08-26 by
-`awk '/^## \[Unreleased\]/{u=1;next} /^## \[/{u=0} !u&&/^- /' CHANGELOG.md | wc -l` — and it names
+`awk '/^## \[Unreleased\]/{u=1;next} /^## \[/{u=0} !u&&/^- /' CHANGELOG.md | wc -l`, and it names
 the internal function the bullet that shipped in `v0.0.2` reached for, which
 `git log -S 'formats the command list' -- CHANGELOG.md` locates, while passing the replacement
 written by hand to fix it. Naming that function here in back quotes would publish it and turn the
-check off, which is why this paragraph does not. A third: deleting the option guard from
+check off, which is why this paragraph does not. The option guard is another: deleting it from
 `bin/lm`, a mutation `node --check` accepts, kills four of the six `tests/cli.mts` cases that
 cover it and leaves the two asserting only the exit status, because the argument then reaches the
 shell runner as a tool name and is refused with 2 there instead. The status was never the
-property at risk. A fourth, over the three hashes the record carries. Seven mutations of
+property at risk. The hashes the record carries have a group of their own. Seven mutations of
 `log_run` and of the `--which` prompt that `bash -n` accepts were run against the eight cases
 covering them, and five discriminate to a single case: hashing a constant kills only the case
 that edits `collect`, the empty string in place of `null` kills only the run that never asked, a
 length of `0` for a missing answer kills only its own case, dropping the `--which` prompt kills
 only that one, and hashing an empty answer rather than nulling it kills only its own. Two are
 broad and worth knowing as such: pinning the length to `null` kills both length cases, and
-dropping the prompt hash kills four. Every one of the eight has been observed red. A fifth, over the model's own numbers: five
-mutations that `bash -n` accepts cover the twelve cases holding them, and the one the task itself
-named — feeding the column the wall clock instead of the reply's `total_duration` — turns four
+dropping the prompt hash kills four. Every one of the eight has been observed red.
+Over the model's own numbers: five mutations that `bash -n` accepts cover the twelve cases holding
+them, and the one the task itself
+named (feeding the column the wall clock instead of the reply's `total_duration`) turns four
 red at once, including the two that read `lm stats`. Replacing the accumulator instead of adding
 to it turns exactly the two summing cases red, treating an absent number as zero turns the two
 null cases red, averaging the missing in as zero turns only the `lm stats` case red, and pinning
 `ms` to zero turns only the case that says the operator's wait is inside it. All twelve have been
-observed red. A sixth, over the two settings that carry the answer budget and stop the model
+observed red. Another covers the two settings that carry the answer budget and stop the model
 thinking, which `tests/request.mts` reads off a recording server rather than from a reply.
 Neither is in the runner's control flow, so a run without them still succeeds and simply grows
 past the budget again: removing the field that names the budget turns two of the four cases red
 and leaves the reasoning case green, and removing the reasoning setting turns that one red and
 leaves the budget cases green. On the real model the budget is what `tests/verb-live.mts` covers
-from the other side, and its three truncation cases were confirmed red both ways — without the
+from the other side, and its three truncation cases were confirmed red both ways: without the
 budget field the answer completes and none of the three fires, and without the runner's own
 truncation arm the exit code is still 5, from the answer that never arrived, so only the case
 reading the message goes red. The code alone cannot tell the two apart, which is why a case
-reads the message. A seventh, over the verbs inside the chat: replacing the registration's walk
+reads the message. Over the verbs inside the chat: replacing the registration's walk
 over the registry with a filter naming the four tool files leaves every case green except the one
 that drops a fifth file in, which is the case that exists for it; making the channel's
 confirmation always answer yes turns the two declining cases in `tests/registry.mts` red, and
 three in `tests/chat.mts`, while leaving the approving ones green; and unwiring the channel from the chat's side, so a verb falls
 back to the terminal, turns the live case reading exit 7 red while the case asserting nothing was
 applied stays green, because a question no one can answer fails the run anyway. Only the pair
-distinguishes a refusal the human made from a refusal the plumbing made. An eighth, over the
+distinguishes a refusal the human made from a refusal the plumbing made. Over the
 difference between no answer and an empty one: sending an empty line where the channel should
 close turns both unanswered cases red and leaves both empty-answer cases green. The first attempt
-at that mutation is the warning worth keeping — restoring the swallowed `read` failure in the
+at that mutation is the warning worth keeping: restoring the swallowed `read` failure in the
 bridge crashed the suite with `ERR_STREAM_WRITE_AFTER_END` instead of failing a case, because a
 body that had already asked its next question was answered into a pipe the refusal had closed.
 That is a mutant that parses and does not run, and it also named a hole in the channel: it now
-tolerates being answered after it closes. A ninth, over the chat's own header and status rows,
+tolerates being answered after it closes. Another covers the chat's own header and status rows,
 where three mutations each redden exactly one case and each was run before it was believed:
 guessing the auto-compact label instead of reading the setting reddens the case that asserts an
 unread setting prints no mode, right-aligning the branch reddens the case that pins it near the
@@ -125,17 +126,17 @@ middle, and dropping the version reddens the case that reads the name. The suite
 the harness's own header is a capture through a pseudo-terminal, killed with `SIGKILL` so the
 harness cannot restore its chrome on the way out and paint a last frame that reads like a defect.
 
-A tenth, over the one `apply` whose command line nothing else sees. Every other verb hands its
+One group covers the one `apply` whose command line nothing else sees. Every other verb hands its
 command what `render` already printed, so the golden fixtures cover it without `git` or `gh` being
 called; `issue` assembles a `--label` list from what the human typed, and that list had only ever
 been read by eye. Four mutations of `tools/issue.sh` that `bash -n` accepts and that run: dropping
 the trim reddens only the case with a space after the comma, reading an empty reply as no labels
 reddens only the case that keeps what the model proposed, taking the word `none` literally reddens
-only its own case, and removing the confirmation reddens two — the exit code and the absence of
-the call — which is the pair worth having, because a verb that creates the issue and then asks is
+only its own case, and removing the confirmation reddens two (the exit code and the absence of
+the call), which is the pair worth having, because a verb that creates the issue and then asks is
 indistinguishable from one that asks first until the first time someone says no.
 
-An eleventh, over the dialog a person answers, which nothing had ever driven: `tests/registry.mts`
+Another covers the dialog a person answers, which nothing had ever driven: `tests/registry.mts`
 hands `applyAsk` an `Ask` of its own and never enters `src/chat.mts`, while the live case runs in
 print mode, where `hasUI` is false and the refusal is the runner's rather than a person's. The
 model is a recording server for these, because the subject is the dialog and not the answer. Six
@@ -153,20 +154,31 @@ case that cleans up the approved run's artefact removed it without `force`, so a
 suppressed the side effect crashed the suite at that line rather than reddening a case, and a
 suite that dies partway prints a plausible run of `ok` lines and proves nothing.
 
-A twelfth, over the one code no page carried. Three sites reach exit 1 and each now has a case
+One group covers the one code no page carried. Three sites reach exit 1 and each now has a case
 asserting the digit rather than its inequality with zero: the `REFUSE` prelude spending it on a
 diagnostic, a body whose command fails, and a body killed before it can return a status. Three
 mutations of `src/registry.mts` that `node --check` accepts and that run, each reddening a
-different one — `REFUSE` exiting 2 reddens only the read-only case; `apply()` falling back to
+different one: `REFUSE` exiting 2 reddens only the read-only case; `apply()` falling back to
 `r.status ?? 0` reddens only the killed case and leaves the failing body green, because that
 body's status was never null; and dropping `-e` from the shell `apply` runs under reddens the
 failing body and its sibling. The negative control is the part worth keeping: written as
 `status !== 0`, the read-only case survives `REFUSE` exiting 2 with no failure reported at all,
 so an assertion against zero cannot notice a code that changed to another non-zero one.
 
+The sample the clean column withholds itself below has a group of its own. Three mutations of
+`libexec/lm-stats` that `bash -n` accepts and that run, each confirmed to have executed by the
+column the mutated line printed: lowering the minimum to one reddens only the two-run case, with
+`100%` where the case wants `n<14`, and removing the conditional from the `awk` reddens exactly
+the same one the same way. Raising the minimum to 999 reddens both that case and the fourteen-run
+one, because the marker carries the number it withheld itself under, so both read `n<999`. The
+two run-count checks stay green under all three, which is what makes the share the thing being
+measured. The fourteen-run case is the positive control, and only the widening mutant reaches
+it: without that case the column could withhold every share it is ever asked for and a green run
+would report the withholding as correct.
+
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
-is honest — `libexec/lm-verb` sources it and never executes it — and `SC2034` twice, for `name` and
+is honest (`libexec/lm-verb` sources it and never executes it), and `SC2034` twice, for `name` and
 `description`, which the runner reads after sourcing and the file itself never uses. Measured
 2026-08-26 across the four tools with
 `for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: four, three, three, three. A

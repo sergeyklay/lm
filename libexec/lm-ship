@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lm-ship — commit, then open the pull request. Makes no model call of its own:
+# lm-ship: commit, then open the pull request. Makes no model call of its own:
 # it runs the two verbs that make one each, and stops on the first refusal.
 
 set -euo pipefail

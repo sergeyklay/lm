@@ -15,8 +15,8 @@ refusal says so rather than listing it as though `lm` took it.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
 extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`, and every
-verb in the registry beside it. A verb offered that way takes what a human types — free text and
-`--dry-run` — and nothing about its own answer: it still writes its own prompt from the
+verb in the registry beside it. A verb offered that way takes what a human types (free text and
+`--dry-run`) and nothing about its own answer: it still writes its own prompt from the
 repository and asks the model itself, so what it commits is what `lm commit` commits, at the cost
 of the chat's own call to choose it. Its questions reach the chat's dialogs rather than the
 terminal, and a mode with no dialog to show, such as the harness's print mode, refuses on the
@@ -77,25 +77,25 @@ for the router and prose may contain a tab.
 ## How apply differs
 
 `apply` is the only function with a side effect and the only one that talks to the human, so it
-does not go through the same call as the other four. It runs under `set -euo pipefail`, because a
-body that fails halfway must not carry on and report success, and it reads the model's answer on
-stdin like `render` does.
+does not go through the same call as the read-only phases. It runs under `set -euo pipefail`,
+because a body that fails halfway must not carry on and report success, and it reads the model's
+answer on stdin like `render` does.
 
-Where its questions go is the caller's to decide, and there are two callers. On the command line
-`apply` inherits the terminal and `confirm` and `ask` read `/dev/tty`. Inside the chat the
-harness owns the terminal, so `applyAsk` gives the tool a pair of file descriptors instead: the
-question goes out on one with the wording the tool file gave it and one line of answer comes back
-on the other. No answer at all is a refusal and exits 7, whichever function asked: a human who
-closed the dialog decided nothing, and a channel deciding on their behalf is what this shape
-exists to avoid. An empty line is an answer, and what it means belongs to the tool — `lm issue`
-reads it as keeping the labels it proposed. Everything the body writes
-comes back to the caller in both cases except the first, where it is simply inherited.
+Where its questions go is the caller's to decide, and the caller is either the command line or the
+chat. On the command line `apply` inherits the terminal and `confirm` and `ask` read `/dev/tty`.
+Inside the chat the harness owns the terminal, so `applyAsk` gives the tool a pair of file
+descriptors instead: the question goes out on one with the wording the tool file gave it and one
+line of answer comes back on the other. No answer at all is a refusal and exits 7, whichever
+function asked: a human who closed the dialog decided nothing, and a channel deciding on their
+behalf is what this shape exists to avoid. An empty line is an answer, and what it means belongs to
+the tool: `lm issue` reads it as keeping the labels it proposed. Everything the body writes comes
+back to the caller in the chat and is simply inherited on the command line.
 
-`confirm` and `ask` are defined in the four read-only phases too, because a tool is entitled to
+`confirm` and `ask` are defined in the read-only phases too, because a tool is entitled to
 assume its runner provides the names. There they print why they are unavailable and `exit` rather
 than returning: no tool tests what `confirm` returned, since `apply()` in every tool file puts
 the side effect on the next line, so a `return` performs the effect the refusal was meant to
-prevent. The code they leave is deliberately none of the ones in [`verbs.md`](verbs.md) —
+prevent. The code they leave is deliberately none of the ones in [`verbs.md`](verbs.md):
 borrowing 7 would tell `lm stats` a human declined.
 
 ## Tests
@@ -111,11 +111,12 @@ while it is here it is the oracle, and a case names the bytes bash produces and 
 same ones back. A case asserting only that the bridge returned something would pass on a bridge
 that dropped a field.
 
-The four `schema matches bash` cases do **not** prove `cwd` is passed through. The test process
-already stands in the repository and a child inherits it, so removing `cwd` from the bridge
-leaves all four green; the case that tests it runs against a temporary directory. That was found
-by perturbing the bridge, not by reading it.
+There is one `schema matches bash` case per tool file, and none of them proves `cwd` is passed
+through. The test process already stands in the repository and a child inherits it, so removing
+`cwd` from the bridge leaves every one of them green; the case that tests it runs against a
+temporary directory. That was found by perturbing the bridge, not by reading it.
 
-No dependency and no build step: Node strips the types and runs the file. `node --check` is this half of the repository's `bash -n` — run it
-on a mutant before believing what the mutant killed, and confirm it rejects a deliberately
+No dependency and no build step: Node strips the types and runs the file. `node --check` is this
+half of the repository's `bash -n`: run it on a mutant before believing what the mutant killed,
+and confirm it rejects a deliberately
 broken file first.

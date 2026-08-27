@@ -31,7 +31,7 @@ consumer GPU does well, and they are most of what an agent is asked for in a day
 
 ## How it works
 
-One command over a directory of tool files. Each file declares five shell functions, and the
+One command over a directory of tool files. Each file declares the shell functions below, and the
 runner calls them in order:
 
 ```bash
@@ -55,11 +55,11 @@ is available on the command line at once, and inside the chat from the next sess
 
 ## Documentation
 
-- [Installing lm](docs/install.md) — requirements, install, first run.
-- [What each verb does](docs/verbs.md) — per-verb behaviour, the two compositions, configuration
+- [Installing lm](docs/install.md): requirements, install, first run.
+- [What each verb does](docs/verbs.md): per-verb behaviour, `ship` and `stats`, configuration
   and exit codes.
-- [Adding a tool](docs/tools.md) — the registry contract, and the tests that pin it.
-- [The runner](docs/runner.md) — how a verb reaches the model, and how the chat reaches a verb.
+- [Adding a tool](docs/tools.md): the registry contract, and the tests that pin it.
+- [The runner](docs/runner.md): how a verb reaches the model, and how the chat reaches a verb.
 
 ## Why "lm"
 

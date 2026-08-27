@@ -297,5 +297,28 @@ check "the table has a model column"  "1" "$(head -1 <<<"$out" | grep -c 'avg mo
 check "and reports the reply's time"  "1500" "$(awk '/^stub /{print $NF}' <<<"$out")"
 teardown
 
+# clean is read against a threshold, so it carries the sample that threshold needs
+# and withholds itself below it. Two runs cannot put the edit share under one in
+# five however they land, and a column that answered anyway would answer the same
+# whatever the log held.
+setup "$(say ok)" "$(say ok)"
+tty_lm y stub >/dev/null
+tty_lm y stub >/dev/null
+out=$("$ROOT/libexec/lm-stats" 2>&1)
+check "two runs are counted"          "2"    "$(awk '/^stub /{print $2}' <<<"$out")"
+check "and the clean share withheld"  "n<14" "$(awk '/^stub /{print $3}' <<<"$out")"
+teardown
+
+# Fourteen is where it starts being read, because fourteen is the smallest sample
+# a share below one in five is reachable from at all. The positive control: without
+# it the column could withhold every share and this suite would not notice.
+replies=(); for _ in $(seq 14); do replies+=("$(say ok)"); done
+setup "${replies[@]}"
+for _ in $(seq 14); do tty_lm y stub >/dev/null; done
+out=$("$ROOT/libexec/lm-stats" 2>&1)
+check "fourteen runs are counted"     "14"   "$(awk '/^stub /{print $2}' <<<"$out")"
+check "and the clean share is read"   "100%" "$(awk '/^stub /{print $3}' <<<"$out")"
+teardown
+
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
 echo "all cases passed"
