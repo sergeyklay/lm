@@ -1,7 +1,7 @@
 # What each verb does
 
-`README.md` lists the verbs; this page says how each one behaves, and what the two
-compositions and the configuration around them do.
+[Installing lm](install.md) lists the verbs and how to meet them; this page says how each one
+behaves, and what the two compositions and the configuration around them do.
 
 ## The verbs
 

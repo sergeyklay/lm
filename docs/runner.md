@@ -23,7 +23,21 @@ terminal, and a mode with no dialog to show, such as the harness's print mode, r
 human's behalf and applies nothing.
 
 The chat keeps its settings, its credentials and its session history in the harness's own
-directory under the home directory, outside this repository, and writes there as you use it.
+directory under the home directory, outside this repository, and writes there as you use it. One
+of those settings it writes itself, once: the harness lists every resource it loaded on each
+launch unless `quietStartup` is set, and there is no flag for it, so the chat sets it and says
+nothing, because a message about a setting you did not ask for is the noise it removes. A value
+already there is left alone.
+
+It wears this project's own header and status rows rather than the harness's. The header is the
+mark, the name and the version `package.json` declares, and one dim row naming what to type; the
+status rows carry the working directory, the branch when there is one and what the session has
+spent, then the context against its window and the model. Both are installed on `session_start`,
+because the harness builds its own header before extensions load and replacing it earlier is a
+no-op, and both are drawn from the harness's theme rather than from colours of their own, so a
+terminal without truecolor gets the theme's approximation. The harness restores its own header
+and footer while it tears the extension UI down, so the last frame you see on quitting is its,
+not this one's.
 
 `libexec/lm-verb` is the shell runner and still runs every verb. The Node side under `src/` is
 the half being built to replace it, and it reads the same registry, so a tool file does not know
