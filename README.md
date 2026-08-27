@@ -1,22 +1,15 @@
 # lm
 
-A local replacement for a hosted coding agent: a chat against a model on your own machine, this repository's verbs beside it, and the run log as a dashboard.
+**A coding agent that never leaves your machine.**
 
-Each tool collects its input from the repository, asks the model once under a JSON schema, validates the answer, shows it, and only then applies it.
+A chat against a model on your own hardware, this repository's own verbs available inside it, and
+every run recorded in a log you can read. No account and no API key, and nothing you type or stage
+is sent anywhere: `issue` and `pr` reach GitHub because publishing is what they are for, and
+nothing else leaves the machine.
 
-## Requirements
-
-`bash`, `jq`, `curl`, `git`, and a running [ollama](https://ollama.com) with a model that honours `format`. `gh` for `issue` and `pr`.
-
-Node 24, new enough to run TypeScript without a build step, and its packages installed.
-
-The chat's file tools shell out to [`fd`](https://github.com/sharkdp/fd) and [`ripgrep`](https://github.com/BurntSushi/ripgrep). Install them yourself: the chat otherwise tries to fetch them from GitHub on first run, which fails on an unauthenticated rate limit and leaves the tools missing.
-
-Under `tmux`, add `set -g extended-keys on` to your configuration, or modified `Enter` keys do not reach the chat.
-
-```bash
-ollama pull qwen3.8:27b
-```
+`lm` does not make a local model as good as a hosted one. What it does is give the model a job
+small enough to be reliable: each verb collects its input from the repository, asks the model once
+under a JSON schema, validates the answer, shows it to you, and only then applies it.
 
 ## Install
 
@@ -26,33 +19,52 @@ export PATH="$HOME/lm/bin:$PATH"
 npm --prefix ~/lm ci
 ```
 
-## Use
+Requirements and the first run: [installing lm](docs/install.md).
+
+## The problem
+
+A hosted coding agent is excellent and it is also a subscription, a network dependency and a copy
+of your repository on someone else's disk. A local model is none of those, and on its own it is
+worse at everything. The gap closes when the work is narrow: writing a commit message from a diff,
+drafting a changelog entry, filling a pull request template. Those are the jobs a 27B model on one
+consumer GPU does well, and they are most of what an agent is asked for in a day.
+
+## How it works
+
+One command over a directory of tool files. Each file declares five shell functions, and the
+runner calls them in order:
 
 ```bash
-lm                 # chat with the local model
-lm commit          # Conventional Commits message from the staged diff
-lm changelog       # CHANGELOG.md entries from the staged diff
-lm issue "topic"   # a GitHub issue, labels picked from the repository
-lm pr              # a pull request description
-lm ship            # stage, branch, commit, pull request
-lm stats           # what the run log says about this repository
+name="commit"
+description="Write a Conventional Commits message for the staged changes"
+
+collect()  { git diff --staged; }    # build the prompt from the repository
+schema()   { ... }                   # the answer's shape, an enum on every closed set
+validate() { ... }                   # print one line per violation, nothing when clean
+render()   { ... }                   # show the result to the human
+apply()    { confirm "commit? [y/N]"; ... }  # the side effect, once the human agrees
 ```
 
-A verb takes free text after its name, and `--dry-run` stops it before the side effect.
+The model never picks a value that can be enumerated: scopes, labels and template sections are
+built from the repository at call time, so the answer cannot name something that does not exist.
+A rejected answer is sent back once with the violations as the correction, and a verb costs one
+model call, or two when the validator rejects the first.
 
-```bash
-lm --list                      # every tool with its description, tab-separated
-lm --which "text"              # pick the verb that serves a request
-lm ship                        # stage, branch, commit and open the pull request
-lm stats                       # what the run log says about this repository
-```
+Adding a verb changes no existing file. The index is the directory listing, so a file dropped in
+is available on the command line at once, and inside the chat from the next session.
 
 ## Documentation
 
-- [What each verb does](docs/verbs.md) — per-verb behaviour, the two compositions,
-  configuration and exit codes.
+- [Installing lm](docs/install.md) — requirements, install, first run.
+- [What each verb does](docs/verbs.md) — per-verb behaviour, the two compositions, configuration
+  and exit codes.
 - [Adding a tool](docs/tools.md) — the registry contract, and the tests that pin it.
-- [The runner](docs/runner.md) — the two runners, and how the Node one reaches a bash tool.
+- [The runner](docs/runner.md) — how a verb reaches the model, and how the chat reaches a verb.
+
+## Why "lm"
+
+Two letters, the ones in "local model", and short enough to type before `commit` without
+resenting it.
 
 ## License
 

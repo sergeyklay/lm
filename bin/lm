@@ -73,14 +73,20 @@ if (argv.length > 0 && argv[0] !== "chat") {
 const { main } = await import("@earendil-works/pi-coding-agent");
 const { providerConfig, modelId } = await import("../src/provider.mts");
 const { registerVerbs } = await import("../src/chat.mts");
+const { installChrome, silenceStartup } = await import("../src/chrome.mts");
+
+silenceStartup();
 
 await main(["--provider", "ollama", "--model", modelId(), ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
   extensionFactories: [
     {
       name: "lm",
+      // Nothing here is news to the operator: this is the program they ran.
+      hidden: true,
       factory: (pi) => {
         pi.registerProvider("ollama", providerConfig());
         registerVerbs(pi, process.env.LM_TOOLS ?? join(libexec, "..", "tools"));
+        installChrome(pi);
       },
     },
   ],

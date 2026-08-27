@@ -53,6 +53,7 @@ bash tests/ship.sh                # the `lm ship` composition, with the verbs st
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and on what terms
+node tests/chrome.mts             # what the chat's header and status rows say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
 LM_LIVE=1 node tests/verb-live.mts  # the runner's retry, its budget and a verb inside the chat, on the real model
 ```
@@ -114,7 +115,14 @@ at that mutation is the warning worth keeping — restoring the swallowed `read`
 bridge crashed the suite with `ERR_STREAM_WRITE_AFTER_END` instead of failing a case, because a
 body that had already asked its next question was answered into a pipe the refusal had closed.
 That is a mutant that parses and does not run, and it also named a hole in the channel: it now
-tolerates being answered after it closes.
+tolerates being answered after it closes. A ninth, over the chat's own header and status rows,
+where three mutations each redden exactly one case and each was run before it was believed:
+guessing the auto-compact label instead of reading the setting reddens the case that asserts an
+unread setting prints no mode, right-aligning the branch reddens the case that pins it near the
+middle, and dropping the version reddens the case that reads the name. The suite works at
+`theme`'s level rather than at the terminal's, so the check that the terminal shows this and not
+the harness's own header is a capture through a pseudo-terminal, killed with `SIGKILL` so the
+harness cannot restore its chrome on the way out and paint a last frame that reads like a defect.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
