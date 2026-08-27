@@ -24,6 +24,12 @@ export LM_COMPOSITION="ship-$$"
 
 # <type>/<kebab-description>, from the subject the model just wrote. Four words is
 # where a branch name stops being read and starts being scrolled past.
+#
+# Reading the subject back out of the commit looks like the long way round, and
+# the short way is worse: naming the branch before committing means a --dry-run
+# of `lm commit` first, which costs a second model call for a prompt identical to
+# the first, because collect() in tools/commit.sh reads the index, the working
+# tree and `git log` and never the branch. Two calls, one answer.
 _name() {
   local s t d
   s=$(git log -1 --format='%s')

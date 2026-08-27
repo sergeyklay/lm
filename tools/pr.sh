@@ -31,6 +31,12 @@ _render_body() {
 # The branch a pull request would target, as a remote-tracking ref. Read-only
 # by contract: collect() runs before the human has approved anything, so this
 # must not reach for the network or write refs the way set-head --auto does.
+#
+# The walk below is not belt and braces. `git symbolic-ref refs/remotes/origin/HEAD`
+# fails with "is not a symbolic ref" on any clone where `git remote set-head` has
+# never run, which is most of them, so a lone lookup always falls through to
+# whatever default sits behind it and every such repository silently gets that
+# default as its base branch.
 _base() {
   local b
   b=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) && { echo "$b"; return 0; }
