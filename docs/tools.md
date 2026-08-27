@@ -64,7 +64,7 @@ model: the prompt `collect` writes, the shape `schema` asks for, the violations 
 reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
 diff before committing them.
 
-Eight groups of checks here have been made to go red, and that record is what makes a green run of
+Ten groups of checks here have been made to go red, and that record is what makes a green run of
 them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
 kills a different subset of the six cases in `tests/runner.sh`: dropping the trap kills five,
 blanking the `which` argument kills three, and dropping the table's exclusion kills one. The
