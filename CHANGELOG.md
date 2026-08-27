@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `lm stats` takes `--since <date>`, which splits the runs at that date and prints the clean share of each period beside its sample, so the column answers how the share moved rather than what it has settled at; each period withholds its own share below the same fourteen-run minimum the table uses, and a value that is not a date is refused.
+
 ### Changed
 
 - Verb answers are now sampled greedily: the runner pins temperature 0 on every request, so the same diff produces the same message again, where before the model's own default of 1 decided and answers varied between identical runs.

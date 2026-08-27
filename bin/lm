@@ -24,6 +24,7 @@ Usage:
   lm <verb> [options] [text]    run one verb
   lm ship [options] [text]      commit the working tree and open a pull request
   lm stats [--all]              what the run log says about this repository
+  lm stats --since <date>       the same, split into before and since that date
 
 Verbs:
 ${rows}
