@@ -193,7 +193,7 @@ repository mutation was first planted at an anchor that appears in the table's o
 so it landed there, parsed, ran and killed nothing: zero kills is not a strong suite, it is the
 signature of a mutant that never reached the code the cases read. And the empty-`LM_LOG` case first
 asserted the exit code alone, which the very next guard produces as well, so removing the guard
-under test left the case green — a case that reads a status two lines can produce has to read the
+under test left the case green - a case that reads a status two lines can produce has to read the
 words too, or it cannot tell which line answered.
 
 The last group in the live suite covers the shell the chat carries beside the verbs, and its shape
