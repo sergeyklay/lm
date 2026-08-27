@@ -76,6 +76,10 @@ check("the runner reached the completions endpoint", true, paths.some((p) => p.i
 check("and asked for a budget", 3000, body.max_tokens);
 check("under the name ollama honours", false, "max_completion_tokens" in body);
 check("and asked the model not to think", "none", body.reasoning_effort);
+// Greedy sampling is what makes the same prompt give the same answer, which is
+// what the golden fixtures and the authorship gate both rest on. The model's own
+// modelfile asks for temperature 1, so silence here is not a neutral default.
+check("and pinned the sampling", 0, body.temperature);
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");
