@@ -139,7 +139,7 @@ Environment only:
 | --- | --- |
 | `LM_OLLAMA` | `http://127.0.0.1:11434` |
 | `LM_MODEL` | `qwen3.8:27b` |
-| `LM_CTX` | `32768` |
+| `LM_CTX` | `65536` |
 | `LM_MAX_TOKENS` | `3000` |
 | `LM_TOOLS` | `<repo>/tools` |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
@@ -153,6 +153,19 @@ budget is `LM_MAX_TOKENS` whatever `LM_CTX` says, the same budget `num_predict` 
 route. That runner sends no window at all, and could not: ollama ignores `options.num_ctx` on
 `/v1/chat/completions`. So lowering this variable asks the chat to account against a smaller window;
 it does not make the server serve one.
+
+The default is what this machine's ollama serves, and the two stay in step by hand.
+`curl -sS http://127.0.0.1:11434/api/ps | jq -c '.models[] | {name, context_length}'` reports the
+window a loaded model was given, and `OLLAMA_CONTEXT_LENGTH` in the service's environment is what it
+is given when nothing asks for another. Declaring less than the server serves spends the difference
+on nothing and compacts the chat early; declaring more lets a conversation grow past what ollama
+holds, and ollama truncates the prompt at its own window without saying so.
+
+There is a floor, and it is the harness's rather than the card's. The chat compacts at `LM_CTX` minus
+a reserve of 16 384 tokens and keeps the most recent 20 000 whole, both defaults an operator can
+change in the harness's own settings, so a window under the sum of the two arms the trigger over a
+history it cannot cut: compaction fires every turn and summarises nothing. `tests/window.mts` pins
+that through the harness's own `shouldCompact` and `findCutPoint`.
 
 `LM_MAX_TOKENS` is that budget, and it is the one number both runners spend: `max_tokens` on
 `/v1/chat/completions`, `num_predict` on `/api/chat`. An answer that reaches it is cut off, which is

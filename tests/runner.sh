@@ -102,7 +102,8 @@ teardown
 
 setup "$(say ok)"
 tty_lm y stub >/dev/null
-check "unset, the budget is the published default" "3000" "$(jq -r '.options.num_predict' "$REPLIES/req.1")"
+check "unset, the budget is the published default" "3000"  "$(jq -r '.options.num_predict' "$REPLIES/req.1")"
+check "and the window is the served one"           "65536" "$(jq -r '.options.num_ctx' "$REPLIES/req.1")"
 teardown
 
 # The retry is single, and it carries the violations: they are its only input.
