@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The chat now hands the model a shell beside the verbs, so it can stage, commit and push without reaching a verb at all, and `lm chat` takes `--exclude-tools bash` to take the shell away, after which the same request stops at the verb and its record is the only trace.
 - Verb answers are now sampled greedily: the runner pins temperature 0 on every request, so the same diff produces the same message again, where before the model's own default of 1 decided and answers varied between identical runs.
 - `lm stats` now withholds the clean share when a verb has fewer than fourteen runs, printing `n<14` instead of a percentage, and prints the percentage again from the fourteenth run on: at smaller samples no outcome can put the edit share below one in five, so a figure no sample can contradict is not a measurement.
 

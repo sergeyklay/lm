@@ -141,6 +141,26 @@ Inside the chat a verb has no exit status to hand anyone, so the tool result say
 thing in words: a refused confirmation reads `Declined. Nothing was applied.` and any other
 failure names its code.
 
+A verb called from inside the chat is a request the model may fulfil another way, and the codes
+above are what it reports when it does call one. The chat hands the model a shell beside the
+verbs, so it can stage the tree, write the commit and push it without reaching a verb at all, and
+then the confirmation you answer, the validator, the message shaped after the ones already in the
+log and the run record are bypassed together while the log still shows a verb run. Asked plainly to
+commit, the model reached for the shell in three of four sessions measured on 2026-08-27; in one of
+them `HEAD` moved to a subject no validator had seen while both records that session wrote read
+exit 7, so the log says you declined twice and the repository has a new commit. This is why
+`lm stats` counts the work that went through a verb rather than the work that was done.
+
+Taking the shell away is one flag, and the same request then stops at the verb: nothing is staged,
+`commit` exits 3, and the model says it cannot run git itself. Both halves are reproducible in a
+repository with one modified file and a scratch log, which is what `tests/verb-live.mts` drives.
+
+```bash
+LM_LOG=/tmp/runs.jsonl lm chat -p 'commit the change'
+LM_LOG=/tmp/runs.jsonl lm chat -p 'commit the change' --exclude-tools bash
+git log --oneline -1 && jq -r '[.verb,.exit,.head_moved]|@tsv' /tmp/runs.jsonl
+```
+
 The gap at 6 is deliberate. It belonged to `lm fix` and went when that verb was removed, so the
 next verb that reverts its own work takes it back rather than inventing an eighth code;
 `grep -rn 'exit 6' bin/ libexec/ src/ tools/` finds nothing today.
