@@ -90,9 +90,20 @@ not that the reading is settled. A message accepted here and rewritten afterward
 `git commit --amend` still counts as accepted, so the column is an upper bound on what went
 through untouched.
 
+`--since <date>` reads the axis the table does not. It splits the runs in two at that date and
+prints the clean share of each period beside its sample, so the column answers how the share
+moved rather than what it has settled at. Each period is read against the same minimum the table
+uses and withholds itself below it, so a period of four runs prints `n<14` whatever those four
+runs did, and a period with nothing in it prints the same rather than a share of no runs. The
+comparison is on the timestamp as it was written, so a log whose records carry two different UTC
+offsets splits by local time; every record in the log this was measured against carries one, which
+`jq -r '.ts' $LM_LOG | grep -oE '[+-][0-9]{2}:[0-9]{2}$' | sort -u` reports. A value that is not a
+date is refused rather than read as a period nothing falls in.
+
 ```bash
 lm stats                       # this repository
 lm stats --all                 # every repository the log has seen
+lm stats --since 2026-08-26    # before that date beside since it
 ```
 
 ## Configuration

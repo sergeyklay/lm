@@ -51,6 +51,7 @@ bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh` stubbed
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
+bash tests/stats.sh               # the clean share split at a date, over a log written by hand
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
@@ -175,6 +176,24 @@ two run-count checks stay green under all three, which is what makes the share t
 measured. The fourteen-run case is the positive control, and only the widening mutant reaches
 it: without that case the column could withhold every share it is ever asked for and a green run
 would report the withholding as correct.
+
+The same column split at a date has a group of its own, and it writes the log by hand rather than
+running a verb, because `libexec/lm-stats` reads nothing else. Five mutations of it that `bash -n`
+accepts and that run, each confirmed by the row or the message the mutated line printed: swapping
+the two periods reddens 6 of the 15 cases and leaves every argument case green; lowering the
+minimum to one reddens the 4 that expect a period to withhold itself, printing `100%` over
+thirteen runs and `n<1` over none; taking the repository filter off the split reddens exactly 1,
+where a record from another repository joins the later period; accepting any `--since` value
+reddens the 3 that refuse one, exiting 0 where they want 2; and removing the empty-`LM_LOG` guard
+reddens 1.
+
+Two first attempts are the warnings worth keeping, and they fail in opposite directions. The
+repository mutation was first planted at an anchor that appears in the table's own query as well,
+so it landed there, parsed, ran and killed nothing: zero kills is not a strong suite, it is the
+signature of a mutant that never reached the code the cases read. And the empty-`LM_LOG` case first
+asserted the exit code alone, which the very next guard produces as well, so removing the guard
+under test left the case green — a case that reads a status two lines can produce has to read the
+words too, or it cannot tell which line answered.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
