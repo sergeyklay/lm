@@ -140,9 +140,23 @@ Environment only:
 | `LM_OLLAMA` | `http://127.0.0.1:11434` |
 | `LM_MODEL` | `qwen3.8:27b` |
 | `LM_CTX` | `32768` |
+| `LM_MAX_TOKENS` | `3000` |
 | `LM_TOOLS` | `<repo>/tools` |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 | `LM_YES` | unset |
+
+`LM_CTX` is the context window, and the two routes that can act on one read it. `lm ship` drives its
+verbs through `libexec/lm-verb`, which posts `options.num_ctx` on `/api/chat`, where ollama honours
+it. The chat accounts against it: the harness compares the conversation with that number to decide
+when to compact and what percentage to show. A verb on the Node runner does neither, and its answer
+budget is `LM_MAX_TOKENS` whatever `LM_CTX` says, the same budget `num_predict` carries on the other
+route. That runner sends no window at all, and could not: ollama ignores `options.num_ctx` on
+`/v1/chat/completions`. So lowering this variable asks the chat to account against a smaller window;
+it does not make the server serve one.
+
+`LM_MAX_TOKENS` is that budget, and it is the one number both runners spend: `max_tokens` on
+`/v1/chat/completions`, `num_predict` on `/api/chat`. An answer that reaches it is cut off, which is
+exit 5 and not a short answer, so the runner says the budget is why.
 
 Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= lm commit` writes no record, and `lm stats` under the same setting reads none. That is what a fixture repository or a rehearsal wants, because one log spans every repository and `lm stats` counts the one you are in.
 

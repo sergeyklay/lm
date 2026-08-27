@@ -91,6 +91,20 @@ check "one model call"         "1" "$(calls)"
 check "apply ran"              "1" "$(grep -c APPLIED <<<"$out")"
 teardown
 
+# The two numbers a request carries: the window this route can set, and the budget
+# both routes spend. `num_predict` is the answer's ceiling here and `max_tokens`
+# there, so a run that reads one variable and not the other answers at two lengths.
+setup "$(say ok)"
+LM_CTX=8192 LM_MAX_TOKENS=64 tty_lm y stub >/dev/null
+check "the window reaches the server on this route" "8192" "$(jq -r '.options.num_ctx' "$REPLIES/req.1")"
+check "and the budget is the variable's"            "64"   "$(jq -r '.options.num_predict' "$REPLIES/req.1")"
+teardown
+
+setup "$(say ok)"
+tty_lm y stub >/dev/null
+check "unset, the budget is the published default" "3000" "$(jq -r '.options.num_predict' "$REPLIES/req.1")"
+teardown
+
 # The retry is single, and it carries the violations: they are its only input.
 setup "$(say bad)" "$(say ok)"
 tty_lm y stub >/dev/null; rc=$?

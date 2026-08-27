@@ -6,6 +6,7 @@ set -euo pipefail
 : "${LM_OLLAMA:=http://127.0.0.1:11434}"
 : "${LM_MODEL:=qwen3.8:27b}"
 : "${LM_CTX:=32768}"
+: "${LM_MAX_TOKENS:=3000}"
 : "${LM_LOG=$HOME/.lm/runs.jsonl}"     # one JSON object per run; empty disables
 
 LM_TOOLS="${LM_TOOLS:-$(dirname "$(readlink -f "$0")")/../tools}"
@@ -18,8 +19,9 @@ list() { for f in "$LM_TOOLS"/*.sh; do [ -f "$f" ] || continue
 call() { # $1 prompt, $2 schema -> sets OUT, adds this call to the model totals
   local resp
   resp=$(jq -n --arg m "$LM_MODEL" --arg p "$1" --argjson s "$2" --argjson c "$LM_CTX" \
+    --argjson n "$LM_MAX_TOKENS" \
     '{model:$m,stream:false,think:false,messages:[{role:"user",content:$p}],format:$s,
-      options:{num_ctx:$c,num_predict:3000,temperature:0},keep_alive:"30m"}' \
+      options:{num_ctx:$c,num_predict:$n,temperature:0},keep_alive:"30m"}' \
   | curl -sS -m 600 "$LM_OLLAMA/api/chat" -d @-)
   # Added before the budget check, because a cut-off answer cost the model the
   # same work as one that fits and the log should say what it cost. A reply that

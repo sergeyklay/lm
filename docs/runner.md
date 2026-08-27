@@ -14,7 +14,7 @@ and `--which` are the shell runner's and pass through. `--dry-run` belongs to a 
 refusal says so rather than listing it as though `lm` took it.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
-extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`, and every
+extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL`, `LM_CTX` and `LM_MAX_TOKENS`, and every
 verb in the registry beside it. A verb offered that way takes what a human types (free text and
 `--dry-run`) and nothing about its own answer: it still writes its own prompt from the
 repository and asks the model itself, so what it commits is what `lm commit` commits, at the cost

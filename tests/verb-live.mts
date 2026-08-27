@@ -67,15 +67,16 @@ check("a clean answer exits 0", 0, good.code);
 check("and costs exactly one model call", 1, good.calls);
 check("and called the tool once", 1, good.attempts);
 
-// LM_CTX below the harness's own 4096-token safety margin clamps the answer
-// budget to one token whatever the prompt costs, so the model is cut off on its
-// first token and the case does not depend on how long an answer it wanted.
-process.env.LM_CTX = "4096";
+// A budget of sixteen tokens is narrower than any answer the schema can hold, so
+// the model is cut off whatever it wanted to say and the case does not depend on
+// how long that was. The window is not the lever: a verb's budget does not follow
+// it, which `tests/request.mts` pins.
+process.env.LM_MAX_TOKENS = "16";
 const cut = await runVerb(accepts, [], {});
 check("an answer cut off by the budget exits 5", 5, cut.code);
 check("and costs exactly one model call", 1, cut.calls);
 check("and never reached the tool", 0, cut.attempts);
-delete process.env.LM_CTX;
+delete process.env.LM_MAX_TOKENS;
 
 process.chdir(ROOT);
 // Through the command, because the exit code alone cannot tell a cut-off answer
@@ -83,7 +84,7 @@ process.chdir(ROOT);
 const cutCli = spawnSync(join(ROOT, "bin/lm"), ["accepts"], {
   encoding: "utf8",
   cwd: work,
-  env: { ...process.env, LM_TOOLS: tools, LM_LOG: "", LM_CTX: "4096" },
+  env: { ...process.env, LM_TOOLS: tools, LM_LOG: "", LM_MAX_TOKENS: "16" },
   timeout: 600_000,
 });
 check("the command exits 5 on a cut-off answer", 5, cutCli.status);
