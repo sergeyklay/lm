@@ -22,14 +22,17 @@ const REFUSE =
   'confirm() { echo "lm: confirm is available only inside apply" >&2; exit 1; }; '
   + 'ask() { echo "lm: ask is available only inside apply" >&2; exit 1; }; ';
 const ASK =
-  'confirm() { local a; read -r -p "$1 " a </dev/tty; [ "$a" = y ] || exit 7; }; '
-  + 'ask() { local a; read -r -p "$1 " a </dev/tty; printf "%s" "$a"; }; ';
+  'confirm() { local a; read -r -p "$1 " a </dev/tty || exit 7; [ "$a" = y ] || exit 7; }; '
+  + 'ask() { local a; read -r -p "$1 " a </dev/tty || exit 7; printf "%s" "$a"; }; ';
 // The same two functions over a pair of file descriptors instead of the
 // terminal: fd 3 carries the tool's own question out, fd 4 carries one line of
-// answer back. A closed channel is a refusal, not a default.
+// answer back. No answer at all is a refusal and exits 7, for both: a human who
+// closed the dialog decided nothing, and a channel deciding on their behalf is
+// the defect this shape exists to avoid. An empty line is an answer, and what it
+// means belongs to the tool — `issue` reads it as keeping the labels it proposed.
 const BRIDGE =
   'confirm() { printf "confirm\t%s\n" "$1" >&3; IFS= read -r a <&4 || exit 7; [ "$a" = y ] || exit 7; }; '
-  + 'ask() { printf "input\t%s\n" "$1" >&3; IFS= read -r a <&4 || a=; printf "%s" "$a"; }; ';
+  + 'ask() { printf "input\t%s\n" "$1" >&3; IFS= read -r a <&4 || exit 7; printf "%s" "$a"; }; ';
 
 const SOURCE = '. "$1" || exit $?; f=$2; shift 2; "$f" "$@"';
 
@@ -99,6 +102,13 @@ export function applyAsk(file: string, opts: Opts, ask: Ask): Promise<{ status: 
     child.stdout!.on("data", (d: string) => (output += d));
     child.stderr!.on("data", (d: string) => (output += d));
     const answers = child.stdio[4] as NodeJS.WritableStream;
+    // A refused question ends the channel, and the body may already have asked
+    // the next one before reading the answer to this one. Answering into a
+    // closed pipe is not this function's failure to report.
+    answers.on("error", () => {});
+    const answer = (line: string) => {
+      if (!(answers as any).writableEnded) answers.write(line);
+    };
     const questions = child.stdio[3] as NodeJS.ReadableStream;
     questions.setEncoding?.("utf8");
     let chain: Promise<void> = Promise.resolve();
@@ -114,8 +124,15 @@ export function applyAsk(file: string, opts: Opts, ask: Ask): Promise<{ status: 
         // Serialised: a body asking twice must not have its answers race, and
         // the human sees one dialog at a time.
         chain = chain.then(async () => {
-          if (kind === "confirm") answers.write((await ask.confirm(question)) ? "y\n" : "n\n");
-          else answers.write(((await ask.input(question)) ?? "") + "\n");
+          if (kind === "confirm") {
+            answer((await ask.confirm(question)) ? "y\n" : "n\n");
+            return;
+          }
+          const line = await ask.input(question);
+          // Nothing to answer with closes the channel rather than sending an
+          // empty line, because an empty line is a decision the human made.
+          if (line === undefined) answers.end();
+          else answer(line + "\n");
         });
       }
     });

@@ -127,6 +127,24 @@ const declined = await applyAsk(join(work, "asks-twice.sh"), { cwd: work, stdin:
 check("a declined confirmation exits 7", "7", String(declined.status));
 check("and leaves no side effect", "false", String(existsSync(join(work, "asked.txt"))));
 
+// No answer and an empty answer are different things. A dialog the human closed
+// decided nothing, so it exits 7 like a refused confirmation; an empty line is a
+// decision, and what it means is the tool's to read.
+const unanswered = await applyAsk(join(work, "asks-twice.sh"), { cwd: work, stdin: "answer" }, {
+  confirm: async () => true,
+  input: async () => undefined,
+});
+check("a question left unanswered exits 7", "7", String(unanswered.status));
+check("and leaves no side effect either", "false", String(existsSync(join(work, "asked.txt"))));
+
+const blank = await applyAsk(join(work, "asks-twice.sh"), { cwd: work, stdin: "answer" }, {
+  confirm: async () => true,
+  input: async () => "",
+});
+check("an empty answer is an answer", "0", String(blank.status));
+check("and reaches the tool as one", "answer|", readFileSync(join(work, "asked.txt"), "utf8"));
+rmSync(join(work, "asked.txt"));
+
 rmSync(work, { recursive: true, force: true });
 
 if (fail) { console.log("FAILED"); process.exit(1); }
