@@ -52,6 +52,7 @@ bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh`
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
 bash tests/stats.sh               # the clean share split at a date, over a log written by hand
+bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
@@ -107,7 +108,7 @@ reading the message goes red. The code alone cannot tell the two apart, which is
 reads the message. Over the verbs inside the chat: replacing the registration's walk
 over the registry with a filter naming the four tool files leaves every case green except the one
 that drops a fifth file in, which is the case that exists for it; making the channel's
-confirmation always answer yes turns the two declining cases in `tests/registry.mts` red, and
+confirmation always answer yes *while the run has not asked for the capability* turns the two declining cases in `tests/registry.mts` red, and
 three in `tests/chat.mts`, while leaving the approving ones green; and unwiring the channel from the chat's side, so a verb falls
 back to the terminal, turns the live case reading exit 7 red while the case asserting nothing was
 applied stays green, because a question no one can answer fails the run anyway. Only the pair
@@ -133,7 +134,7 @@ called; `issue` assembles a `--label` list from what the human typed, and that l
 been read by eye. Four mutations of `tools/issue.sh` that `bash -n` accepts and that run: dropping
 the trim reddens only the case with a space after the comma, reading an empty reply as no labels
 reddens only the case that keeps what the model proposed, taking the word `none` literally reddens
-only its own case, and removing the confirmation reddens two (the exit code and the absence of
+only its own case, and removing the confirmation from a run that did not ask for the capability reddens two (the exit code and the absence of
 the call), which is the pair worth having, because a verb that creates the issue and then asks is
 indistinguishable from one that asks first until the first time someone says no.
 
@@ -150,7 +151,7 @@ the dialog's label reddens only the case that reads it; the chat no longer sayin
 happened reddens only the two cases that read its words; sending an empty line where the channel
 should close reddens the three cases that hold no answer apart from an empty one, because the body
 then goes on to ask its second question and is answered; and a confirmation that always answers yes
-reddens the declining cases here too. The first attempt at these is the warning worth keeping: the
+where the capability was not asked for reddens the declining cases here too. The first attempt at these is the warning worth keeping: the
 case that cleans up the approved run's artefact removed it without `force`, so a mutant that
 suppressed the side effect crashed the suite at that line rather than reddening a case, and a
 suite that dies partway prints a plausible run of `ok` lines and proves nothing.
@@ -197,8 +198,8 @@ words too, or it cannot tell which line answered.
 
 The last group in the live suite covers the shell the chat carries beside the verbs, and its shape
 is a concession rather than a preference. Asked plainly to commit, this model reached for the shell
-in 3 of 4 sessions measured on 2026-08-27, so an assertion that it does would be red about a fifth
-of the time with nothing wrong in the repository. What the two arms assert instead is the capability
+in 4 of 6 sessions measured on 2026-08-27, taking the refusal at its word in the other two, so an
+assertion that it goes past would be red about a third of the time with nothing wrong here. What the two arms assert instead is the capability
 the page claims: with the shell, `HEAD` moves and no record the log holds accounts for it; with
 `--exclude-tools bash`, the same request reaches the verb, stops there and leaves `HEAD` where it
 started. Three mutations, each killing exactly one case and each confirmed by the row it printed:
@@ -208,6 +209,48 @@ shell arm `--exclude-tools bash` reddens the case that claims the shell moved `H
 record count is asserted separately from the records' exit codes: with an empty log the check that
 every record is non-zero passes over no records at all, and under the mutation it passed in exactly
 that way.
+
+Consent has two groups, because it has two halves. The capability needs no terminal, so
+`tests/registry.mts` drives `apply()` with and without it over a tool that both confirms and asks,
+and `tests/issue-labels.sh` drives the one tool whose command line depends on what the answer was.
+Four mutations, each killing exactly the predicted case names and each leaving every other case in
+the suite still reported rather than cut short: the unattended `confirm` refusing reddens 2, its
+`ask` answering `y` instead of an empty line reddens 1, `apply` ignoring the flag reddens the same 2
+as the first, and `apply` assuming yes for every run reddens the 2 that hold today's refusal down.
+The first attempt at the first is the warning worth keeping, and it is the second time this file
+records that shape: the case reading the artefact read it without `existsSync`, so the mutant
+crashed the suite at that line instead of reddening the case above it, and the kill set came back
+one name short of the prediction rather than wrong in a way anyone would notice.
+
+The two affordances are not one thing twice, so `tests/request.mts` drives the seam that reads them
+apart from the run that uses it: the flag alone, the variable alone, neither, and a variable set to
+something other than `1`. Three mutations, each killing exactly one of them - the seam ignoring the
+variable, the seam ignoring the flag, and the flag no longer reaching the tool's own shell.
+`lm ship --yes` has two cases of its own in `tests/ship.sh`, because a composition runs its verbs
+rather than letting anyone type a flag at them: `libexec/lm-ship` consumes the flag and exports the
+variable, the way it already exports `LM_COMPOSITION`. Two mutations, and the first is the defect
+the operator met before it was fixed - letting `--yes` fall through into the arguments forwarded to
+each verb reddens both cases, because the shell runner then refuses a flag it does not declare,
+while setting the variable without exporting it reddens only the case that reads what the verbs
+received.
+
+The bounded wait is the other half, and `tests/consent.sh` cannot afford to wait for it: the bound
+is 120 seconds, so its cases take the shipped text of the reading function out of the shell runner
+and substitute only the number, which leaves the number itself to cases that grep for it in both
+runners. `grep -c '^check ' tests/consent.sh` counts them, at 16 as this is written. The split is
+deliberate and it is also a limit worth stating: the shell runner's line is driven under a pty and
+the Node runner's is read rather than driven, because the two are built from the same shape and only
+one of them is cheap to put a terminal in front of. Five mutations: taking the bound off the shell
+read reddens 3, moving the Node constant reddens the 1 that names it, deleting the shell line that
+says why the wait ended reddens 1, deleting the Node line that says it reddens 1, and hardcoding a
+different bound into the shell read reddens the 2 behaviour cases while the case that greps for the
+text survives - which is what shows the text and the behaviour are checked separately rather than
+twice. Two harness faults cost more than the five kills. The feeder holding the pty open ended
+before the harness did, so the blocked read hit end of input and exited 7 by that route, and a case
+reading only the status reported a bound that was not there. And a series killed by the tool's own
+wall clock left a mutant in the working tree twice, the second time with `trap ... EXIT INT TERM`
+installed, which did not fire: what proves a restore is `cmp` against the pre-series copy in the
+same command, never a trap and never the intention to restore.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

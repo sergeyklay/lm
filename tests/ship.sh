@@ -19,9 +19,11 @@ setup() {
   work=$(mktemp -d); bin=$work/bin; mkdir -p "$bin"
   cp "$ROOT/libexec/lm-ship" "$bin/lm-ship"
   COMPLOG=$(mktemp); export COMPLOG
+  ARGLOG=$(mktemp); export ARGLOG
   cat > "$bin/lm-verb" <<EOF
 #!/usr/bin/env bash
 echo "\$1 \${LM_COMPOSITION:-none}" >> "\$COMPLOG"
+echo "\$1 yes=\${LM_YES:-unset} args=\$*" >> "\$ARGLOG"
 case "\$1" in
   commit) [ "${1:-0}" -eq 0 ] || exit ${1:-0}
           git commit -qm "feat: scope the widget to one repository" ;;
@@ -35,7 +37,7 @@ EOF
   echo change > f.txt; git add f.txt
 }
 
-teardown() { cd /; rm -rf "$work" "$COMPLOG"; }
+teardown() { cd /; rm -rf "$work" "$COMPLOG" "$ARGLOG"; }
 
 # A thematic branch is what happens when nothing is said, named from the subject.
 setup 0
@@ -105,6 +107,22 @@ setup 0
 "$bin/lm-ship" >/dev/null 2>&1
 check "both verbs saw a composition" "2" "$(grep -cv ' none$' "$COMPLOG")"
 check "and it was the same one"      "1" "$(cut -d' ' -f2 "$COMPLOG" | sort -u | wc -l)"
+teardown
+
+# Consent belongs to the composition. A verb takes it as a flag, and both verbs here
+# are run by the script rather than typed, so the flag is consumed and the variable is
+# what reaches them - a --yes forwarded as an argument is a flag the shell runner
+# refuses, which is what the operator met.
+setup 0
+"$bin/lm-ship" --yes >/dev/null 2>&1
+check "--yes reaches both verbs as the variable" "2" "$(grep -c 'yes=1' "$ARGLOG")"
+check "and is not passed on as a flag"           "0" "$(grep -c -- '--yes' "$ARGLOG")"
+check "and the commit still lands"               "feat: scope the widget to one repository" "$(git log -1 --format='%s')"
+teardown
+
+setup 0
+"$bin/lm-ship" >/dev/null 2>&1
+check "without it the verbs are asked as before" "2" "$(grep -c 'yes=unset' "$ARGLOG")"
 teardown
 
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }

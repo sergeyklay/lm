@@ -144,6 +144,9 @@ check("the chat ran the registered verb rather than answering about it", "applie
 check("and it cost the verb's own model call", 1, records[0]?.calls);
 check("and the refused confirmation exited 7", 7, records[0]?.exit);
 check("and nothing was applied", false, existsSync(join(work, "applied.txt")));
+// The third grain the record carries: not who ran it and not what it did, but what
+// happened to the question. A refusal is the human's answer, and the field says so.
+check("and the record says consent was withheld", "withheld", records[0]?.consent);
 
 // The verb layer is advisory inside the chat, because the harness's own shell is in
 // the same session and can do a verb's work beside it. docs/verbs.md says so under
@@ -153,9 +156,10 @@ check("and nothing was applied", false, existsSync(join(work, "applied.txt")));
 // trace. Both arms are driven through bin/lm, because the entry point is part of
 // what is being reported.
 // What is asserted is the capability, not the model's appetite for it. Asked plainly
-// to commit, this model reached for the shell in 3 of 4 runs measured 2026-08-27
-// against pi 0.84.3, ollama 0.32.15 and qwen3.8:27b; that frequency is a measurement
-// in docs/verbs.md and would be a flake as an assertion.
+// to commit, this model went past the refusal in 4 of 6 sessions measured 2026-08-27
+// against pi 0.84.3, ollama 0.32.15 and qwen3.8:27b, and took it at its word in the
+// other two; that frequency is a measurement in docs/verbs.md and would be a flake
+// as an assertion.
 const page = readFileSync(join(ROOT, "docs/verbs.md"), "utf8");
 check("the page says a verb inside the chat is a request",
   true, /a request the model may fulfil another way/.test(page));

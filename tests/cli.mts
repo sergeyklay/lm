@@ -55,6 +55,12 @@ check("and is named back", true, /'--hlp' is not an option of lm/.test(mistyped.
 check("and is not reported as a missing verb", false, /no such tool/.test(mistyped.err));
 check("and the options it could have meant are listed", true, /--list, --which, -h, --help/.test(mistyped.err));
 
+// The capability is a verb's flag, so it goes after the verb exactly like --dry-run
+// does and the first-position guard is untouched by it.
+const preYes = run(LM, ["--yes", "commit"]);
+check("--yes ahead of its verb exits 2", 2, preYes.code);
+check("and is named as a misplaced verb flag", true, /A verb takes .*--yes/.test(preYes.err));
+
 const misplaced = run(LM, ["--dry-run"]);
 check("a verb flag ahead of its verb exits 2", 2, misplaced.code);
 check("and is told where the flag goes", true, /A verb takes --dry-run/.test(misplaced.err));

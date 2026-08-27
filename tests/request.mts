@@ -13,7 +13,7 @@ import { createServer } from "node:http";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runVerb } from "../src/verb.mts";
+import { runVerb, parseArgs, unattended } from "../src/verb.mts";
 
 let fail = 0;
 
@@ -25,6 +25,15 @@ function check(name: string, want: unknown, got: unknown) {
     fail = 1;
   }
 }
+
+// The capability has two affordances and they are not the same one twice: a person
+// types the flag, and a composition or a script exports the variable instead.
+const flagged = parseArgs("v", [], ["--yes"]);
+check("the flag alone asks for it", true, flagged.ok && unattended(flagged.yes, {}));
+check("and reaches the tool's own shell as well", "1", flagged.ok ? flagged.env.LM_YES : "absent");
+check("the variable alone asks for it", true, unattended(false, { LM_YES: "1" }));
+check("neither leaves the question to the human", false, unattended(false, {}));
+check("and a variable set to anything else is not it", false, unattended(false, { LM_YES: "yes" }));
 
 const bodies: any[] = [];
 const paths: string[] = [];
