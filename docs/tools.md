@@ -53,7 +53,7 @@ bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
-node tests/chat.mts               # which verbs the chat is offered, and on what terms
+node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
 node tests/chrome.mts             # what the chat's header and status rows say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
 LM_LIVE=1 node tests/verb-live.mts  # the runner's retry, its budget and a verb inside the chat, on the real model
@@ -64,7 +64,7 @@ model: the prompt `collect` writes, the shape `schema` asks for, the violations 
 reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
 diff before committing them.
 
-Ten groups of checks here have been made to go red, and that record is what makes a green run of
+Eleven groups of checks here have been made to go red, and that record is what makes a green run of
 them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
 kills a different subset of the six cases in `tests/runner.sh`: dropping the trap kills five,
 blanking the `which` argument kills three, and dropping the table's exclusion kills one. The
@@ -105,8 +105,8 @@ reading the message goes red. The code alone cannot tell the two apart, which is
 reads the message. A seventh, over the verbs inside the chat: replacing the registration's walk
 over the registry with a filter naming the four tool files leaves every case green except the one
 that drops a fifth file in, which is the case that exists for it; making the channel's
-confirmation always answer yes turns the two declining cases in `tests/registry.mts` red and
-leaves the approving ones green; and unwiring the channel from the chat's side, so a verb falls
+confirmation always answer yes turns the two declining cases in `tests/registry.mts` red, and
+three in `tests/chat.mts`, while leaving the approving ones green; and unwiring the channel from the chat's side, so a verb falls
 back to the terminal, turns the live case reading exit 7 red while the case asserting nothing was
 applied stays green, because a question no one can answer fails the run anyway. Only the pair
 distinguishes a refusal the human made from a refusal the plumbing made. An eighth, over the
@@ -134,6 +134,24 @@ reddens only the case that keeps what the model proposed, taking the word `none`
 only its own case, and removing the confirmation reddens two — the exit code and the absence of
 the call — which is the pair worth having, because a verb that creates the issue and then asks is
 indistinguishable from one that asks first until the first time someone says no.
+
+An eleventh, over the dialog a person answers, which nothing had ever driven: `tests/registry.mts`
+hands `applyAsk` an `Ask` of its own and never enters `src/chat.mts`, while the live case runs in
+print mode, where `hasUI` is false and the refusal is the runner's rather than a person's. The
+model is a recording server for these, because the subject is the dialog and not the answer. Six
+mutations of `src/chat.mts` and `src/registry.mts` that `node --check` accepts and that run, each
+confirmed by the dialog or the side effect the mutated line was supposed to produce: showing the
+tool's question without the artefact `render` printed above it reddens only the two cases that read
+what the human was shown; replacing the dialog with a refusal the chat makes on their behalf
+reddens the five approving cases and leaves the declining ones green; dropping the verb's name from
+the dialog's label reddens only the case that reads it; the chat no longer saying a refusal
+happened reddens only the two cases that read its words; sending an empty line where the channel
+should close reddens the three cases that hold no answer apart from an empty one, because the body
+then goes on to ask its second question and is answered; and a confirmation that always answers yes
+reddens the declining cases here too. The first attempt at these is the warning worth keeping: the
+case that cleans up the approved run's artefact removed it without `force`, so a mutant that
+suppressed the side effect crashed the suite at that line rather than reddening a case, and a
+suite that dies partway prints a plausible run of `ok` lines and proves nothing.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
