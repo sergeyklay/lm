@@ -108,6 +108,13 @@ check("a window sized for a smaller card leaves the verb's budget alone", 3000, 
 const tiny = await sent({ LM_CTX: "4096" });
 check("and so does one under the harness's own safety margin", 3000, tiny.body.max_tokens);
 
+// A verb spends nothing on thinking unless it is asked to, and the variable is
+// what asks. The chat is the other half of that choice and takes its level from
+// the harness rather than from here.
+const thinking = await sent({ LM_THINK: "low" });
+check("a verb thinks when the variable asks it to", "low", thinking.body.reasoning_effort);
+check("and the budget it spends is still its own", 3000, thinking.body.max_tokens);
+
 // The budget is its own number on both runners, and a window sized for a smaller
 // card does not overrule it.
 const budgeted = await sent({ LM_MAX_TOKENS: "64" });

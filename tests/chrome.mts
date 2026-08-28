@@ -60,17 +60,30 @@ const chrome = {
   autoCompact: true,
   input: 12345,
   output: 1234,
+  thinking: "medium",
 };
 
 const rows = footerLines(theme, 78, chrome);
 check("the status is two rows", 2, rows.length);
 check("the first row opens on the directory", true, plain(rows[0]).startsWith("~/lm"));
 check("carries the branch near the middle", true, /^.{30,44}main/.test(plain(rows[0])));
-check("and ends with what the session has spent", true, plain(rows[0]).trimEnd().endsWith("↑12.3k ↓1.2k"));
+check("and ends with the model", true, plain(rows[0]).trimEnd().endsWith("qwen3.8:27b"));
 check("the second row opens on the context and says the mode", true,
   plain(rows[1]).startsWith("3.7%/32.8k (auto)"));
-check("and ends with the model", true, plain(rows[1]).trimEnd().endsWith("qwen3.8:27b"));
+check("carries what the session has spent beside it", true,
+  plain(rows[1]).startsWith("3.7%/32.8k (auto)  ↑12.3k ↓1.2k"));
+check("and ends with the thinking level", true, plain(rows[1]).trimEnd().endsWith("think medium"));
 check("both rows fit the width", true, rows.every((l) => visibleWidth(l) <= 78));
+
+// The spend is one thought and wears one colour; the model is the row above,
+// where the operator reads what they chose rather than what it costs.
+check("the spend is dim on both halves", true,
+  styled(rows[1], "dim") && !rows[1].includes("\x1b[1m"));
+// The level is the harness's own and means nothing for a model declared without
+// reasoning, so the slot is empty rather than carrying a state the request does
+// not have.
+check("and a model with no level to report leaves the slot empty", true,
+  plain(footerLines(theme, 78, { ...chrome, thinking: undefined })[1]).trimEnd().endsWith("↑12.3k ↓1.2k"));
 
 // The label is a claim about a setting, so it is absent when the setting could
 // not be read rather than guessed at.

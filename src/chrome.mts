@@ -56,6 +56,7 @@ export type Chrome = {
   autoCompact: boolean | undefined;
   input: number;
   output: number;
+  thinking: string | undefined;
 };
 
 export function headerLines(theme: any): string[] {
@@ -82,13 +83,21 @@ export function footerLines(theme: any, width: number, c: Chrome): string[] {
     share > 90 ? theme.fg("error", context) : share > 70 ? theme.fg("warning", context) : theme.fg("dim", context);
 
   const bold = (s: string) => theme.bold(theme.fg("text", s));
+  // Both halves of the left slot are what the session has spent, so they sit
+  // together and in the same grey. The model has the row above, where a name the
+  // operator chose is the one thing here they cannot read anywhere else.
   const tokens = c.input || c.output
     ? theme.fg("dim", `↑${formatTokens(c.input)} ↓${formatTokens(c.output)}`)
     : "";
+  const spent = tokens ? `${contextColoured}  ${tokens}` : contextColoured;
+  // The level is the harness's own, and it is a claim about the request only for
+  // a model declared as thinking. Declared otherwise, it is nailed to one value
+  // whatever the model does, so the slot stays empty rather than saying it.
+  const thinking = c.thinking ? theme.fg("dim", `think ${c.thinking}`) : "";
 
   return [
-    threeSlots(width, bold(shortenCwd(c.cwd, homedir())), c.branch ? bold(c.branch) : "", tokens),
-    threeSlots(width, contextColoured, "", bold(c.model)),
+    threeSlots(width, bold(shortenCwd(c.cwd, homedir())), c.branch ? bold(c.branch) : "", bold(c.model)),
+    threeSlots(width, spent, "", thinking),
   ];
 }
 
@@ -148,6 +157,7 @@ export function installChrome(pi: any): void {
           autoCompact,
           input,
           output,
+          thinking: ctx.model?.reasoning ? ctx.thinkingLevel : undefined,
         });
       },
     }));

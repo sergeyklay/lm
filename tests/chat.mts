@@ -173,7 +173,9 @@ rmSync(dialogWork, { recursive: true, force: true });
 // What the chat opens on. `LM_MODEL` is the verb's model and the chat's default,
 // and a model the operator saved inside the chat is their explicit choice: the
 // harness reads it for itself when no --model is handed to it, so handing one
-// would overrule that choice on every launch.
+// would overrule that choice on every launch. The thinking level is handed over
+// whatever is saved, because nothing else keeps the harness's own default off
+// the session. What that level does to the request is `tests/chat-request.mts`.
 const agentDir = mkdtempSync(join(tmpdir(), "lm-agent-"));
 const settingsAt = (settings: Record<string, unknown>) => {
   writeFileSync(join(agentDir, "settings.json"), JSON.stringify(settings));
@@ -182,17 +184,17 @@ const settingsAt = (settings: Record<string, unknown>) => {
 
 process.env.LM_MODEL = "phi3:mini";
 check("with no saved choice the chat opens on LM_MODEL",
-  ["--provider", "ollama", "--model", "phi3:mini"],
+  ["--provider", "ollama", "--model", "phi3:mini", "--thinking", "low"],
   initialSelection(settingsAt({})));
 check("a saved choice is left to the harness to read",
-  [],
+  ["--thinking", "low"],
   initialSelection(settingsAt({ defaultProvider: "ollama", defaultModel: "gpt-oss:20b" })));
 check("and half a saved choice is no choice",
-  ["--provider", "ollama", "--model", "phi3:mini"],
+  ["--provider", "ollama", "--model", "phi3:mini", "--thinking", "low"],
   initialSelection(settingsAt({ defaultModel: "gpt-oss:20b" })));
 delete process.env.LM_MODEL;
 check("with neither, the model this project ships with opens it",
-  ["--provider", "ollama", "--model", "qwen3.8:27b"],
+  ["--provider", "ollama", "--model", "qwen3.8:27b", "--thinking", "low"],
   initialSelection(settingsAt({})));
 rmSync(agentDir, { recursive: true, force: true });
 
