@@ -86,7 +86,7 @@ export type Io = {
   ask?: Ask;
 };
 
-const terminal: Io = {
+export const terminal: Io = {
   out: (s) => process.stdout.write(s),
   err: (s) => process.stderr.write(s),
 };
@@ -110,6 +110,7 @@ function record(r: {
   verb: string; dry: boolean; calls: number; violations: string; exit: number;
   ms: number; head0: string | null; prompt: string; answer: string | undefined;
   consent: Consent;
+  composition: string | null;
 }): void {
   const log = process.env.LM_LOG ?? `${homedir()}/.lm/runs.jsonl`;
   if (!log) return;
@@ -127,7 +128,7 @@ function record(r: {
       exit: r.exit,
       ms: r.ms,
       head_moved: head !== null && head !== r.head0,
-      composition: process.env.LM_COMPOSITION || null,
+      composition: r.composition ?? (process.env.LM_COMPOSITION || null),
       which: null,
       prompt_hash: sha(r.prompt),
       answer_hash: r.answer === undefined ? null : sha(r.answer),
@@ -145,7 +146,7 @@ function record(r: {
   }
 }
 
-export async function runVerb(file: string, argv: string[], env: Record<string, string> = {}, io: Io = terminal): Promise<Outcome> {
+export async function runVerb(file: string, argv: string[], env: Record<string, string> = {}, io: Io = terminal, composition: string | null = null): Promise<Outcome> {
   const t0 = Date.now();
   const head0 = git("rev-parse", "HEAD");
   const info = meta(file);
@@ -174,7 +175,7 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   // and any other status from a body that reached its question means it was yes.
   const finish = (code: number, prompt: string, consent: Consent = null): Outcome => {
     record({ verb: name, dry: parsed.dry, calls, violations: firstViolations, exit: code,
-             ms: Date.now() - t0, head0, prompt, answer, consent });
+             ms: Date.now() - t0, head0, prompt, answer, consent, composition });
     return { code, calls, attempts };
   };
 
@@ -282,7 +283,7 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
     io.out(applied.output);
     return finish(applied.status, prompt, applied.status === 7 ? "withheld" : "given");
   }
-  const yes = unattended(parsed.yes);
+  const yes = unattended(parsed.yes, { ...process.env, ...env });
   const status = apply(file, { ...opts, stdin: answer! }, yes);
   return finish(status, prompt, yes ? "assumed" : status === 7 ? "withheld" : "given");
 }
