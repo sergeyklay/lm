@@ -7,6 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runVerb } from "../src/verb.mts";
+import { modelId } from "../src/provider.mts";
 
 if (process.env.LM_LIVE !== "1") {
   console.log("skipped: set LM_LIVE=1 to call the model");
@@ -117,26 +118,25 @@ writeFileSync(join(tools, "applies.sh"), [
   "",
 ].join("\n"));
 
+// Through `bin/lm chat`, because what the entry point wires up is what this case
+// reports, and a rebuilt factory array is a copy of it: nothing in the copy fails
+// when `bin/lm` stops registering the verbs. The harness flags go after the
+// subcommand, which is where they reach `main()`, and `--model` is explicit
+// because a choice saved inside the chat otherwise decides what this suite calls.
+// `installChrome` is out of reach here whatever the entry point does:
+// `if (!ctx.hasUI) return` is its first line and print mode has no UI, which is
+// the same fact `tests/chat.mts` records about its own refusal.
 const chatLog = join(work, "chat-runs.jsonl");
-process.chdir(work);
-process.env.LM_TOOLS = tools;
-process.env.LM_LOG = chatLog;
-const { main } = await import("@earendil-works/pi-coding-agent");
-const { providerConfig, modelId } = await import("../src/provider.mts");
-const { registerVerbs } = await import("../src/chat.mts");
-await main(["--provider", "ollama", "--model", modelId(), "-p", "Run the applies tool. Pass no text."], {
-  extensionFactories: [
-    {
-      name: "lm",
-      factory: (pi: any) => {
-        pi.registerProvider("ollama", providerConfig());
-        registerVerbs(pi, tools);
-      },
-    },
-  ],
+spawnSync(join(ROOT, "bin/lm"), [
+  "chat", "--provider", "ollama", "--model", modelId(),
+  "-p", "Run the applies tool. Pass no text.",
+], {
+  cwd: work,
+  encoding: "utf8",
+  stdio: ["ignore", "pipe", "pipe"],
+  env: { ...process.env, LM_TOOLS: tools, LM_LOG: chatLog },
+  timeout: 600_000,
 });
-process.env.LM_LOG = "";
-process.chdir(ROOT);
 
 const records = existsSync(chatLog)
   ? readFileSync(chatLog, "utf8").trim().split("\n").filter((l) => l).map((l) => JSON.parse(l))
@@ -180,7 +180,9 @@ function fixture() {
 }
 
 function session(f: ReturnType<typeof fixture>, prompt: string, extra: string[]) {
-  spawnSync(join(ROOT, "bin/lm"), ["chat", "-p", prompt, ...extra], {
+  spawnSync(join(ROOT, "bin/lm"), [
+    "chat", "--provider", "ollama", "--model", modelId(), "-p", prompt, ...extra,
+  ], {
     cwd: f.repo,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
