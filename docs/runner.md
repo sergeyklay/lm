@@ -5,8 +5,10 @@ it runs that verb; `lm ship` and `lm stats` reach the composition and the run lo
 dispatches to lives in `libexec/`, which is not on anyone's `PATH`.
 
 `lm --help` is written by `lm` itself and lists everything it dispatches, because the shell
-runner it hands a verb to knows nothing about the chat, `ship` or `stats`. It answers wherever
-`-h` or `--help` appears, so `lm commit --help` prints it too.
+runner it hands a verb to knows nothing about the chat, `ship` or `stats`. A name in the first
+position claims the flag: `lm commit --help` is a question about `commit` and is answered from what
+that file declares, while `lm --help` is a question about `lm`. Nothing in a tool file answers
+`--help`, and nothing has to.
 
 An argument in the first position that starts with a dash and is none of `lm`'s own options is
 refused by name, with the options it could have meant, before anything is dispatched. `--list`

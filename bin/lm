@@ -12,36 +12,81 @@ function hand(program, args) {
   process.exit(r.status ?? 1);
 }
 
-if (argv.includes("-h") || argv.includes("--help")) {
+// A description is prose written for the router, so its length is not ours to
+// bound and it is never a column. It is wrapped as a paragraph instead.
+function wrap(text, width) {
+  const out = [];
+  let line = "";
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    if (line && line.length + 1 + word.length > width) { out.push(line); line = word; }
+    else line = line ? `${line} ${word}` : word;
+  }
+  if (line) out.push(line);
+  return out;
+}
+
+// What one tool takes, generated from what it declares: nothing in a tool file
+// answers --help, and nothing has to.
+function nameHelp(m) {
+  const rows = [
+    ["--dry-run", "print the result and stop before the side effect"],
+    ["--yes", "answer the confirmation, for a run with nobody at it"],
+    ["--", "treat everything after it as text, dashes and all"],
+  ];
+  const w = Math.max(...rows.map(([f]) => f.length));
+  // Which kind it is shows in whether there is a sequence to name.
+  const runs = m.verbs.length > 0 ? `\nRuns in order:\n  ${m.verbs.join(", ")}\n` : "";
+  // A flag's meaning is declared nowhere, so these are named and not described.
+  const own = m.flags.length > 0 ? `\n\nDeclared by ${m.name}:\n  ${m.flags.join(", ")}` : "";
+  return wrap(m.description, Math.min(process.stdout.columns || 80, 80)).join("\n")
+    + `\n\nUsage:\n  lm ${m.name} [options] [text]\n${runs}\nOptions:\n`
+    + rows.map(([f, d]) => `  ${f.padEnd(w + 2)}${d}`).join("\n") + own + "\n";
+}
+
+const wantsHelp = argv.includes("-h") || argv.includes("--help");
+
+// A name in the first position claims the flag: `lm commit --help` is a question
+// about `commit`, and only `lm --help` is a question about `lm`.
+if (wantsHelp && argv[0] && !argv[0].startsWith("-")) {
+  const { list, meta } = await import("../src/registry.mts");
+  const file = list(toolsDir()).find((f) => basename(f, ".sh") === argv[0]);
+  if (file) {
+    process.stdout.write(nameHelp(meta(file)));
+    process.exit(0);
+  }
+}
+
+if (wantsHelp) {
   const { list, meta } = await import("../src/registry.mts");
   const declared = list(toolsDir()).map(meta);
-  // A composition is listed where it is invoked, under Usage, and not a second
-  // time as a verb: it takes the same two arguments and runs two of them.
-  const verbs = declared.filter((v) => v.verbs.length === 0);
-  const w = Math.max(...verbs.map((v) => v.name.length));
-  const rows = verbs.map((v) => `  ${v.name.padEnd(w + 2)}  ${v.description}`).join("\n");
-  const compRows = declared
-    .filter((v) => v.verbs.length > 0)
-    .map((c) => `  ${`lm ${c.name} [options] [text]`.padEnd(28)}  ${c.description.charAt(0).toLowerCase()}${c.description.slice(1)}`)
-    .join("\n");
+  // Usage names what `lm` exposes. The listings below name what this repository
+  // happens to ship, and they are names alone: a description belongs to whoever
+  // wrote the file, and `lm <name> --help` is where it is read.
+  const names = (kind) => declared.filter((d) => (d.verbs.length > 0) === kind).map((d) => d.name);
+  const tools = names(false);
+  const flows = names(true);
+  const flowUsage = flows.length > 0 ? "\n  lm <workflow> [options] [text]  run one workflow" : "";
+  const rows = `  ${tools.join(", ")}`;
+  const flowRows = flows.length === 0 ? "" : `\n\nAvailable workflows:\n  ${flows.join(", ")}`;
   process.stdout.write(`lm - local developer verbs and a chat, against a model on your own machine
 
 Usage:
-  lm                            open a chat with the local model
-  lm <verb> [options] [text]    run one verb
-${compRows}
-  lm stats [--all]              what the run log says about this repository
-  lm stats --since <date>       the same, split into before and since that date
+  lm                              open a chat with the local model
+  lm <tool> [options] [text]      run one tool${flowUsage}
+  lm stats [--all]                what the run log says about this repository
+  lm stats --since <date>         the same, split into before and since that date
 
-Verbs:
-${rows}
+Available tools:
+${rows}${flowRows}
+
+Run 'lm <name> --help' for what one does and how to call it.
 
 Options:
   --dry-run                     print the result and stop before the side effect
   --yes                         answer the verb's own question, for a run with nobody at it
   --                            treat everything after it as text, dashes and all
-  --list                        every verb with its description, tab-separated
-  --which <text>                name the verb that serves a request
+  --list                        every verb and workflow with its description, tab-separated
+  --which <text>                name the verb or workflow that serves a request
   -h, --help                    print this help
 
 Environment:

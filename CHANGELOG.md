@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `lm <name> --help` now answers about that one tool: its description, its usage, the flags every tool takes, and, for a workflow, the verbs it runs in order and the flags it declared, all generated from what the tool file declares so no tool file writes a help handler.
 - A composition is a named sequence of verbs that `lm` runs as one command: `lm ship` is now one, and a new file dropped into the compositions directory is offered as a command and in the chat in the next session with no other file edited.
 - `lm --help` lists the compositions beside the verbs, and `LM_COMPOSITIONS` points `lm` at a compositions directory other than the one beside the tools.
 - The chat now offers every model the local ollama has, listing them when `/model` opens and again at startup, and each model declares the smaller of its own context length and `LM_CTX`.
@@ -19,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `lm --help` now lists the tools and workflows as names alone under their own headings, with a pointer to `lm <name> --help` for the detail, rather than printing each one's description beside it.
+- `lm ship` is no longer named in the Usage block of `lm --help`; it appears only in the workflows listing, since `lm stats` is `lm` itself rather than something this repository ships.
+- The documentation is split so that what each verb does to the repository lives in `docs/instruments.md`, while the flags every verb takes, the run log, configuration and exit codes live in `docs/verbs.md`, and the README and install page point to the two.
 - A verb run inside a composition records the composition's name in the run log, so `lm stats` can tell a run that came from a composition apart from one typed by hand.
 - A composition's confirmations and questions arrive as the chat's own dialogs, a refusal applies nothing and says so, and a delivery that produces nothing still reports its exit code.
 - `LM_MODEL` is now the model a verb asks and the chat's default, so a model saved inside the chat no longer changes what a verb asks.
