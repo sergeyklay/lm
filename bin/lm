@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
-import { existsSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
 
 const libexec = join(dirname(realpathSync(process.argv[1])), "..", "libexec");
 const argv = process.argv.slice(2);
 const toolsDir = () => process.env.LM_TOOLS ?? join(libexec, "..", "tools");
-const compositionsDir = () => process.env.LM_COMPOSITIONS ?? join(libexec, "..", "compositions");
 
 function hand(program, args) {
   const r = spawnSync(join(libexec, program), args, { stdio: "inherit" });
@@ -15,11 +14,14 @@ function hand(program, args) {
 
 if (argv.includes("-h") || argv.includes("--help")) {
   const { list, meta } = await import("../src/registry.mts");
-  const verbs = list(toolsDir()).map(meta);
+  const declared = list(toolsDir()).map(meta);
+  // A composition is listed where it is invoked, under Usage, and not a second
+  // time as a verb: it takes the same two arguments and runs two of them.
+  const verbs = declared.filter((v) => v.verbs.length === 0);
   const w = Math.max(...verbs.map((v) => v.name.length));
   const rows = verbs.map((v) => `  ${v.name.padEnd(w + 2)}  ${v.description}`).join("\n");
-  const comps = existsSync(compositionsDir()) ? list(compositionsDir()).map(meta) : [];
-  const compRows = comps
+  const compRows = declared
+    .filter((v) => v.verbs.length > 0)
     .map((c) => `  ${`lm ${c.name} [options] [text]`.padEnd(28)}  ${c.description.charAt(0).toLowerCase()}${c.description.slice(1)}`)
     .join("\n");
   process.stdout.write(`lm - local developer verbs and a chat, against a model on your own machine
@@ -49,7 +51,6 @@ Environment:
   LM_CTX                        what ollama serves per model, not what a model can hold (65536)
   LM_MAX_TOKENS                 how many tokens an answer may cost (3000)
   LM_TOOLS                      the registry directory (<repo>/tools)
-  LM_COMPOSITIONS               the compositions directory (<repo>/compositions)
   LM_LOG                        the run log, empty to disable ($HOME/.lm/runs.jsonl)
 `);
   process.exit(0);
@@ -65,16 +66,6 @@ if (argv[0]?.startsWith("-") && !OPTIONS.includes(argv[0])) {
 if (argv[0] === "stats") hand("lm-stats", argv.slice(1));
 if (OPTIONS.includes(argv[0])) hand("lm-verb", argv);
 
-if (argv.length > 0 && existsSync(compositionsDir())) {
-  const { list } = await import("../src/registry.mts");
-  const file = list(compositionsDir()).find((f) => basename(f, ".sh") === argv[0]);
-  if (file) {
-    const { runComposition } = await import("../src/composition.mts");
-    const { code } = await runComposition(file, toolsDir(), argv.slice(1), `${argv[0]}-${process.pid}`);
-    process.exit(code);
-  }
-}
-
 if (argv.length > 0 && argv[0] !== "chat") {
   const { list, meta } = await import("../src/registry.mts");
   const files = list(toolsDir());
@@ -84,6 +75,13 @@ if (argv.length > 0 && argv[0] !== "chat") {
     for (const f of files) process.stderr.write(`  ${meta(f).name}\n`);
     process.exit(2);
   }
+  // What the file declares decides how it runs: one that names verbs is a
+  // composition, one that does not is a verb.
+  if (meta(file).verbs.length > 0) {
+    const { runComposition } = await import("../src/composition.mts");
+    const { code } = await runComposition(file, toolsDir(), argv.slice(1), `${argv[0]}-${process.pid}`);
+    process.exit(code);
+  }
   const { runVerb } = await import("../src/verb.mts");
   process.exit((await runVerb(file, argv.slice(1))).code);
 }
@@ -92,7 +90,7 @@ const { main, SettingsManager } = await import("@earendil-works/pi-coding-agent"
 const { providerConfig } = await import("../src/provider.mts");
 const { catalogue } = await import("../src/catalogue.mts");
 const { initialSelection } = await import("../src/selection.mts");
-const { registerVerbs, registerCompositions } = await import("../src/chat.mts");
+const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup } = await import("../src/chrome.mts");
 
 silenceStartup();
@@ -108,7 +106,6 @@ await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
       factory: (pi) => {
         pi.registerProvider("ollama", { ...providerConfig(), refreshModels: catalogue });
         registerVerbs(pi, toolsDir());
-        if (existsSync(compositionsDir())) registerCompositions(pi, compositionsDir(), toolsDir());
         installChrome(pi);
       },
     },
