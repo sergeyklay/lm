@@ -274,8 +274,11 @@ Twelve mutations, each predicted by case name before it was planted and each com
 set. Dropping the project directory from `bin/lm` reddens the six cases that dispatch a verb, run a
 workflow or take help from a project file, and none of the listing cases; dropping it from
 `libexec/lm-verb` reddens the eight that read the listing or reach a verb through the shell runner,
-and none that dispatch. The two sets are disjoint, which is what says the two resolvers are pinned
-apart rather than once. Removing the shell runner's dedup reddens 2, removing the Node one reddens
+and none that dispatch. The two sets share exactly one case, the one that asks both runners for the
+registry and requires the same answer, which must die whenever either resolver breaks and is the
+only case that can say the two agree; every other case belongs to one runner alone, which is what
+says the two are pinned apart rather than once. Removing the shell runner's dedup reddens 2,
+removing the Node one reddens
 3, two of them the workflow's, because a composition builds a `Map` from the listing and a repeated
 name resolves to the last entry rather than the first. Never marking an entry `project` reddens 3;
 never collapsing two identical directories in the shell runner reddens the one case that runs
@@ -295,6 +298,31 @@ deduplicates by name whatever it is handed, so that collapse is a saved director
 shared with the shell runner, not a behaviour. The anchor rule earned its place here too - `DIRS=(`
 occurs three times and the first is the `LM_TOOLS` branch, so a patch taken at the first hit would
 have measured a branch nobody meant to touch and reported its kill set as the other one's.
+
+The twelve leave part of the group unreddened, and a second series on 2026-08-28 measured which
+part. Their kill sets, unioned by case name, cover 20 of the 26 cases the group holds - counted by
+differencing the case names the two suites print at `4d345ea` against those they print at
+`b069603`. Two of the remaining six were reddened by mutations of `list()` that the twelve never
+made: iterating `dirs` in reverse reddens 3 across both suites, one of them the case pinning that a
+shadowed name resolves to the nearer file, and reading only the first directory reddens 4,
+one of them the case pinning that the installation still supplies the rest. Each set was predicted
+by name first and matched. Neither mutant is reachable from the runners, which is why a series
+aimed at the resolvers missed both.
+
+The last four are covered by no mutant that is not equivalent, and the guard behind them by no case
+at all. Dropping either `[ -n "$TOP" ]` or `[ -d "$TOP/tools" ]` from the `elif` in
+`libexec/lm-verb` changes no output anywhere: the mutant lands and the branch flips - `bash -x`
+prints a two-element `DIRS` where the intact file prints one - but a directory that is not there
+supplies no rows to glob and the `project` marker is a field on a row, so stdout and stderr are
+byte-identical, including in the one fixture that isolates the `-d` test, a repository where
+`tools` exists as a regular file. An empty kill set under an equivalent mutant indicts neither the
+mutant nor the cases. The Node runner's own guard is a different matter: dropping
+`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 57 and 53 while
+`node bin/lm --help` run inside a repository that has no `tools/` throws `ENOENT` at `lstat` with
+`registry` on the stack, because `--list` leaves `bin/lm` for the shell runner before `registry()`
+is reached and no case stands the Node runner in such a repository. That is the ordinary case for
+anyone who installs `lm` and runs a verb in a project of their own, and it is the group's one real
+hole rather than a coarse assertion.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
