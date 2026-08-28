@@ -115,9 +115,20 @@ Environment only:
 | `LM_MODEL` | `qwen3.8:27b` |
 | `LM_CTX` | `65536` |
 | `LM_MAX_TOKENS` | `3000` |
+| `LM_THINK` | `none` |
 | `LM_TOOLS` | unset, and the registry is a precedence |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 | `LM_YES` | unset |
+
+`LM_OLLAMA` is where every verb and the chat send their requests. The chat reads the model list
+from it before it draws anything, and that read is bounded at two seconds: a host that refuses the
+connection is answered at once, and one that accepts the connection and never answers would
+otherwise hold the launch open for as long as it stays silent. Both degrade the same way, and
+neither is fatal: the chat opens on the single model `LM_MODEL` names, and the list is read again
+in the background and whenever `/model` opens, where the harness bounds the read itself. Two
+seconds is thirty times what the read costs when it works, measured on 2026-08-28 at 66 ms cold and
+10 ms warm for eight models against an ollama on the same machine, over the `/api/tags` call and the
+one `/api/show` per model the read is made of.
 
 `LM_TOOLS`, when set, is the whole registry: exactly the one directory it names, and nothing
 beside it. When it is unset the registry is a precedence of two directories, nearest first: the
@@ -138,7 +149,8 @@ compares the conversation with that number to decide when to compact and what pe
 verb on the Node runner does neither, and its answer budget is `LM_MAX_TOKENS` whatever `LM_CTX`
 says, the same budget `num_predict` carries on the other route. That runner sends no window at all,
 and could not: ollama ignores `options.num_ctx` on `/v1/chat/completions`. So lowering this variable
-asks the chat to account against a smaller window; it does not make the server serve one.
+asks the chat to account against a smaller window and does nothing else: it does not make the
+server serve one, and there is no answer budget on that route for it to shrink.
 
 The default is what this machine's ollama serves, and the two stay in step by hand. A service with
 `OLLAMA_CONTEXT_LENGTH` unset picks its own on startup from the VRAM it finds — 262 144 above 47 GiB,
@@ -157,9 +169,23 @@ change in the harness's own settings, so a window under the sum of the two arms 
 history it cannot cut: compaction fires every turn and summarises nothing. `tests/window.mts` pins
 that through the harness's own `shouldCompact` and `findCutPoint`.
 
-`LM_MAX_TOKENS` is that budget, and it is the one number both runners spend: `max_tokens` on
+`LM_MAX_TOKENS` is that budget, and it is the one number both verb runners spend: `max_tokens` on
 `/v1/chat/completions`, `num_predict` on `/api/chat`. An answer that reaches it is cut off, which is
 exit 5 and not a short answer, so the runner says the budget is why.
+
+It reaches no chat turn. The chat asks for no answer budget at all, under either name, and what
+bounds a turn there is the window it accounts against and the person watching the answer arrive.
+`docs/runner.md` carries the rest of what the chat asks for.
+
+`LM_THINK` is the effort a verb asks the model for, and `none` is what it asks for unset: a verb is
+one call under a budget, and an answer that fits the budget is one the model did not spend on
+thinking first. Set it to an effort the model takes — `minimal`, `low`, `medium`, `high` — and that
+is what `reasoning_effort` carries on `/v1/chat/completions`, in front of the same budget, so a verb
+asked to think can run out of tokens before it answers. The chat does not read this variable: its
+level is the harness's own `/thinking`, per session and per model, and it opens at `low`, one notch
+below the harness's own default. That level is named rather than inherited, so a change in the
+harness's default cannot move it, and a model whose card advertises no thinking is offered `off`
+alone and opens there.
 
 Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= lm commit` writes no record, and `lm stats` under the same setting reads none. That is what a fixture repository or a rehearsal wants, because one log spans every repository and `lm stats` counts the one you are in.
 

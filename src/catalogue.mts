@@ -23,19 +23,29 @@ async function json(path: string, body: unknown, signal?: AbortSignal): Promise<
   return res.json();
 }
 
-// The card's own context length, under whichever key its architecture uses:
-// `qwen35.context_length` for one model and `gemma4.context_length` for another,
-// so the key is found by its suffix rather than named.
-async function card(name: string, signal?: AbortSignal): Promise<number | undefined> {
+// What one card says about its model: its own context length, under whichever
+// key its architecture uses — `qwen35.context_length` for one model and
+// `gemma4.context_length` for another, so the key is found by its suffix rather
+// than named — and whether it advertises thinking. Both come out of the one
+// reply, so declaring the capability costs no request that was not already made.
+type Card = { tokens: number | undefined; thinking: boolean };
+
+async function card(name: string, signal?: AbortSignal): Promise<Card> {
   try {
     const shown = await json("/api/show", { model: name }, signal);
     const info = shown?.model_info ?? {};
     const key = Object.keys(info).find((k) => k.endsWith(".context_length"));
-    return key ? Number(info[key]) : undefined;
+    const capabilities = Array.isArray(shown?.capabilities) ? shown.capabilities : [];
+    return { tokens: key ? Number(info[key]) : undefined, thinking: capabilities.includes("thinking") };
   } catch {
-    return undefined;
+    return { tokens: undefined, thinking: false };
   }
 }
+
+// The launch waits on one of these reads, and a host that accepts a connection
+// and never answers would hold the chat closed for as long as it stays silent.
+// The bound is in `docs/verbs.md` beside `LM_OLLAMA`.
+export const CATALOGUE_DEADLINE_MS = 2000;
 
 // Every model ollama has, for the chat's selector. Returns undefined rather than
 // an empty list when the machine cannot be asked: the harness replaces the
@@ -63,6 +73,7 @@ export async function catalogue(
     ...template,
     id: name,
     name,
-    contextWindow: windowFor(cards[i]),
+    contextWindow: windowFor(cards[i].tokens),
+    reasoning: cards[i].thinking,
   }));
 }

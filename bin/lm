@@ -107,7 +107,8 @@ Environment:
   LM_MODEL                      the model a verb asks, and the chat's default (qwen3.8:27b)
   LM_YES                        set to 1, the same as --yes on every verb
   LM_CTX                        what ollama serves per model, not what a model can hold (65536)
-  LM_MAX_TOKENS                 how many tokens an answer may cost (3000)
+  LM_MAX_TOKENS                 how many tokens a verb's answer may cost; the chat asks for no budget (3000)
+  LM_THINK                      the effort a verb asks the model for; the chat has /thinking (none)
   LM_TOOLS                      the whole registry; unset, the project's tools/ then the installation's
   LM_LOG                        the run log, empty to disable ($HOME/.lm/runs.jsonl)
 `);
@@ -146,7 +147,7 @@ if (argv.length > 0 && argv[0] !== "chat") {
 
 const { main, SettingsManager } = await import("@earendil-works/pi-coding-agent");
 const { providerConfig } = await import("../src/provider.mts");
-const { catalogue } = await import("../src/catalogue.mts");
+const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts");
 const { initialSelection } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup } = await import("../src/chrome.mts");
@@ -157,6 +158,16 @@ silenceStartup();
 const selection = initialSelection(SettingsManager.create(process.cwd()));
 const files = list(registry());
 
+// The catalogue is read once before the session opens, not only at the refresh
+// the harness runs after it: a session keeps the model object it opened on, so a
+// model declared from its own card only by the refresh would be a model the
+// operator's own session never sees. `PI_OFFLINE` is the harness's own switch and
+// is honoured here as `catalogue()` honours it.
+const models = await catalogue({
+  allowNetwork: process.env.PI_OFFLINE === undefined,
+  signal: AbortSignal.timeout(CATALOGUE_DEADLINE_MS),
+});
+
 await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
   extensionFactories: [
     {
@@ -164,7 +175,7 @@ await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
       // Nothing here is news to the operator: this is the program they ran.
       hidden: true,
       factory: (pi) => {
-        pi.registerProvider("ollama", { ...providerConfig(), refreshModels: catalogue });
+        pi.registerProvider("ollama", { ...providerConfig(), ...(models ? { models } : {}), refreshModels: catalogue });
         registerVerbs(pi, files);
         installChrome(pi);
       },

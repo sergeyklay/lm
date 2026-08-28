@@ -66,8 +66,9 @@ node tests/registry.mts           # the Node runner's bridge to a bash tool, and
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
 node tests/chrome.mts             # what the chat's header and status rows say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
+node tests/chat-request.mts       # what the chat asks the model for, off the wire
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
-node tests/catalogue.mts          # which models the chat offers, and what each declares
+node tests/catalogue.mts          # which models the chat offers, what each declares, and the deadline the launch reads them under
 LM_LIVE=1 node tests/verb-live.mts  # the retry, the budget, a verb inside the chat and the shell beside it, on the real model
 ```
 
@@ -115,7 +116,43 @@ from the other side, and its three truncation cases were confirmed red both ways
 budget field the answer completes and none of the three fires, and without the runner's own
 truncation arm the exit code is still 5, from the answer that never arrived, so only the case
 reading the message goes red. The code alone cannot tell the two apart, which is why a case
-reads the message. Over the verbs inside the chat: replacing the registration's walk
+reads the message. What the chat asks for has a group of its own, and part of it
+is an absence: `tests/chat-request.mts` reads the request off a recording server through two
+instruments, the whole program in print mode and a session on a model a catalogue refresh built.
+Twelve mutations that node loads were run against its fourteen cases. Declaring the chat's budget again
+turns three red, one per place a budget can be read. Ignoring the card's `thinking` capability, or
+declaring the effort field unsupported, each turn four red, the three level cases and the one that
+reads what the chat opens at; dropping the map that carries the closed level turns exactly one red,
+which is the case the whole declaration exists for; declaring every model thinking turns red the two
+cases for a card that claims none, the one asked on a refreshed session and the one that launches
+on it. Dropping the verb's own `maxTokens`, which is the regression
+this half most risks, turns one red here and five in `tests/request.mts`; ignoring `LM_THINK` turns
+red the one case that sets it, and thinking by default turns red the one that does not. Dropping the
+level `bin/lm` hands the harness, so its own default decides again, turns red the one case that
+reads what the chat opens at and the four in `tests/chat.mts` that read the flags; ignoring
+`LM_MODEL` turns red the two cases that launch on a card claiming no thinking, and two more in
+`tests/chat.mts`. Emptying the
+tag list turns five red rather than the one predicted, and the surplus is the finding: with no
+catalogue the chat falls back to the single declared entry, so the levels stop reaching the wire as
+well as the refresh stopping. The mutant worth keeping is the one that moves the per-model
+declaration out of `catalogue()` and applies it at `bin/lm`'s registration instead: the print-mode
+case stays green and the three level cases go red, which is the whole reason the second instrument
+exists, because print mode never refreshes a catalogue and a fix verified there alone ships a chat
+whose own session never sees the declaration. Two cases survived every mutant and are controls
+rather than assertions: that the recorder saw a completions request, and that the session opened on
+one model. The case reading the refresh is not one of them: it is among the five the emptied tag
+list reddens. In `tests/catalogue.mts`, ignoring the capability, forcing
+it, and claiming it for a card that could not be read turn red one case each, in that order. Two
+cases there stand on the deadline the launch reads the catalogue under, and both are needed:
+dropping the signal from `bin/lm`'s call reddens only the case that runs the program against a host
+that accepts the connection and never answers, while dropping it from the `fetch` inside
+`catalogue()` reddens that one and the in-process case beside it. Neither mutant fails by itself —
+both hang — so each case is raced against a timer of its own and reports the timeout as a value,
+which is what turns a suite that would never finish into two named failures. In the
+status rows, swapping the two right slots back to the layout before them turns four of the
+`tests/chrome.mts` cases red — the model's row, the level's, the one reading the second row's grey,
+and the empty-slot case — and leaves the case reading the spend on the left green, because that slot
+did not move; filling the slot for a model with no level to report turns red that case alone. Over the verbs inside the chat: replacing the registration's walk
 over the registry with a filter naming the four tool files leaves every case green except the one
 that drops a fifth file in, which is the case that exists for it; making the channel's
 confirmation always answer yes *while the run has not asked for the capability* turns the two declining cases in `tests/registry.mts` red, and

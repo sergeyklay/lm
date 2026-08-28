@@ -7,9 +7,15 @@
 // models only when the refresh returns one, and leaves them alone otherwise.
 
 import { createServer, type Server } from "node:http";
+import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { catalogue } from "../src/catalogue.mts";
 import { providerConfig, SERVED_CONTEXT_TOKENS } from "../src/provider.mts";
+
+const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
 let fail = 0;
 
@@ -23,11 +29,13 @@ function check(name: string, want: unknown, got: unknown) {
 }
 
 // One card is smaller than the window the service serves and one is larger, which
-// is the whole of the per-model decision. `phi3:mini-4k` is a real tag on this
-// machine and 4096 is what its card reports.
-const CARDS: Record<string, number | null> = {
-  "qwen3.8:27b": 262144,
-  "phi3:mini-4k": 4096,
+// is the whole of the per-model window decision, and one advertises thinking
+// while the other does not, which is the whole of the per-model capability
+// decision. `phi3:mini-4k` is a real tag on this machine: 4096 is what its card
+// reports and `completion` is all it claims.
+const CARDS: Record<string, { tokens: number; capabilities: string[] } | null> = {
+  "qwen3.8:27b": { tokens: 262144, capabilities: ["completion", "vision", "tools", "thinking"] },
+  "phi3:mini-4k": { tokens: 4096, capabilities: ["completion"] },
   "silent:1b": null, // /api/show answers 500 for this one
 };
 
@@ -49,7 +57,7 @@ async function withOllama(run: (port: number) => Promise<void>) {
         return;
       }
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ model_info: { "someArch.context_length": card }, capabilities: ["completion"] }));
+      res.end(JSON.stringify({ model_info: { "someArch.context_length": card.tokens }, capabilities: card.capabilities }));
     });
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
@@ -83,10 +91,16 @@ await withOllama(async () => {
         (narrowed ?? []).map((m) => m.contextWindow).join(","));
   delete process.env.LM_CTX;
 
-  // What the chat sends is not this task's, so the entries carry what the single
-  // registration already carried.
   check("the budget is the one the single entry declares", providerConfig().models[0].maxTokens, byId["qwen3.8:27b"]?.maxTokens);
-  check("and the thinking switch is untouched", providerConfig().models[0].reasoning, byId["qwen3.8:27b"]?.reasoning);
+
+  // The capability is the card's own answer, per model, and it is what decides
+  // whether the harness offers a thinking level for that model at all. A card
+  // that cannot be read claims nothing on the model's behalf.
+  check("a card that advertises thinking declares a thinking model", true, byId["qwen3.8:27b"]?.reasoning);
+  check("and one that advertises none declares none", false, byId["phi3:mini-4k"]?.reasoning);
+  check("and a card that cannot be read claims nothing", false, byId["silent:1b"]?.reasoning);
+  check("the level that reads as closed is mapped to the one that closes it", "none",
+        (byId["qwen3.8:27b"] as any)?.thinkingLevelMap?.off);
 
   // The harness's own path: register the provider the way `bin/lm` does, refresh,
   // and read back what the selector would list.
@@ -111,6 +125,51 @@ const offlineRuntime = await ModelRuntime.create({ modelsPath: null, refreshOnCr
 offlineRuntime.registerProvider("ollama", { ...providerConfig(), refreshModels: catalogue } as any);
 await offlineRuntime.refresh({});
 check("so the chat keeps the one it opened on", 1, offlineRuntime.getModels("ollama").length);
+delete process.env.LM_OLLAMA;
+
+// A host that accepts the connection and never answers is the case a refusal does
+// not cover: fetch rejects at once on a refused port and waits for as long as a
+// silent one stays silent. `bin/lm` awaits this read before `main()`, so the read
+// carries a deadline and the deadline has to degrade the way the refusal above
+// does, leaving the chat on the entry it opened with rather than killing it.
+const silentWork = mkdtempSync(join(tmpdir(), "lm-catalogue-"));
+const seen: string[] = [];
+const silent: Server = createServer((req, res) => {
+  seen.push(req.url ?? "");
+  if (req.url?.includes("/api/")) return;
+  res.writeHead(400, { "content-type": "application/json" });
+  res.end(JSON.stringify({ error: { message: "recorded" } }));
+});
+await new Promise<void>((r) => silent.listen(0, "127.0.0.1", r));
+process.env.LM_OLLAMA = `http://127.0.0.1:${(silent.address() as any).port}`;
+
+// Raced against a timer rather than awaited, because a read that ignores its
+// deadline hangs this suite instead of failing a case.
+let waiting: NodeJS.Timeout;
+const bounded = await Promise.race([
+  catalogue({ signal: AbortSignal.timeout(200) }).then((l) => (l === undefined ? "no list" : `a list of ${l.length}`)),
+  new Promise((r) => { waiting = setTimeout(() => r("still waiting"), 5000); }),
+]);
+clearTimeout(waiting!);
+check("a silent ollama offers no list either, once the deadline passes", "no list", bounded);
+
+// Through the program, because the deadline is the launch's and not the
+// catalogue's: nothing else stops a silent host from holding the chat closed
+// before it has drawn anything.
+const child = spawn(join(ROOT, "bin", "lm"), ["chat", "-p", "Say hello."], {
+  cwd: silentWork,
+  stdio: ["ignore", "ignore", "ignore"],
+  env: { ...process.env, LM_TOOLS: silentWork, LM_LOG: "", PI_CODING_AGENT_DIR: join(silentWork, "agent") },
+});
+const patience = setTimeout(() => child.kill("SIGKILL"), 30_000);
+await new Promise((r) => child.on("close", r));
+clearTimeout(patience);
+check("and the launch waiting on it still reaches the model", true,
+      seen.some((p) => p.includes("/chat/completions")));
+
+silent.closeAllConnections?.();
+silent.close();
+rmSync(silentWork, { recursive: true, force: true });
 delete process.env.LM_OLLAMA;
 
 // The harness's own offline switch is `PI_OFFLINE === undefined`, so a refresh

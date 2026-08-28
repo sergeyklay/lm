@@ -16,7 +16,7 @@ and `--which` are the shell runner's and pass through. `--dry-run` belongs to a 
 refusal says so rather than listing it as though `lm` took it.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
-extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL`, `LM_CTX` and `LM_MAX_TOKENS`, and every
+extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`, and every
 verb in the registry beside it. The chat offers every model ollama has, and opens on the one the
 operator saved inside it, falling back to `LM_MODEL` when they have saved none. A model chosen
 through `/model` and kept with Ctrl+S is an explicit choice, and `findInitialModel` in the
@@ -29,7 +29,8 @@ context length and `LM_CTX`, because the service bounds every model it loads and
 than that bounds itself; a model under the floor in `docs/verbs.md` arms compaction on every turn
 and summarises nothing, which is that model's limit rather than a setting. Nothing is cached: the
 list costs two round trips to a service on the same machine, and a cached one would outlive an
-`ollama rm`. An ollama that cannot be reached, and `PI_OFFLINE`, leave the chat on the single
+`ollama rm`. An ollama that cannot be reached, one that accepts the connection and stays
+silent past the deadline in `docs/verbs.md`, and `PI_OFFLINE`, all leave the chat on the single
 model it opened with, because the harness replaces the offered list only when a refresh returns
 one. A verb offered that way takes what a human types (free text and
 `--dry-run`) and nothing about its own answer: it still writes its own prompt from the
@@ -37,6 +38,36 @@ repository and asks the model itself, so what it commits is what `lm commit` com
 of the chat's own call to choose it. Its questions reach the chat's dialogs rather than the
 terminal, and a mode with no dialog to show, such as the harness's print mode, refuses on the
 human's behalf and applies nothing.
+
+A chat turn asks the model for no answer budget. `LM_MAX_TOKENS` is a verb's number and reaches
+nothing here: the field the harness would carry it in on this route is `max_completion_tokens`, which
+ollama discards, and what does bound a turn is the window it accounts against, with the person
+watching the answer arrive beside it. A budget that did reach the model would be spent on its
+thinking before its answer, and a turn that ran out of one would lose the answer rather than shorten
+it, because the harness reads a truncated reply as something to compact and retry.
+
+The thinking channel is the harness's own `/thinking`, and it works here because the registration
+tells the truth about each model. `/api/show` answers with a `capabilities` array beside the
+`model_info` the window is read from, so `catalogue()` declares a model as thinking exactly when its
+own card advertises it, at no request that was not already being made. A model the card calls
+thinking is offered the harness's five levels; one it does not is offered `off` alone and is asked
+for no effort at all.
+
+Those levels reach ollama as `reasoning_effort`, under their own names, except the one that reads
+as closed: `off` sends no field, and no field is the state this model thinks in, so the
+registration maps `off` to `none`, which is the only form measured to close the channel on `/v1`.
+The chat opens at `low` rather than at `off`, because the chat is where a person thinks with the
+model, and one notch below the harness's own default because the levels above it buy no more
+reasoning on this model than the one below. A verb is batch and asks for `none` unless `LM_THINK`
+says otherwise.
+The second status row shows the level the session is at, and shows nothing for a model that has no
+level to report.
+
+The catalogue is read once before the session opens as well as at the refresh the harness runs
+after it. A session keeps the model object it opened on, and no refresh replaces it, so a
+declaration that only the refresh produced would be a declaration the operator's own session never
+sees: it would reach the model selector and not the request. `PI_OFFLINE` switches that first read
+off exactly as it switches the refresh off.
 
 The chat keeps its settings, its credentials and its session history in the harness's own
 directory under the home directory, outside this repository, and writes there as you use it. One
@@ -47,8 +78,9 @@ already there is left alone.
 
 It wears this project's own header and status rows rather than the harness's. The header is the
 mark, the name and the version `package.json` declares, and one dim row naming what to type; the
-status rows carry the working directory, the branch when there is one and what the session has
-spent, then the context against its window and the model. Both are installed on `session_start`,
+status rows carry the working directory, the branch when there is one and the model, then the
+context against its window, what the session has spent beside it, and the thinking level the
+session is at. Both are installed on `session_start`,
 because the harness builds its own header before extensions load and replacing it earlier is a
 no-op, and both are drawn from the harness's theme rather than from colours of their own, so a
 terminal without truecolor gets the theme's approximation. The harness restores its own header
