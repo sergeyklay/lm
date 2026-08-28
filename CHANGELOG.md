@@ -9,12 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The chat now offers every model the local ollama has, listing them when `/model` opens and again at startup, and each model declares the smaller of its own context length and `LM_CTX`.
+- A model the operator saved inside the chat is now honoured on the next launch: the chat opens on it rather than on `LM_MODEL`, and a saved provider and model together count as the choice while either one alone does not.
 - `LM_MAX_TOKENS` sets how many tokens a verb's answer may cost, defaulting to 3000, and an answer that reaches it is still cut off and exits 5 as before.
 - `lm stats` takes `--since <date>`, which splits the runs at that date and prints the clean share of each period beside its sample, so the column answers how the share moved rather than what it has settled at; each period withholds its own share below the same fourteen-run minimum the table uses, and a value that is not a date is refused.
 - A confirmation or question that nobody answers no longer blocks the verb for two minutes: the read now times out, the verb exits 7 as a refusal does, applies nothing, and says on the terminal that it got no answer in time, while an answer that arrives before the bound still applies and a refusal is still reported as a refusal.
 
 ### Changed
 
+- `LM_MODEL` is now the model a verb asks and the chat's default, so a model saved inside the chat no longer changes what a verb asks.
 - The default context window is now 65536 tokens, matching what this machine's ollama serves, so the chat no longer compacts early against a window the server does not hold and a conversation can grow to what ollama actually keeps.
 - `LM_CTX` now reaches only the chat and `lm ship`: a verb's answer budget no longer follows the window, so a window sized for a smaller card no longer shortens a verb's answer, and the budget is `LM_MAX_TOKENS` whatever the window says.
 - The chat now hands the model a shell beside the verbs, so it can stage, commit and push without reaching a verb at all, and `lm chat` takes `--exclude-tools bash` to take the shell away, after which the same request stops at the verb and its record is the only trace.

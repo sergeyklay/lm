@@ -39,7 +39,7 @@ Options:
 
 Environment:
   LM_OLLAMA                     where ollama listens (http://127.0.0.1:11434)
-  LM_MODEL                      the model to ask (qwen3.8:27b)
+  LM_MODEL                      the model a verb asks, and the chat's default (qwen3.8:27b)
   LM_YES                        set to 1, the same as --yes on every verb
   LM_CTX                        context window for the chat and 'lm ship' (65536)
   LM_MAX_TOKENS                 how many tokens an answer may cost (3000)
@@ -74,21 +74,25 @@ if (argv.length > 0 && argv[0] !== "chat") {
   process.exit((await runVerb(file, argv.slice(1))).code);
 }
 
-const { main } = await import("@earendil-works/pi-coding-agent");
-const { providerConfig, modelId } = await import("../src/provider.mts");
+const { main, SettingsManager } = await import("@earendil-works/pi-coding-agent");
+const { providerConfig } = await import("../src/provider.mts");
+const { catalogue } = await import("../src/catalogue.mts");
+const { initialSelection } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup } = await import("../src/chrome.mts");
 
 silenceStartup();
 
-await main(["--provider", "ollama", "--model", modelId(), ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
+const selection = initialSelection(SettingsManager.create(process.cwd()));
+
+await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
   extensionFactories: [
     {
       name: "lm",
       // Nothing here is news to the operator: this is the program they ran.
       hidden: true,
       factory: (pi) => {
-        pi.registerProvider("ollama", providerConfig());
+        pi.registerProvider("ollama", { ...providerConfig(), refreshModels: catalogue });
         registerVerbs(pi, process.env.LM_TOOLS ?? join(libexec, "..", "tools"));
         installChrome(pi);
       },

@@ -15,7 +15,21 @@ refusal says so rather than listing it as though `lm` took it.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
 extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL`, `LM_CTX` and `LM_MAX_TOKENS`, and every
-verb in the registry beside it. A verb offered that way takes what a human types (free text and
+verb in the registry beside it. The chat offers every model ollama has, and opens on the one the
+operator saved inside it, falling back to `LM_MODEL` when they have saved none. A model chosen
+through `/model` and kept with Ctrl+S is an explicit choice, and `findInitialModel` in the
+harness reads it from the settings file whenever no `--model` reaches `main()` ahead of it, so
+`bin/lm` hands the flag over only when there is nothing saved to overrule. The list itself:
+the extension hands the harness a `refreshModels` function, which the harness calls in the
+background once at startup and again whenever `/model` opens, and which reads the names from
+`/api/tags` and each card from `/api/show`. Each model declares the smaller of its card's own
+context length and `LM_CTX`, because the service bounds every model it loads and a card smaller
+than that bounds itself; a model under the floor in `docs/verbs.md` arms compaction on every turn
+and summarises nothing, which is that model's limit rather than a setting. Nothing is cached: the
+list costs two round trips to a service on the same machine, and a cached one would outlive an
+`ollama rm`. An ollama that cannot be reached, and `PI_OFFLINE`, leave the chat on the single
+model it opened with, because the harness replaces the offered list only when a refresh returns
+one. A verb offered that way takes what a human types (free text and
 `--dry-run`) and nothing about its own answer: it still writes its own prompt from the
 repository and asks the model itself, so what it commits is what `lm commit` commits, at the cost
 of the chat's own call to choose it. Its questions reach the chat's dialogs rather than the

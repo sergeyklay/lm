@@ -59,6 +59,7 @@ node tests/chat.mts               # which verbs the chat is offered, and the dia
 node tests/chrome.mts             # what the chat's header and status rows say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
+node tests/catalogue.mts          # which models the chat offers, and what each declares
 LM_LIVE=1 node tests/verb-live.mts  # the retry, the budget, a verb inside the chat and the shell beside it, on the real model
 ```
 
