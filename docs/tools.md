@@ -64,7 +64,7 @@ bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
-node tests/chrome.mts             # what the chat's header and status rows say, and at what width
+node tests/chrome.mts             # what the chat's header, status rows and closing line say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
 node tests/chat-request.mts       # what the chat asks the model for, off the wire
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
@@ -170,11 +170,34 @@ tolerates being answered after it closes. Another covers the chat's own header a
 where three mutations each redden exactly one case and each was run before it was believed:
 guessing the auto-compact label instead of reading the setting reddens the case that asserts an
 unread setting prints no mode, right-aligning the branch reddens the case that pins it near the
-middle, and dropping the version reddens the case that reads the name. The suite works at
-`theme`'s level rather than at the terminal's, so the check that the terminal shows this and not
-the harness's own header is a capture through a pseudo-terminal, killed with `SIGKILL` so the
-harness cannot restore its chrome on the way out and paint a last frame that reads like a defect.
+middle, and dropping the version reddens the case that reads the name.
 
+The same suite covers the line the chat prints on quitting, over a transcript fixture in the
+harness's own on-disk shape rather than a session anyone ran. Flipping the one tool result that
+fixture records as failed reddens three cases: the two that read the counts, and the one that
+drives `lm chat` on a copy of the fixture through a pseudo-terminal and ends it with an end of
+input. It leaves green the case that derives an all-worked session from the same fixture, and that
+pair is what separates the count from the clause it prints. Nine mutations of `src/chrome.mts` each
+redden the set predicted for them before they were planted: counting successes as failures reddens
+five, printing the failure clause at zero reddens the two cases written for its silence, printing
+the tool clause at zero reddens three, dropping the session record from the span reddens only the
+case that pins where the span opens, disabling the gate on a session that never reached the model
+reddens only that case, and dropping the cached half of the input from the token totals reddens
+four. Two of the nine redden nothing but the pseudo-terminal pair, and nothing else can: refusing
+the quit reason, and inverting the guard on whether there is a UI, both leave every assertion over
+the summary green, because a line that is never printed reads exactly like a line that is right
+until something reads the terminal back. The three mutations of the duration redden one case each
+except the round-minute form, which reddens two, since the fixture's tool-free variant also lasts a
+round ten minutes: that was the one prediction of the twelve that was wrong, and it was wrong by a
+case it gained rather than one it lost.
+
+`node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 it
+exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,
+which every module under `src/` and `tests/` does, while the same bytes saved as `.mjs` are
+rejected as they should be. The gate that works is an import: `node -e 'import(process.argv[1])'`
+on the mutated file throws the `SyntaxError` `--check` swallowed. An ungated mutant that does not
+parse reddens every case at once, which is the shape that reads like coverage and demonstrates
+nothing, so a gate that never objects is worse here than no gate at all.
 One group covers the one `apply` whose command line nothing else sees. Every other verb hands its
 command what `render` already printed, so the golden fixtures cover it without `git` or `gh` being
 called; `issue` assembles a `--label` list from what the human typed, and that list had only ever

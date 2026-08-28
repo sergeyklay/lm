@@ -4,11 +4,11 @@
 // reads on every launch, so the cases pin the slots rather than the colours: a
 // theme is the operator's to change, and the position of the branch is not.
 
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, visibleWidth, version } from "../src/chrome.mts";
+import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryLine, visibleWidth, version } from "../src/chrome.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
@@ -125,6 +125,89 @@ check("a setting already made is left alone", before, statSync(settingsFile).mti
 check("and nothing else in the file is disturbed", "light",
   JSON.parse(readFileSync(settingsFile, "utf8")).theme);
 rmSync(work, { recursive: true, force: true });
+
+// What the chat says on the way out. The figures are counts of what this session
+// did and never one divided by another, so the fixture is a transcript in the
+// harness's own on-disk shape and the expectations are read off it by hand.
+const FIXTURE = join(ROOT, "tests/fixtures/session-three-tools.jsonl");
+const records = readFileSync(FIXTURE, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+const head = records.find((r) => r.type === "session");
+const entries = records.filter((r) => r.type !== "session");
+const line = (es: any[], h: any = head) => {
+  const s = summarize(h, es);
+  return s === null ? null : summaryLine(s);
+};
+
+check("the closing line counts the tools and the one that failed", true,
+  String(line(entries)).startsWith("3 tools ran, 1 failed."));
+check("and says what the session spent over how long it lasted",
+  "3 tools ran, 1 failed. ↑40.0k ↓1.2k over 12m 30s.", line(entries));
+
+// A session whose tools all worked is the expected case, and so is one that ran
+// no tool at all. Neither is worth telling a person who was watching it happen.
+const worked = entries.map((e) =>
+  e.message?.role === "toolResult" ? { ...e, message: { ...e.message, isError: false } } : e);
+check("a session whose tools all worked says nothing about failures",
+  "3 tools ran. ↑40.0k ↓1.2k over 12m 30s.", line(worked));
+check("a session that ran no tool says nothing about tools",
+  "↑40.0k ↓1.2k over 10m.", line(entries.filter((e) => e.message?.role !== "toolResult")));
+
+const at = (ms: number, message: any) => ({ type: "message", timestamp: new Date(ms).toISOString(), message });
+const turn = (input: number, output: number) =>
+  ({ role: "assistant", usage: { input, output, cacheRead: 0, cacheWrite: 0 } });
+const one = [at(1000, turn(500, 20)), at(4000, { role: "toolResult", toolName: "commit", isError: false })];
+check("one tool is not two", "1 tool ran. ↑500 ↓20 over 3s.", line(one, { timestamp: new Date(1000).toISOString() }));
+
+// The span is the session's own, and the session record is what opens it: the
+// first entry is written after the model and the thinking level are settled.
+check("the span opens at the session record rather than at the first entry",
+  "↑500 ↓20 over 1m.", line([at(60_000, turn(500, 20))], { timestamp: new Date(0).toISOString() }));
+check("and falls back to the entries when there is no session record",
+  "↑500 ↓20 over 0s.", line([at(60_000, turn(500, 20))], null));
+
+// Nothing was asked and nothing was answered, so there is nothing to report.
+check("a session that never reached the model prints nothing", null,
+  line([at(1000, { role: "user" })]));
+
+check("a short session is counted in seconds", "45s", formatDuration(45_000));
+check("a round one drops the seconds", "5m", formatDuration(300_000));
+check("and a long one drops them for the minutes", "2h 5m", formatDuration(7_500_000));
+
+// The unit cases above say the line is right. This says the harness reaches the
+// handler that prints it, on the quit path and to the terminal it has already
+// restored, which no assertion over `summarize` can show.
+const quit = mkdtempSync(join(tmpdir(), "lm-quit-"));
+const session = join(quit, "2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl");
+copyFileSync(FIXTURE, session);
+const capture = join(quit, "capture.txt");
+// The model is never asked: nothing is submitted, the catalogue read is off and
+// the endpoint points nowhere, so a chat that tried would fail rather than run.
+const chat = spawn("script", ["-qc", `${ROOT}/bin/lm chat --session ${session} --session-dir ${quit}`, capture], {
+  cwd: ROOT,
+  stdio: ["pipe", "ignore", "ignore"],
+  env: { ...process.env, PI_CODING_AGENT_DIR: join(quit, "agent"), PI_OFFLINE: "1",
+    LM_OLLAMA: "http://127.0.0.1:1", TERM: "xterm-256color", COLUMNS: "100", LINES: "30" },
+});
+const seen = () => (existsSync(capture) ? readFileSync(capture, "utf8") : "");
+const exited = new Promise<void>((r) => chat.on("exit", () => r()));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const deadline = Date.now() + 60_000;
+while (Date.now() < deadline && !seen().includes("for commands")) await wait(200);
+// Repeated because the key reaches a TUI that may still be drawing its first
+// frame, and an end of input it has not started reading is an end of input lost.
+while (Date.now() < deadline && chat.exitCode === null) {
+  chat.stdin.write(String.fromCharCode(4));
+  await Promise.race([exited, wait(500)]);
+}
+chat.kill("SIGKILL");
+await exited;
+
+const printed = seen().replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
+check("quitting the chat prints the closing line on the restored terminal", true,
+  printed.includes("3 tools ran, 1 failed. ↑40.0k ↓1.2k over "));
+check("and prints it above the harness's own resume line", true,
+  printed.indexOf("tools ran") >= 0 && printed.indexOf("tools ran") < printed.indexOf("To resume this session"));
+rmSync(quit, { recursive: true, force: true });
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");

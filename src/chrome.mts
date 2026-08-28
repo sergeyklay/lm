@@ -27,6 +27,15 @@ export function formatTokens(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
+export function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return seconds % 60 ? `${minutes}m ${seconds % 60}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+}
+
 export function shortenCwd(cwd: string, home: string | undefined): string {
   if (!home || home === "/") return cwd;
   if (cwd === home) return "~";
@@ -136,10 +145,52 @@ function totals(entries: Iterable<any>): { input: number; output: number } {
   return { input, output };
 }
 
-// The header is built before extensions initialise, and `setHeader` is a no-op
-// until it exists, so this waits for session_start rather than running in the
-// factory. Without a terminal there is nothing to draw on.
+export type Summary = { tools: number; failed: number; input: number; output: number; ms: number };
+
+// Every figure here is a count of what this session did. None is divided by
+// another, because a share below this project's stated minimum sample is
+// withheld and one session is never that sample.
+export function summarize(header: any, entries: any[]): Summary | null {
+  const messages = entries.filter((e) => e?.type === "message");
+  if (!messages.some((e) => e.message?.role === "assistant")) return null;
+  const results = messages.filter((e) => e.message?.role === "toolResult");
+  const stamps = [header?.timestamp, ...entries.map((e) => e?.timestamp)]
+    .map((t) => Date.parse(String(t)))
+    .filter((n) => Number.isFinite(n));
+  return {
+    tools: results.length,
+    failed: results.filter((e) => e.message.isError === true).length,
+    ...totals(entries),
+    ms: stamps.length > 1 ? Math.max(...stamps) - Math.min(...stamps) : 0,
+  };
+}
+
+// A session that ran no tool and a session whose tools all worked are both the
+// expected case, so neither is said. What is left is the clause a person acts
+// on: the tool that failed, and what the session cost in tokens and in time.
+export function summaryLine(s: Summary): string {
+  const ran = s.tools === 1 ? "1 tool ran" : `${s.tools} tools ran`;
+  const failed = s.failed > 0 ? `, ${s.failed} failed` : "";
+  const spent = `↑${formatTokens(s.input)} ↓${formatTokens(s.output)} over ${formatDuration(s.ms)}`;
+  return s.tools > 0 ? `${ran}${failed}. ${spent}.` : `${spent}.`;
+}
+
+// Everything this project draws on the chat's screen. Without a terminal there
+// is nothing to draw on.
 export function installChrome(pi: any): void {
+  // The same event fires for a reload and for each of the three ways a session
+  // is replaced, where the chat carries on and a closing line would be a lie.
+  // Only quitting ends the session, and the harness has already stopped the TUI
+  // by then, so the line goes to the restored terminal rather than to a frame.
+  pi.on("session_shutdown", (event: any, ctx: any) => {
+    if (event?.reason !== "quit" || !ctx.hasUI) return;
+    const summary = summarize(ctx.sessionManager.getHeader(), ctx.sessionManager.getEntries());
+    if (summary) process.stdout.write(`${summaryLine(summary)}\n`);
+  });
+
+  // The header is built before extensions initialise, and `setHeader` is a no-op
+  // until it exists, so this waits for session_start rather than running in the
+  // factory.
   pi.on("session_start", (_event: unknown, ctx: any) => {
     if (!ctx.hasUI) return;
     const autoCompact = compactionEnabled(ctx.cwd);

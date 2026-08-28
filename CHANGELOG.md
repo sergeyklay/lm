@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The chat now prints one closing line when you quit it: how many tools the session ran and how many of those failed, what it spent in tokens, and how long it lasted, measured from the session's own first record to its last rather than from a clock started when the line was written. Every figure is a count and none is a share; a session whose tools all worked says nothing about failures, a session that ran no tool says nothing about tools, and a session that never reached the model prints nothing at all, because none of the three is news to the person who was watching. The line goes to the terminal the harness has already restored, immediately above its own resume command, and a reload or a session replacement prints nothing, since the chat carries on through both.
 - `lm <name> --help` now answers about that one tool: its description, its usage, the flags every tool takes, and, for a workflow, the verbs it runs in order and the flags it declared, all generated from what the tool file declares so no tool file writes a help handler.
 - A composition is a named sequence of verbs that `lm` runs as one command: `lm ship` is now one, and a new file dropped into the compositions directory is offered as a command and in the chat in the next session with no other file edited.
 - `lm --help` lists the compositions beside the verbs, and `LM_COMPOSITIONS` points `lm` at a compositions directory other than the one beside the tools.
