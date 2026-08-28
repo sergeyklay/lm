@@ -9,7 +9,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerVerbs } from "../src/chat.mts";
+import { initialSelection } from "../src/selection.mts";
 import { list, meta } from "../src/registry.mts";
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const TOOLS = join(ROOT, "tools");
@@ -167,6 +169,32 @@ check("and the chat reports that refusal too", true, /Declined\. Nothing was app
 
 server.close();
 rmSync(dialogWork, { recursive: true, force: true });
+
+// What the chat opens on. `LM_MODEL` is the verb's model and the chat's default,
+// and a model the operator saved inside the chat is their explicit choice: the
+// harness reads it for itself when no --model is handed to it, so handing one
+// would overrule that choice on every launch.
+const agentDir = mkdtempSync(join(tmpdir(), "lm-agent-"));
+const settingsAt = (settings: Record<string, unknown>) => {
+  writeFileSync(join(agentDir, "settings.json"), JSON.stringify(settings));
+  return SettingsManager.create(process.cwd(), agentDir);
+};
+
+process.env.LM_MODEL = "phi3:mini";
+check("with no saved choice the chat opens on LM_MODEL",
+  ["--provider", "ollama", "--model", "phi3:mini"],
+  initialSelection(settingsAt({})));
+check("a saved choice is left to the harness to read",
+  [],
+  initialSelection(settingsAt({ defaultProvider: "ollama", defaultModel: "gpt-oss:20b" })));
+check("and half a saved choice is no choice",
+  ["--provider", "ollama", "--model", "phi3:mini"],
+  initialSelection(settingsAt({ defaultModel: "gpt-oss:20b" })));
+delete process.env.LM_MODEL;
+check("with neither, the model this project ships with opens it",
+  ["--provider", "ollama", "--model", "qwen3.8:27b"],
+  initialSelection(settingsAt({})));
+rmSync(agentDir, { recursive: true, force: true });
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");
