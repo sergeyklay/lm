@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { hook, list, meta } from "./registry.mts";
+import { hook, meta } from "./registry.mts";
 import { parseArgs, runVerb, terminal, type Io, type Outcome } from "./verb.mts";
 
 // Who is asking, so a dialog carries the verb that asked rather than the delivery
@@ -16,7 +16,7 @@ export const terminalFor: IoFor = () => terminal;
 // `lm ship` on the command line, one session per chat and a counter inside it.
 export async function runComposition(
   file: string,
-  toolsDir: string,
+  files: string[],
   argv: string[],
   tag: string,
   io: IoFor = terminalFor,
@@ -38,7 +38,7 @@ export async function runComposition(
     ...(parsed.text.length > 0 ? ["--", ...parsed.text] : []),
   ];
 
-  const tools = new Map(list(toolsDir).map((f) => [basename(f, ".sh"), f]));
+  const tools = new Map(files.map((f) => [basename(f, ".sh"), f]));
   let calls = 0;
   let attempts = 0;
 

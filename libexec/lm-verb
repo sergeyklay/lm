@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lm: thin runner over a tool registry. One file per tool in $LM_TOOLS.
+# lm: thin runner over a tool registry. One file per tool in the registry.
 
 set -euo pipefail
 
@@ -9,10 +9,37 @@ set -euo pipefail
 : "${LM_MAX_TOKENS:=3000}"
 : "${LM_LOG=$HOME/.lm/runs.jsonl}"     # one JSON object per run; empty disables
 
-LM_TOOLS="${LM_TOOLS:-$(dirname "$(readlink -f "$0")")/../tools}"
+TOP=$(git rev-parse --show-toplevel 2>/dev/null || true)
 
-list() { for f in "$LM_TOOLS"/*.sh; do [ -f "$f" ] || continue
-  ( . "$f"; printf '%s\t%s\n' "$name" "$description" ); done; }
+# LM_TOOLS names the whole registry. Otherwise the project's tools/ shadows the
+# installation's. bin/lm resolves this for itself, and tests/cli.mts is what
+# requires the two to answer alike.
+INSTALL=$(dirname "$(readlink -f "$0")")/../tools
+if [ -n "${LM_TOOLS:-}" ]; then
+  DIRS=("$LM_TOOLS")
+elif [ -n "$TOP" ] && [ -d "$TOP/tools" ] \
+  && [ "$(readlink -f "$TOP/tools")" != "$(readlink -f "$INSTALL")" ]; then
+  DIRS=("$TOP/tools" "$INSTALL")
+else
+  DIRS=("$INSTALL")
+fi
+
+# The nearer directory wins a name outright, and a third field says so, because a
+# shadowed verb the operator cannot see is one they cannot account for. An entry
+# from the installation prints the two fields it always printed. The file name is
+# carried through the sort and cut back off, so the order is the one the glob gave
+# when there was a single directory to glob.
+list() { local d f n seen=" " src
+  { for d in "${DIRS[@]}"; do
+      src=""
+      if [ "$d" = "${DIRS[0]}" ] && [ "${#DIRS[@]}" -gt 1 ]; then src=$'\tproject'; fi
+      for f in "$d"/*.sh; do [ -f "$f" ] || continue
+        n=${f##*/}
+        case "$seen" in *" $n "*) continue ;; esac
+        seen="$seen$n "
+        ( . "$f"; printf '%s\t%s\t%s%s\n' "$n" "$name" "$description" "$src" )
+      done
+    done; } | LC_ALL=C sort -t$'\t' -k1,1 | cut -f2-; }
 
 # Assigns rather than echoing: a command substitution is a subshell, and the six
 # numbers ollama returns beside the answer cannot come back through one.
@@ -108,7 +135,7 @@ MODEL_SUM='{"total_duration":0,"load_duration":0,"prompt_eval_count":0,
 HEAD0=$(git rev-parse HEAD 2>/dev/null || true)
 # A run outside a repository still happened somewhere, and "-" names nothing
 # lm-stats can scope to, so the working directory stands in for the repository.
-REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+REPO=$(basename "${TOP:-$PWD}")
 
 
 case "${1:-}" in
@@ -151,8 +178,11 @@ done
 
 
 VERB=$1; shift
-TOOL="$LM_TOOLS/$VERB.sh"
-[ -f "$TOOL" ] || { echo "lm: no such tool '$VERB'. Available:" >&2; list | cut -f1 | sed 's/^/  /' >&2; exit 2; }
+TOOL=
+for d in "${DIRS[@]}"; do
+  if [ -f "$d/$VERB.sh" ]; then TOOL="$d/$VERB.sh"; break; fi
+done
+[ -n "$TOOL" ] || { echo "lm: no such tool '$VERB'. Available:" >&2; list | cut -f1 | sed 's/^/  /' >&2; exit 2; }
 . "$TOOL"
 
 # Flags are found by scanning, so a flag and free text coexist in either order.

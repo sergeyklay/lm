@@ -115,9 +115,19 @@ Environment only:
 | `LM_MODEL` | `qwen3.8:27b` |
 | `LM_CTX` | `65536` |
 | `LM_MAX_TOKENS` | `3000` |
-| `LM_TOOLS` | `<repo>/tools` |
+| `LM_TOOLS` | unset, and the registry is a precedence |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 | `LM_YES` | unset |
+
+`LM_TOOLS`, when set, is the whole registry: exactly the one directory it names, and nothing
+beside it. When it is unset the registry is a precedence of two directories, nearest first: the
+`tools/` of the repository you are standing in, then the `tools/` of the installation. The
+repository is what `git rev-parse --show-toplevel` reports in the working directory, so outside a
+repository, and in one with no `tools/` of its own, the installation's is the whole registry. A
+name present in both resolves to the nearer file and is listed once. `lm --list` prints
+`project` in a third tab-separated field for every entry the repository supplied, so a verb
+shadowing one the installation ships is visible rather than silent; an entry from the
+installation prints the two fields it always printed.
 
 `LM_CTX` is what the service serves, not what a model can hold. Ollama bounds every model it loads,
 and a card's own length is read per model by `card()` in `src/catalogue.mts`, so a new `LM_MODEL`

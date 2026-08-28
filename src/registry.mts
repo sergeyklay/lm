@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 export type ToolMeta = { name: string; description: string; flags: string[]; verbs: string[] };
 export type Result = { stdout: string; stderr: string; status: number };
@@ -70,11 +70,20 @@ function bash(script: string, argv: string[], opts: Opts = {}): Result {
   return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status ?? 0 };
 }
 
-export function list(toolsDir: string): string[] {
-  return readdirSync(toolsDir)
-    .filter((f) => f.endsWith(".sh"))
-    .sort()
-    .map((f) => join(toolsDir, f));
+// The index is still a directory listing, of every directory in the precedence in
+// turn. A name the nearer directory already supplied is skipped rather than read
+// twice, so a tool appears once whatever shadows it.
+export function list(dirs: string[]): string[] {
+  const seen = new Set<string>();
+  const files: string[] = [];
+  for (const dir of dirs) {
+    for (const f of readdirSync(dir).filter((f) => f.endsWith(".sh"))) {
+      if (seen.has(f)) continue;
+      seen.add(f);
+      files.push(join(dir, f));
+    }
+  }
+  return files.sort((a, b) => (basename(a) < basename(b) ? -1 : 1));
 }
 
 export function meta(file: string): ToolMeta {

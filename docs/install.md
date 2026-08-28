@@ -56,5 +56,9 @@ lm --list                      # every tool with its description, tab-separated
 lm --which "text"              # name the verb that serves a request
 ```
 
+A tool the installation ships prints two tab-separated fields; one the repository you are standing
+in supplies prints `project` in a third.
+
 What each verb does to the repository is in [what this repository ships](instruments.md). What
-the exit codes mean and which environment variables are read is in [running a verb](verbs.md).
+the exit codes mean, which environment variables are read and where the registry comes from is in
+[running a verb](verbs.md).

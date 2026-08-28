@@ -1,4 +1,4 @@
-import { list, meta } from "./registry.mts";
+import { meta } from "./registry.mts";
 import { runVerb, type Io } from "./verb.mts";
 import { runComposition, type IoFor } from "./composition.mts";
 
@@ -25,14 +25,14 @@ function outcome(code: number): string {
   return `The verb failed with exit ${code}.`;
 }
 
-export function registerVerbs(pi: any, toolsDir: string): string[] {
+export function registerVerbs(pi: any, files: string[]): string[] {
   const registered: string[] = [];
   // The index is the directory listing here as everywhere else, so a fifth tool
   // file is offered in the next session with no file edited. What a file is is
   // declared in the file: one that names verbs is a composition the runner
   // drives, one that does not is a verb it runs.
   let runs = 0;
-  for (const file of list(toolsDir)) {
+  for (const file of files) {
     const info = meta(file);
     const composed = info.verbs.length > 0;
     registered.push(info.name);
@@ -72,7 +72,7 @@ export function registerVerbs(pi: any, toolsDir: string): string[] {
         // `$$` would tag every delivery of a session identically and `lm stats`
         // would read them as one.
         const result = composed
-          ? await runComposition(file, toolsDir, argv, `${info.name}-${process.pid}-${++runs}`, io)
+          ? await runComposition(file, files, argv, `${info.name}-${process.pid}-${++runs}`, io)
           : await runVerb(file, argv, {}, io(info.name));
 
         const text = [said.trim(), outcome(result.code)].filter((p) => p.length > 0).join("\n\n");

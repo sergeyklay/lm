@@ -26,7 +26,7 @@ function viaBash(file: string, script: string, cwd = ROOT): string {
   return r.stdout ?? "";
 }
 
-const files = list(TOOLS);
+const files = list([TOOLS]);
 const fromBash = spawnSync(join(ROOT, "libexec/lm-verb"), ["--list"], { encoding: "utf8", cwd: ROOT })
   .stdout.trim().split("\n").map((l) => l.split("\t")[0]).sort();
 check("the registry lists what lm-verb lists", fromBash, files.map((f) => basename(f, ".sh")).sort());
@@ -185,6 +185,23 @@ const blank = await applyAsk(join(work, "asks-twice.sh"), { cwd: work, stdin: "a
 check("an empty answer is an answer", "0", String(blank.status));
 check("and reaches the tool as one", "answer|", readFileSync(join(work, "asked.txt"), "utf8"));
 rmSync(join(work, "asked.txt"));
+
+// The index over a precedence of directories. Which directories those are is
+// bin/lm's answer and tests/cli.mts pins it; this is what the listing does once
+// they are known.
+const near = mkdtempSync(join(tmpdir(), "lm-near-"));
+writeFileSync(join(near, "commit.sh"), 'name="commit"\ndescription="the nearer one"\n');
+writeFileSync(join(near, "hello.sh"), 'name="hello"\ndescription="only here"\n');
+writeFileSync(join(near, "notatool.txt"), "ignored");
+const precedence = list([near, TOOLS]);
+check("each name is listed once, in name order",
+  ["changelog.sh", "commit.sh", "hello.sh", "issue.sh", "pr.sh", "ship.sh"],
+  precedence.map((f) => basename(f)));
+check("and a shadowed name resolves to the nearer file",
+  join(near, "commit.sh"), precedence.find((f) => basename(f) === "commit.sh"));
+check("and the installation still supplies the rest",
+  join(TOOLS, "pr.sh"), precedence.find((f) => basename(f) === "pr.sh"));
+rmSync(near, { recursive: true, force: true });
 
 rmSync(work, { recursive: true, force: true });
 
