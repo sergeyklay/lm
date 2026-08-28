@@ -21,6 +21,15 @@ verb is a verb's flag. `lm ship --yes` takes it as well and carries it to both v
 whole delivery goes through with nobody at the terminal. What neither reaches is a chat session: a
 chat has a person in it by construction, and its dialog is still asked.
 
+On a composition `--dry-run` covers the whole delivery and not only the verbs inside it. `lm ship`
+opens a branch and stages the tree around the verbs it runs, and those are side effects like any
+other, so a rehearsal runs none of them: after `lm ship --dry-run` the working tree, the branch you
+are on, the branches that exist, `HEAD` and the reflog all read exactly as they did before it. What
+you see is each verb rehearsed against the repository as it stands, which is thinner than the run,
+and the composition says so on stderr. A verb whose input an earlier step would have made refuses
+the way it would if you ran it yourself now: on a tree nothing was staged in, `lm ship --dry-run`
+reaches `commit` and `commit` exits 3.
+
 Exit 7 is what a declined confirmation reports, so a run under `--yes` stops producing it rather
 than producing it for a different reason.
 
@@ -143,7 +152,7 @@ installation prints the two fields it always printed.
 `LM_CTX` is what the service serves, not what a model can hold. Ollama bounds every model it loads,
 and a card's own length is read per model by `card()` in `src/catalogue.mts`, so a new `LM_MODEL`
 needs no new `LM_CTX`: a service or a card change is what moves this number. The two routes that can
-act on a window read it. `lm ship` drives its verbs through `libexec/lm-verb`, which posts
+act on a window read it. `lm --which` asks the model through `libexec/lm-verb`, which posts
 `options.num_ctx` on `/api/chat`, where ollama honours it. The chat accounts against it: the harness
 compares the conversation with that number to decide when to compact and what percentage to show. A
 verb on the Node runner does neither, and its answer budget is `LM_MAX_TOKENS` whatever `LM_CTX`

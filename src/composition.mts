@@ -42,12 +42,23 @@ export async function runComposition(
   let calls = 0;
   let attempts = 0;
 
+  // --dry-run stops a verb before apply(), and a composition's hooks are its
+  // apply. The guard is here rather than in each hook, because a guard a hook
+  // has to remember is one the next composition forgets.
   const step = (fn: string): number => {
+    if (parsed.dry) return 0;
     const r = hook(file, fn, opts);
     own.out(r.stdout);
     own.err(r.stderr);
     return r.status;
   };
+
+  // The rehearsal is thinner than the run and the difference is not the flag's to
+  // imply: a verb that refuses for want of what prepare() would have done is
+  // otherwise read as the composition being broken.
+  if (parsed.dry) {
+    own.err(`lm: --dry-run: ${info.name}'s own steps do not run, so each verb rehearses the repository as it stands\n`);
+  }
 
   const prepared = step("prepare");
   if (prepared !== 0) return { code: prepared, calls, attempts };

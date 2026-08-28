@@ -38,8 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The chat now asks the model for no answer budget at all. It used to send one under a name ollama discards, so the number bounded nothing and `LM_CTX` quietly divided it; what bounds a turn now is the context window it accounts against and the person watching the answer arrive. A verb still asks for `LM_MAX_TOKENS` under the name ollama honours.
 - The chat's status rows carry the model on the first row, beside the working directory and the branch, and the second row holds the context against its window, what the session has spent and the thinking level the session is at, all three in the same grey.
 
+### Removed
+
+- `libexec/lm-ship`, the script that ran the delivery before `lm ship` became a composition. Nothing had reached it since: `lm ship` runs `tools/ship.sh` through the runner every verb already goes through, and that is now what the composition's tests drive.
+
 ### Fixed
 
+- `lm ship --dry-run` no longer changes the repository it was asked to rehearse. It staged the working tree and cut a placeholder branch before any model call, and renamed that branch after a commit the run never made, because the flag reached the composition and guarded nothing inside it. A rehearsal now runs none of the composition's own steps, so the working tree, the branch you are on, the branches that exist, `HEAD` and the reflog all read after it exactly as they did before; each verb is rehearsed against the repository as it stands, which the run says on stderr, because that is thinner than the delivery and a verb may refuse for want of what a step would have done.
 - The exit code table omitted 1, which `lm` returns whenever a verb's side effect fails: a commit a hook rejected, a tool file that asks a question outside `apply`, or a body killed before it could return a status. It is listed now, with the note that `git commit` reports 1 whatever code the hook itself exited with, so what the hook printed is the only thing that says why.
 
 ## [0.1.0] - 2026-08-27

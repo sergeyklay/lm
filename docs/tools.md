@@ -58,7 +58,7 @@ node tests/cli.mts                # what `lm` dispatches, and its help
 bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh` stubbed
 bash tests/golden.sh              # every verb except the model call
-bash tests/ship.sh                # the `lm ship` composition, with the verbs stubbed
+bash tests/ship.sh                # the `lm ship` composition, on the driver `lm` runs it on
 bash tests/stats.sh               # the clean share split at a date, over a log written by hand
 bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
@@ -273,13 +273,15 @@ The two affordances are not one thing twice, so `tests/request.mts` drives the s
 apart from the run that uses it: the flag alone, the variable alone, neither, and a variable set to
 something other than `1`. Three mutations, each killing exactly one of them - the seam ignoring the
 variable, the seam ignoring the flag, and the flag no longer reaching the tool's own shell.
-`lm ship --yes` has two cases of its own in `tests/ship.sh`, because a composition runs its verbs
-rather than letting anyone type a flag at them: `libexec/lm-ship` consumes the flag and exports the
-variable, the way it already exports `LM_COMPOSITION`. Two mutations, and the first is the defect
-the operator met before it was fixed - letting `--yes` fall through into the arguments forwarded to
-each verb reddens both cases, because the shell runner then refuses a flag it does not declare,
-while setting the variable without exporting it reddens only the case that reads what the verbs
-received.
+`lm ship --yes` has cases of its own in `tests/ship.sh`, because a composition runs its verbs
+rather than letting anyone type a flag at them: `parseArgs` in `src/verb.mts` turns the flag into
+`LM_YES=1` in the environment `runComposition` hands each verb, the way that environment already
+carries `LM_COMPOSITION`. Dropping that assignment reddens the one case that counts how many verbs
+saw the variable. The mutation that reddens nothing is worth as much - forwarding `--yes` as an
+argument to each verb kills no case, because the runner declares that flag and every verb consumes
+it rather than refusing it, so the defect this group was first written for cannot happen on this
+driver at all. The case asserting the flag was not forwarded went for that reason, and a case that
+free text is forwarded took its place.
 
 The bounded wait is the other half, and `tests/consent.sh` cannot afford to wait for it: the bound
 is 120 seconds, so its cases take the shipped text of the reading function out of the shell runner
@@ -360,6 +362,55 @@ mutant nor the cases. The Node runner's own guard is a different matter: droppin
 is reached and no case stands the Node runner in such a repository. That is the ordinary case for
 anyone who installs `lm` and runs a verb in a project of their own, and it is the group's one real
 hole rather than a coarse assertion.
+
+The delivery has a group of its own, and it sits on the driver the operator uses rather than
+beside it. `tests/ship.sh` runs `bin/lm ship` into `runComposition` over `tools/ship.sh`, with
+`commit` and `pr` written as tool files of the suite's own and a recording server answering the one
+model call each makes, so every line a delivery runs is run here and none of it needs a GPU.
+`grep -c '^check ' tests/ship.sh` counts the cases, at 36 as this is written.
+
+Seventeen mutations beside the two on `--yes` above, each predicted by case name before it was
+planted and each compared as a name set. Taking the `git switch -q -c` out of `prepare()` reddens exactly one, the case reading that
+`main` is untouched, and not the case reading the branch name: `after_commit` renames whatever
+branch is current, so a commit made on `main` still ends up on a branch called after its subject,
+and the prediction that the branch cases would die was wrong for that reason. Dropping
+`LM_COMPOSITION` from the environment `runComposition` builds reddens the two cases that read the
+tag and leaves the branch names alone, which is the `:-ship` fallback in `_branch()` working.
+Dropping the `--dry-run` guard from the composition's own `step()` reddens six: the four that read
+the repository back after a rehearsal, the one that says a rehearsal stages nothing, and the one
+that reads the refusal a rehearsed verb makes on its own account. Its evidence is what the mutant
+left behind - a branch renamed to `chore/seed`, after a commit the run never made. Removing the
+line that says the composition's own steps did not run reddens only the case that reads it.
+
+Then one property each: `_name()` returning a constant reddens the case reading the branch name;
+cutting the placeholder whether or not `--here` was given reddens the two `--here` cases that read
+a branch; never calling `failed_<verb>` reddens the two that read what a refusal left behind;
+deleting `git branch -q -D` from `failed_commit` reddens the one that reads the branch list;
+removing the `nothing to stage` diagnostic reddens the one that reads it; dropping `git add -A`
+reddens the one that reads what an unstaged tree shipped; staging whether or not `--no-stage` was
+given reddens both `--no-stage` cases; always taking the staging branch that says nothing reddens
+the two that read what got staged; dropping the free text from the arguments each verb is handed
+reddens the one that reads it; and dropping the runner's own `--dry-run` guard, in `src/verb.mts`,
+reddens the three rehearsal cases that read the commit and the tree.
+
+Three are broad and worth knowing as such: running only the first verb reddens five, the two that
+read `pr` and the three that count both verbs; swallowing a verb's non-zero status reddens six,
+across the refusal, the `--no-stage` and the rehearsal groups, because every refusal in the suite
+travels the same line; and handing every verb `--dry-run` reddens ten, which is what covers the
+cases saying the commit landed and `pr` ran.
+
+Two first attempts are the warnings worth keeping, and both are cases too coarse for the mutant
+written for them. The rehearsal case reading `git status --porcelain` first ran on a fixture whose
+tree was already staged, so the mutation that lets `prepare()` stage changed nothing it could see
+and the kill set came back one name short; the fixture now carries a file staged and modified again
+on top of that, and an untracked one beside it. And the `--no-stage` case first read the index
+alone, which is empty both when nothing was staged and when what was staged has just been
+committed, so the mutation that always stages left it green; it reads the working tree now.
+
+Five cases no mutation reddens, and they are controls rather than assertions: that a refusal leaves
+no commit, with and without `--here`; that the work is still staged after one; that a rehearsal
+exits 0; and that it still prints what `commit` would do. Each holds an absence or a completion
+that no mutation of the composition can manufacture on its own.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
