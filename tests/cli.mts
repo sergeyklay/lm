@@ -26,16 +26,39 @@ check("bin holds one command", "lm", readdirSync(join(ROOT, "bin")).join(","));
 
 const help = run(LM, ["--help"]);
 check("--help exits 0", 0, help.code);
-for (const line of ["open a chat", "lm ship", "lm stats", "--dry-run", "--which", "LM_MODEL"]) {
+for (const line of ["open a chat", "lm <workflow>", "lm stats", "--dry-run", "--which", "LM_MODEL"]) {
   check(`--help covers ${line}`, true, help.out.includes(line));
 }
-for (const verb of ["changelog", "commit", "issue", "pr"]) {
-  check(`--help lists ${verb}`, true, new RegExp(`^  ${verb}\\s`, "m").test(help.out));
-}
+// A description is prose written for the router by whoever wrote the file, so its
+// length is not this help to bound: the listing carries names and the detail is
+// one command away. A workflow is listed too, and never named in Usage beside
+// `lm stats`, which is `lm` itself rather than something this repository ships.
+check("the tools are listed as names alone",
+  true, /^Available tools:\n  changelog, commit, issue, pr$/m.test(help.out));
+check("the workflows have a listing of their own",
+  true, /^Available workflows:\n  ship$/m.test(help.out));
+check("no description reaches the listing", false, help.out.includes("Conventional Commits"));
+check("and it says where the detail is", true, help.out.includes("lm <name> --help"));
+check("a workflow is not named in Usage", false, /^  lm ship /m.test(help.out));
+
+// A name in the first position claims the help flag, and what comes back is
+// generated from what the file declares: no tool file answers --help itself.
+const own = run(LM, ["commit", "--help"]);
+check("what it does is the first line, not a label",
+  true, own.out.startsWith("Write a Conventional Commits message"));
+check("and the usage names it once", true, /^  lm commit \[options\] \[text\]$/m.test(own.out));
+check("and exits 0", 0, own.code);
+// Which kind it is shows in whether there is a sequence to name.
+check("a tool names no sequence", false, own.out.includes("Runs in order:"));
+const flow = run(LM, ["ship", "--help"]);
+check("a workflow names the verbs it runs, in order",
+  true, /^Runs in order:\n  commit, pr$/m.test(flow.out));
+check("and names the flags it declared, under who declared them",
+  true, /^Declared by ship:\n  --here, --no-stage$/m.test(flow.out));
 check("help goes to stdout, not stderr", "", help.err);
 
 check("-h is the same help", help.out, run(LM, ["-h"]).out);
-check("help wins after a verb", help.out, run(LM, ["commit", "--help"]).out);
+check("a name claims the flag, so the global help is not what comes back", false, run(LM, ["commit", "--help"]).out === help.out);
 
 const viaDispatch = run(LM, ["--list"]);
 const viaVerb = run(join(ROOT, "libexec/lm-verb"), ["--list"]);

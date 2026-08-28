@@ -56,8 +56,9 @@ is available on the command line at once, and inside the chat from the next sess
 ## Documentation
 
 - [Installing lm](docs/install.md): requirements, install, first run.
-- [What each verb does](docs/verbs.md): per-verb behaviour, `ship` and `stats`, configuration
-  and exit codes.
+- [What this repository ships](docs/instruments.md): what each verb does, and `ship`.
+- [Running a verb](docs/verbs.md): the flags every verb takes, the run log `lm stats` reads,
+  configuration and exit codes.
 - [Adding a tool](docs/tools.md): the registry contract, and the tests that pin it.
 - [The runner](docs/runner.md): how a verb reaches the model, and how the chat reaches a verb.
 

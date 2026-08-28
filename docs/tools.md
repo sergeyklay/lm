@@ -20,6 +20,10 @@ read as words. A flag the tool declared arrives as a variable, not as an argumen
 `--force` becomes `LM_FORCE=1`. Only text reaches `collect`, and text after `--` is text,
 dashes and all.
 
+`lm <verb> --help` is generated from what the file declares — `name`, `description` and `flags` —
+so no verb writes a help handler. A declared flag is named there and not described, because the
+declaration carries its name and nothing else.
+
 `schema()` is compiled to a GBNF grammar before the model is called, so a shape the
 compiler rejects costs the whole request: `HTTP 400 failed to parse grammar`, ahead of any
 prefill. Two limits bind every schema, at any depth. A `pattern` opens with `^` and closes

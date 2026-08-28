@@ -56,5 +56,5 @@ lm --list                      # every tool with its description, tab-separated
 lm --which "text"              # name the verb that serves a request
 ```
 
-What each verb does to the repository, what the exit codes mean and which environment variables
-are read is in [what each verb does](verbs.md).
+What each verb does to the repository is in [what this repository ships](instruments.md). What
+the exit codes mean and which environment variables are read is in [running a verb](verbs.md).
