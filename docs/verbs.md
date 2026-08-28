@@ -145,16 +145,22 @@ Environment only:
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 | `LM_YES` | unset |
 
-`LM_CTX` is the context window, and the two routes that can act on one read it. `lm ship` drives its
-verbs through `libexec/lm-verb`, which posts `options.num_ctx` on `/api/chat`, where ollama honours
-it. The chat accounts against it: the harness compares the conversation with that number to decide
-when to compact and what percentage to show. A verb on the Node runner does neither, and its answer
-budget is `LM_MAX_TOKENS` whatever `LM_CTX` says, the same budget `num_predict` carries on the other
-route. That runner sends no window at all, and could not: ollama ignores `options.num_ctx` on
-`/v1/chat/completions`. So lowering this variable asks the chat to account against a smaller window;
-it does not make the server serve one.
+`LM_CTX` is what the service serves, not what a model can hold. Ollama bounds every model it loads,
+and a card's own length is read per model by `card()` in `src/catalogue.mts`, so a new `LM_MODEL`
+needs no new `LM_CTX`: a service or a card change is what moves this number. The two routes that can
+act on a window read it. `lm ship` drives its verbs through `libexec/lm-verb`, which posts
+`options.num_ctx` on `/api/chat`, where ollama honours it. The chat accounts against it: the harness
+compares the conversation with that number to decide when to compact and what percentage to show. A
+verb on the Node runner does neither, and its answer budget is `LM_MAX_TOKENS` whatever `LM_CTX`
+says, the same budget `num_predict` carries on the other route. That runner sends no window at all,
+and could not: ollama ignores `options.num_ctx` on `/v1/chat/completions`. So lowering this variable
+asks the chat to account against a smaller window; it does not make the server serve one.
 
-The default is what this machine's ollama serves, and the two stay in step by hand.
+The default is what this machine's ollama serves, and the two stay in step by hand. A service with
+`OLLAMA_CONTEXT_LENGTH` unset picks its own on startup from the VRAM it finds — 262 144 above 47 GiB,
+32 768 above 23 GiB and 4 096 below that, which `grep -n 'defaultNumCtx = ' server/routes.go` finds
+at `v0.32.15` of `ollama/ollama` — so the number this variable has to match is the service's rather
+than the card's.
 `curl -sS http://127.0.0.1:11434/api/ps | jq -c '.models[] | {name, context_length}'` reports the
 window a loaded model was given, and `OLLAMA_CONTEXT_LENGTH` in the service's environment is what it
 is given when nothing asks for another. Declaring less than the server serves spends the difference

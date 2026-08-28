@@ -41,7 +41,7 @@ Environment:
   LM_OLLAMA                     where ollama listens (http://127.0.0.1:11434)
   LM_MODEL                      the model a verb asks, and the chat's default (qwen3.8:27b)
   LM_YES                        set to 1, the same as --yes on every verb
-  LM_CTX                        context window for the chat and 'lm ship' (65536)
+  LM_CTX                        what ollama serves per model, not what a model can hold (65536)
   LM_MAX_TOKENS                 how many tokens an answer may cost (3000)
   LM_TOOLS                      the registry directory (<repo>/tools)
   LM_LOG                        the run log, empty to disable ($HOME/.lm/runs.jsonl)
