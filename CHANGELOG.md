@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A composition is a named sequence of verbs that `lm` runs as one command: `lm ship` is now one, and a new file dropped into the compositions directory is offered as a command and in the chat in the next session with no other file edited.
+- `lm --help` lists the compositions beside the verbs, and `LM_COMPOSITIONS` points `lm` at a compositions directory other than the one beside the tools.
 - The chat now offers every model the local ollama has, listing them when `/model` opens and again at startup, and each model declares the smaller of its own context length and `LM_CTX`.
 - A model the operator saved inside the chat is now honoured on the next launch: the chat opens on it rather than on `LM_MODEL`, and a saved provider and model together count as the choice while either one alone does not.
 - `LM_MAX_TOKENS` sets how many tokens a verb's answer may cost, defaulting to 3000, and an answer that reaches it is still cut off and exits 5 as before.
@@ -17,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A verb run inside a composition records the composition's name in the run log, so `lm stats` can tell a run that came from a composition apart from one typed by hand.
+- A composition's confirmations and questions arrive as the chat's own dialogs, a refusal applies nothing and says so, and a delivery that produces nothing still reports its exit code.
 - `LM_MODEL` is now the model a verb asks and the chat's default, so a model saved inside the chat no longer changes what a verb asks.
 - The default context window is now 65536 tokens, matching what this machine's ollama serves, so the chat no longer compacts early against a window the server does not hold and a conversation can grow to what ollama actually keeps.
 - `LM_CTX` now reaches only the chat and `lm ship`: a verb's answer budget no longer follows the window, so a window sized for a smaller card no longer shortens a verb's answer, and the budget is `LM_MAX_TOKENS` whatever the window says.

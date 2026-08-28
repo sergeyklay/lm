@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
-export type ToolMeta = { name: string; description: string; flags: string[] };
+export type ToolMeta = { name: string; description: string; flags: string[]; verbs: string[] };
 export type Result = { stdout: string; stderr: string; status: number };
 export type Fn = "collect" | "schema" | "validate" | "render";
 export type Opts = { args?: string[]; stdin?: string; cwd?: string; env?: Record<string, string> };
@@ -78,14 +78,23 @@ export function list(toolsDir: string): string[] {
 }
 
 export function meta(file: string): ToolMeta {
-  const r = bash('. "$1" || exit $?; printf "%s\\0%s\\0%s" "$name" "$description" "${flags:-}"', [file]);
+  const r = bash('. "$1" || exit $?; printf "%s\\0%s\\0%s\\0%s" "$name" "$description" "${flags:-}" "${verbs:-}"', [file]);
   if (r.status !== 0) throw new Error(`cannot read ${file}: ${r.stderr.trim() || `exit ${r.status}`}`);
-  const [name, description, flags] = r.stdout.split("\0");
-  return { name, description, flags: flags ? flags.split(/\s+/).filter(Boolean) : [] };
+  const [name, description, flags, verbs] = r.stdout.split("\0");
+  const words = (s: string | undefined) => (s ? s.split(/\s+/).filter(Boolean) : []);
+  return { name, description, flags: words(flags), verbs: words(verbs) };
 }
 
 export function call(file: string, fn: Fn, opts: Opts = {}): Result {
   return bash(SOURCE, [file, fn, ...(opts.args ?? [])], opts);
+}
+
+// A composition's own step, around the verbs it names. A step nobody wrote is not
+// a failure: the file defines only the hooks it needs, so an undefined one is a
+// no-op rather than a `command not found`.
+export function hook(file: string, fn: string, opts: Opts = {}): Result {
+  const script = '. "$1" || exit $?; f=$2; shift 2; declare -F "$f" >/dev/null || exit 0; "$f" "$@"';
+  return bash(script, [file, fn, ...(opts.args ?? [])], opts);
 }
 
 // apply is the only function with a side effect and the only one that talks to
