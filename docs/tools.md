@@ -1,6 +1,10 @@
 # Adding a tool
 
-Drop one file into `tools/`. Nothing else changes: the index is the directory listing.
+Drop one file into a `tools/` directory. Nothing else changes: the index is the directory
+listing. Which directories are listed is the registry, and
+[running a verb](verbs.md) fixes that: the repository you are standing in supplies verbs of its
+own and the installation supplies the rest, unless `LM_TOOLS` names one directory as the whole of
+it. A name the repository also ships resolves to the repository's file.
 
 ```bash
 name="verb"
@@ -257,6 +261,40 @@ reading only the status reported a bound that was not there. And a series killed
 wall clock left a mutant in the working tree twice, the second time with `trap ... EXIT INT TERM`
 installed, which did not fire: what proves a restore is `cmp` against the pre-series copy in the
 same command, never a trap and never the intention to restore.
+
+The registry is a precedence of directories rather than one directory, and the group that pins it
+is split across the two runners because the resolution is: `libexec/lm-verb` answers `--list` and
+`bin/lm` dispatches, and each resolves for itself. `tests/cli.mts` stands `lm` in five kinds of
+directory - a repository with no `tools/` of its own, one shadowing a name the installation ships,
+one adding a name it does not, a directory that is no repository at all, and a run with `LM_TOOLS`
+set - and `tests/registry.mts` drives `list()` over two directories on its own. Counted 2026-08-28
+with `node tests/cli.mts | grep -c '^ok'` at 57 and `node tests/registry.mts | grep -c '^ok'` at 53.
+
+Twelve mutations, each predicted by case name before it was planted and each compared as a name
+set. Dropping the project directory from `bin/lm` reddens the six cases that dispatch a verb, run a
+workflow or take help from a project file, and none of the listing cases; dropping it from
+`libexec/lm-verb` reddens the eight that read the listing or reach a verb through the shell runner,
+and none that dispatch. The two sets are disjoint, which is what says the two resolvers are pinned
+apart rather than once. Removing the shell runner's dedup reddens 2, removing the Node one reddens
+3, two of them the workflow's, because a composition builds a `Map` from the listing and a repeated
+name resolves to the last entry rather than the first. Never marking an entry `project` reddens 3;
+never collapsing two identical directories in the shell runner reddens the one case that runs
+inside this repository; taking the sort off the shell listing reddens 3; pointing the shell
+runner's verb lookup at the installation reddens 2; and letting `LM_TOOLS` be the first of two
+rather than the whole registry reddens 2 in each runner.
+
+Three attempts are the warnings worth keeping. `node --check` is not a parse gate for these files:
+it accepts a duplicate `const` in any `.mts` carrying an `import`, which is the error that stopped
+`tests/cli.mts` loading while it was being written, so what gated every Node mutant here is the
+suite printing at least one `ok` line. Reversing the sort in `list()` was predicted to redden one
+case and reddened two, the second an older case pinning the order `--help` names tools in - new code
+killed by a case nobody wrote for it, and the reason a prediction is worth writing down. And the
+mutant that never collapses two identical directories on the Node side kills nothing at all, with
+the site confirmed to have executed and to have returned the same directory twice: `list()`
+deduplicates by name whatever it is handed, so that collapse is a saved directory read and a shape
+shared with the shell runner, not a behaviour. The anchor rule earned its place here too - `DIRS=(`
+occurs three times and the first is the `LM_TOOLS` branch, so a patch taken at the first hit would
+have measured a branch nobody meant to touch and reported its kill set as the other one's.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

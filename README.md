@@ -51,7 +51,8 @@ A rejected answer is sent back once with the violations as the correction, and a
 model call, or two when the validator rejects the first.
 
 Adding a verb changes no existing file. The index is the directory listing, so a file dropped in
-is available on the command line at once, and inside the chat from the next session.
+is available on the command line at once, and inside the chat from the next session. That holds
+for a file dropped into a repository of your own, which [running a verb](docs/verbs.md) covers.
 
 ## Documentation
 

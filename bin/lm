@@ -1,11 +1,24 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 
 const libexec = join(dirname(realpathSync(process.argv[1])), "..", "libexec");
 const argv = process.argv.slice(2);
-const toolsDir = () => process.env.LM_TOOLS ?? join(libexec, "..", "tools");
+
+// LM_TOOLS names the whole registry. Otherwise the project's tools/ shadows the
+// installation's. libexec/lm-verb resolves this for itself, and tests/cli.mts is
+// what requires the two to answer alike.
+function registry() {
+  if (process.env.LM_TOOLS) return [process.env.LM_TOOLS];
+  const install = join(libexec, "..", "tools");
+  const top = (spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout ?? "").trim();
+  const project = top && join(top, "tools");
+  // The installation's own repository is its own project, so the same directory
+  // must not enter the precedence twice.
+  if (!project || !existsSync(project) || realpathSync(project) === realpathSync(install)) return [install];
+  return [project, install];
+}
 
 function hand(program, args) {
   const r = spawnSync(join(libexec, program), args, { stdio: "inherit" });
@@ -49,7 +62,7 @@ const wantsHelp = argv.includes("-h") || argv.includes("--help");
 // about `commit`, and only `lm --help` is a question about `lm`.
 if (wantsHelp && argv[0] && !argv[0].startsWith("-")) {
   const { list, meta } = await import("../src/registry.mts");
-  const file = list(toolsDir()).find((f) => basename(f, ".sh") === argv[0]);
+  const file = list(registry()).find((f) => basename(f, ".sh") === argv[0]);
   if (file) {
     process.stdout.write(nameHelp(meta(file)));
     process.exit(0);
@@ -58,7 +71,7 @@ if (wantsHelp && argv[0] && !argv[0].startsWith("-")) {
 
 if (wantsHelp) {
   const { list, meta } = await import("../src/registry.mts");
-  const declared = list(toolsDir()).map(meta);
+  const declared = list(registry()).map(meta);
   // Usage names what `lm` exposes. The listings below name what this repository
   // happens to ship, and they are names alone: a description belongs to whoever
   // wrote the file, and `lm <name> --help` is where it is read.
@@ -95,7 +108,7 @@ Environment:
   LM_YES                        set to 1, the same as --yes on every verb
   LM_CTX                        what ollama serves per model, not what a model can hold (65536)
   LM_MAX_TOKENS                 how many tokens an answer may cost (3000)
-  LM_TOOLS                      the registry directory (<repo>/tools)
+  LM_TOOLS                      the whole registry; unset, the project's tools/ then the installation's
   LM_LOG                        the run log, empty to disable ($HOME/.lm/runs.jsonl)
 `);
   process.exit(0);
@@ -113,7 +126,7 @@ if (OPTIONS.includes(argv[0])) hand("lm-verb", argv);
 
 if (argv.length > 0 && argv[0] !== "chat") {
   const { list, meta } = await import("../src/registry.mts");
-  const files = list(toolsDir());
+  const files = list(registry());
   const file = files.find((f) => basename(f, ".sh") === argv[0]);
   if (!file) {
     process.stderr.write(`lm: no such tool '${argv[0]}'. Available:\n`);
@@ -124,7 +137,7 @@ if (argv.length > 0 && argv[0] !== "chat") {
   // composition, one that does not is a verb.
   if (meta(file).verbs.length > 0) {
     const { runComposition } = await import("../src/composition.mts");
-    const { code } = await runComposition(file, toolsDir(), argv.slice(1), `${argv[0]}-${process.pid}`);
+    const { code } = await runComposition(file, files, argv.slice(1), `${argv[0]}-${process.pid}`);
     process.exit(code);
   }
   const { runVerb } = await import("../src/verb.mts");
@@ -137,10 +150,12 @@ const { catalogue } = await import("../src/catalogue.mts");
 const { initialSelection } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup } = await import("../src/chrome.mts");
+const { list } = await import("../src/registry.mts");
 
 silenceStartup();
 
 const selection = initialSelection(SettingsManager.create(process.cwd()));
+const files = list(registry());
 
 await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
   extensionFactories: [
@@ -150,7 +165,7 @@ await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
       hidden: true,
       factory: (pi) => {
         pi.registerProvider("ollama", { ...providerConfig(), refreshModels: catalogue });
-        registerVerbs(pi, toolsDir());
+        registerVerbs(pi, files);
         installChrome(pi);
       },
     },

@@ -29,17 +29,17 @@ function check(name: string, want: unknown, got: unknown) {
 
 function collect(dir: string) {
   const tools: any[] = [];
-  const names = registerVerbs({ registerTool: (t: any) => tools.push(t) }, dir);
+  const names = registerVerbs({ registerTool: (t: any) => tools.push(t) }, list([dir]));
   return { tools, names };
 }
 
 const repo = collect(TOOLS);
 check("every tool file in the registry is offered to the chat",
-  list(TOOLS).map((f) => meta(f).name), repo.names);
+  list([TOOLS]).map((f) => meta(f).name), repo.names);
 check("and each is offered under its own name",
   repo.names, repo.tools.map((t) => t.name));
 check("with the description the router already uses",
-  list(TOOLS).map((f) => meta(f).description), repo.tools.map((t) => t.description));
+  list([TOOLS]).map((f) => meta(f).description), repo.tools.map((t) => t.description));
 check("and the same one in the system prompt's tool list",
   repo.tools.map((t) => t.description), repo.tools.map((t) => t.promptSnippet));
 
@@ -112,7 +112,7 @@ type Shown = { label: string; message: string };
 async function throughTheChat(dir: string, ui: any) {
   const shown: Shown[] = [];
   const tools: any[] = [];
-  registerVerbs({ registerTool: (t: any) => tools.push(t) }, dir);
+  registerVerbs({ registerTool: (t: any) => tools.push(t) }, list([dir]));
   const ctx = {
     hasUI: ui !== undefined,
     ui: {

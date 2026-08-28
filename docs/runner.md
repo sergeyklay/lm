@@ -57,7 +57,8 @@ not this one's.
 
 `libexec/lm-verb` is the shell runner and still runs every verb. The Node side under `src/` is
 the half being built to replace it, and it reads the same registry, so a tool file does not know
-which one called it. A verb reads none of that directory: the Node runner hands the harness
+which one called it. Each resolves that registry for itself, which is why `tests/cli.mts` asks
+both for it from the same directory and requires the same answer. A verb reads none of that directory: the Node runner hands the harness
 settings of its own with the automatic retry and the compact-and-retry both off, so a verb costs
 the one model call the record reports, or the two a validator's rejection buys, and never a
 number that depends on a file outside the repository.
@@ -77,7 +78,7 @@ next call; `libexec/lm-verb` gets the same isolation for `list()` from a subshel
 
 | Export | What it does |
 | --- | --- |
-| `list(dir)` | The index: the `*.sh` files in `dir`, sorted. Adding a tool changes no file here. |
+| `list(dirs)` | The index: the `*.sh` files in each of `dirs`, nearest first, each name once, sorted. Adding a tool changes no file here. |
 | `meta(file)` | The declared `name`, `description` and `flags`. |
 | `call(file, fn, opts)` | Calls one function. `opts` carries `args`, `stdin`, `cwd` and `env`. |
 | `apply(file, opts)` | The side effect, for a caller that owns the terminal. Returns the status. |
