@@ -201,28 +201,46 @@ check("the block opens on the session, what it ran and how long it took",
 check("the table charges the spend to the model that answered",
   "Model         Reqs   Input   Cache   Output\nqwen3.8:27b      3   37.0k    3.0k     1.2k",
   part(block(entries), 1));
-check("and the last line reopens the session from lm itself",
-  "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de", part(block(entries), 2));
+check("and it closes on the command that reopens the session, over two lines",
+  "Resume this session with:\nlm --resume 01a04900-0000-7000-8000-00000000c0de", part(block(entries), 2));
 // The identifier is the shorter line and the one the operator reads on the row
 // above, but it resolves in one directory. A session kept anywhere else is named
 // by its file, which reopens it wherever it is.
 check("a session outside that directory is named by its file instead",
-  `Resume: lm --session ${AWAY.file}`, part(block(entries, head, OPENED, AWAY), 2));
+  `Resume this session with:\nlm --resume ${AWAY.file}`, part(block(entries, head, OPENED, AWAY), 2));
 // The harness declares no method that answers this, so a build that stops
 // shipping one leaves the question open, and an open question takes the file.
 check("and a directory the harness will not answer for takes the file too",
-  `Resume: lm --session ${AWAY.file}`,
+  `Resume this session with:\nlm --resume ${AWAY.file}`,
   part(block(entries, head, OPENED, { file: AWAY.file, isDefaultDir: undefined }), 2));
 check("but with no file to name it falls back to the identifier",
-  "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de",
+  "Resume this session with:\nlm --resume 01a04900-0000-7000-8000-00000000c0de",
   part(block(entries, head, OPENED, { file: undefined, isDefaultDir: undefined }), 2));
 // The line is pasted into a shell, so a path that is more than one word there is
 // quoted rather than printed as a command that would open something else.
 check("a path a shell would split is quoted",
-  "Resume: lm --session '/srv/my sessions/a.jsonl'",
+  "Resume this session with:\nlm --resume '/srv/my sessions/a.jsonl'",
   part(block(entries, head, OPENED, { file: "/srv/my sessions/a.jsonl", isDefaultDir: false }), 2));
 check("every row of it reads on an eighty-column terminal", true,
   String(block(entries)).split("\n").every((l) => l.length <= 80));
+
+// The two lines are a command to paste rather than a figure to read, so they
+// wear the grey the status row spends on `think`. The block is written once the
+// harness has stopped the TUI, where the theme a render callback is handed is
+// gone, so the colour arrives as an argument instead of being read in here.
+const rowsOf = (dim?: (text: string) => string) => {
+  const s = summarize(head, entries, OPENED, HOME);
+  return s === null ? [] : summaryBlock(s, dim);
+};
+const coloured = rowsOf((text) => theme.fg("dim", text));
+check("the two lines that reopen the session are dim", true,
+  coloured.slice(-2).every((l) => styled(l, "dim")));
+check("and nothing above them carries a colour of its own", true,
+  coloured.slice(0, -2).every((l) => l === plain(l)));
+check("the words are the same ones a terminal without colour reads",
+  part(block(entries), 2), coloured.slice(-2).map(plain).join("\n"));
+check("and with no colour to spend they are printed as text", true,
+  rowsOf().slice(-2).every((l) => l === plain(l)));
 
 // A zero the operator cannot see is a feature they cannot tell from one that was
 // never built, which is what the suppressed clauses cost. Both counts are printed
@@ -338,7 +356,7 @@ async function quitAfterOpening(
   argv: (session: string, dir: string) => string,
   holds: (quit: string) => string = (quit) => quit,
   from: string = FIXTURE,
-): Promise<{ printed: string; session: string }> {
+): Promise<{ printed: string; raw: string; session: string }> {
   const quit = mkdtempSync(join(tmpdir(), "lm-quit-"));
   const dir = holds(quit);
   mkdirSync(dir, { recursive: true });
@@ -364,9 +382,10 @@ async function quitAfterOpening(
   }
   chat.kill("SIGKILL");
   await exited;
-  const printed = seen().replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
+  const raw = seen();
+  const printed = raw.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
   rmSync(quit, { recursive: true, force: true });
-  return { printed, session };
+  return { printed, raw, session };
 }
 
 // Where the harness keeps a session by default, and the only directory an
@@ -375,7 +394,7 @@ async function quitAfterOpening(
 const defaultSessions = (quit: string) =>
   join(quit, "agent", "sessions", `--${ROOT.replace(/^\//, "").replace(/\//g, "-")}--`);
 
-const { printed, session: away } = await quitAfterOpening((s, d) => `chat --session ${s} --session-dir ${d}`);
+const { printed, raw, session: away } = await quitAfterOpening((s, d) => `chat --session ${s} --session-dir ${d}`);
 const BLOCK = ["Session   01a04900-0000-7000-8000-00000000c0de", "Tools     3 ran, 1 failed",
   "Model         Reqs   Input   Cache   Output", "qwen3.8:27b      3   37.0k    3.0k     1.2k"];
 check("quitting the chat prints the closing block on the restored terminal", true,
@@ -383,9 +402,16 @@ check("quitting the chat prints the closing block on the restored terminal", tru
 // The session is not in the directory an identifier resolves in, so the line
 // names the file, which reopens it from wherever it is.
 check("and a session held outside the default directory is resumed by its file", true,
-  printed.includes(`Resume: lm --session ${away}`));
+  printed.includes(`Resume this session with:\nlm --resume ${away}`));
 check("naming no identifier the chat could not have found it by", false,
-  printed.includes("Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"));
+  printed.includes("lm --resume 01a04900-0000-7000-8000-00000000c0de"));
+// Every case here reads a capture the escapes have been stripped out of, so the
+// colour is only visible in the one that was not. The theme is the harness's own
+// and its grey is whatever the operator's theme says, so what is pinned is that
+// the two lines were coloured and reset rather than which colour came out.
+check("and the two lines it prints wear a colour the theme chose", true,
+  /\x1b\[[0-9;]+mResume this session with:\x1b\[39m/.test(raw));
+check("which the block above them does not", false, /\x1b\[[0-9;]+mTools /.test(raw));
 // The two figures differ only where a session outlived a launch, and this run is
 // that: the fixture's own record is dated before any run of this suite, while the
 // sitting is the seconds this case spends in the chat before ending it.
@@ -400,7 +426,8 @@ check("set off by a blank line from the frame the harness restored", true,
 // operator would otherwise be the one to notice.
 check("and the harness's own resume line never reaches the screen", false,
   printed.includes("To resume this session"));
-check("leaving one resume line on it, this project's own", 1,
+// This project's own are two lines and the harness's would be a third.
+check("leaving the two resume lines on it, this project's own", 2,
   printed.split("\n").filter((l) => /[Rr]esume/.test(l)).length);
 
 // A session flag is the chat's and `lm` claims none of them, so the same session
@@ -418,9 +445,26 @@ check("a session reopens without naming the chat first", true,
 const atHome = await quitAfterOpening(() => "--session 01a04900-0000-7000-8000-00000000c0de", defaultSessions);
 check("a session held where the harness keeps its own is resumed by its identifier", true,
   BLOCK.every((l) => atHome.printed.includes(l))
-    && atHome.printed.includes("Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"));
+    && atHome.printed.includes("Resume this session with:\nlm --resume 01a04900-0000-7000-8000-00000000c0de"));
 check("and names no file, which is the longer line for nothing", false,
-  atHome.printed.includes(`Resume: lm --session ${atHome.session}`));
+  atHome.printed.includes(`lm --resume ${atHome.session}`));
+
+// The command the block prints is the one the operator pastes, so it is run as
+// printed rather than asserted as a string. The harness spells its own `--resume`
+// without an argument and reads a stray word as a prompt, so an untranslated
+// identifier opens the session picker and asks the model the identifier: the
+// block is proof of neither, because a run that reopened nothing has no entries
+// to count and one that asked would carry the request in the table.
+const reopened = await quitAfterOpening(() => "--resume 01a04900-0000-7000-8000-00000000c0de", defaultSessions);
+check("the command the block prints is what reopens that session", true,
+  BLOCK.every((l) => reopened.printed.includes(l)));
+check("and the identifier is not asked of the model on the way in", false,
+  /Error|Retrying/.test(reopened.printed));
+// The short form is the same word, and the harness spells that one without an
+// argument too.
+const shortForm = await quitAfterOpening(() => "-r 01a04900-0000-7000-8000-00000000c0de", defaultSessions);
+check("and -r reopens it the same way", true,
+  BLOCK.every((l) => shortForm.printed.includes(l)));
 
 // A session that never reached the model reports nothing, and the harness's line
 // is dropped all the same, because the wrap goes in before the block is built

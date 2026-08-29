@@ -94,7 +94,7 @@ Usage:
   lm                              open a chat with the local model
   lm <verb> [options] [text]      run one verb${workflowUsage}
   lm --continue                   reopen the last chat where it left off
-  lm --resume                     choose a past chat to reopen
+  lm --resume [id]                reopen a past chat, or pick one from a list
   lm stats [--all]                what the run log says about this repository
   lm stats --since <date>         the same, split into before and since that date
 
@@ -125,6 +125,25 @@ Environment:
 }
 
 const OPTIONS = ["--list", "--which"];
+
+// `--resume` is this program's word for reopening a chat, and the harness spells
+// the two halves apart: an identifier or a session file is what its `--session`
+// takes, and its own `--resume` takes nothing and offers the list. Left
+// untranslated the identifier is a word the harness has no flag for, so it goes
+// to the model as the first thing the reopened chat is asked.
+function resumeArgs(args) {
+  const out = [];
+  for (let i = 0; i < args.length; i++) {
+    // Everything after it is text, dashes and all, so a flag there is not one.
+    if (args[i] === "--") return [...out, ...args.slice(i)];
+    const next = args[i + 1];
+    if ((args[i] === "--resume" || args[i] === "-r") && next !== undefined && !next.startsWith("-") && !next.startsWith("@")) {
+      out.push("--session", next);
+      i++;
+    } else out.push(args[i]);
+  }
+  return out;
+}
 
 if (argv[0] === "stats") hand("lm-stats", argv.slice(1));
 if (OPTIONS.includes(argv[0])) hand("lm-verb", argv);
@@ -190,7 +209,7 @@ const models = await catalogue({
   signal: AbortSignal.timeout(CATALOGUE_DEADLINE_MS),
 });
 
-await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
+await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))], {
   extensionFactories: [
     {
       name: "lm",

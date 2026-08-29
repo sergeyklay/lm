@@ -246,7 +246,7 @@ function spendTable(models: ModelSpend[]): string[] {
 const shellWord = (s: string) =>
   /^[A-Za-z0-9_\-./~:@]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`;
 
-export function summaryBlock(s: Summary): string[] {
+export function summaryBlock(s: Summary, dim: (text: string) => string = (text) => text): string[] {
   const head: string[][] = [
     ...(s.id ? [["Session", s.id]] : []),
     ["Tools", `${s.tools} ran, ${s.failed} failed`],
@@ -258,7 +258,7 @@ export function summaryBlock(s: Summary): string[] {
     ...head.map(([name, value]) => `${name.padEnd(label)}${GUTTER}${value}`),
     "",
     ...spendTable(s.models),
-    ...(s.resume ? ["", `Resume: lm --session ${shellWord(s.resume)}`] : []),
+    ...(s.resume ? ["", dim("Resume this session with:"), dim(`lm --resume ${shellWord(s.resume)}`)] : []),
   ];
 }
 
@@ -283,6 +283,12 @@ export function dropHarnessResume(out: { write: (chunk: any, ...rest: any[]) => 
 // Everything this project draws on the chat's screen. Without a terminal there
 // is nothing to draw on.
 export function installChrome(pi: any, updated?: string): void {
+  // The closing block is written after the harness has stopped the TUI, where
+  // the theme a header or footer callback is handed is out of scope. The header
+  // callback keeps it for then. A launch that draws nothing never sets one, and
+  // the block goes out in plain text.
+  let dim: ((text: string) => string) | undefined;
+
   // The same event fires for a reload and for each of the three ways a session
   // is replaced, where the chat carries on and a closing block would be a lie.
   // Only quitting ends the session, and the harness has already stopped the TUI
@@ -305,7 +311,7 @@ export function installChrome(pi: any, updated?: string): void {
       { file: manager.getSessionFile(), isDefaultDir },
     );
     if (!summary) return;
-    process.stdout.write(`\n${summaryBlock(summary).join("\n")}\n`);
+    process.stdout.write(`\n${summaryBlock(summary, dim).join("\n")}\n`);
   });
 
   // The header is built before extensions initialise, and `setHeader` is a no-op
@@ -314,7 +320,10 @@ export function installChrome(pi: any, updated?: string): void {
   pi.on("session_start", (_event: unknown, ctx: any) => {
     if (!ctx.hasUI) return;
     const autoCompact = compactionEnabled(ctx.cwd);
-    ctx.ui.setHeader((_tui: unknown, theme: any) => ({ render: () => headerLines(theme, updated) }));
+    ctx.ui.setHeader((_tui: unknown, theme: any) => {
+      dim = (text: string) => theme.fg("dim", text);
+      return { render: () => headerLines(theme, updated) };
+    });
     ctx.ui.setFooter((_tui: unknown, theme: any, footerData: any) => ({
       render: (width: number) => {
         const usage = ctx.getContextUsage();

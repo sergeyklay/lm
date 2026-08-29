@@ -194,7 +194,7 @@ a case nobody wrote for it, and the second entry in this file's record of why a 
 written down first. Dropping the version from the row reddens the case that reads it, and drawing
 the row in the harness's own warning colour reddens the case that requires the theme's grey, each
 leaving the other green, which is what says the text and its colour are pinned apart rather than
-twice. Counted 2026-08-29 with `node tests/chrome.mts | grep -c '^ok'` at 89.
+twice. Counted 2026-08-30 with `node tests/chrome.mts | grep -c '^ok'` at 100.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
@@ -224,14 +224,13 @@ on a copy of the fixture through a pseudo-terminal and ends it with an end of in
 the case that derives an all-worked session from the same fixture, and that pair is what separates
 the count from the form it prints.
 
-Eleven mutations of the block in `src/chrome.mts` each redden the set predicted for them before they
+Ten mutations of the block in `src/chrome.mts` each redden the set predicted for them before they
 were planted. Restoring the withheld failure clause reddens four, among them the two cases that
 exist because that clause used to be withheld. Dropping the cached half of a model's input reddens
 four, left-aligning the numeric columns reddens seven, and widening every column heading fourfold
 reddens those seven and the case that holds the block to eighty columns. Blanking the session
-identifier reddens five, writing the resume line as `lm chat --session` reddens three, printing that
-line for a session with no record to name reddens only the case that counts the block's paragraphs,
-and collapsing the sitting to zero reddens four. Three narrow the attribution of a model's
+identifier reddens five, printing the resume paragraph for a session with no record to name reddens
+only the case that counts the block's paragraphs, and collapsing the sitting to zero reddens four. Three narrow the attribution of a model's
 spend: ignoring usage an entry carries rather than a message reddens the two compaction cases,
 renaming the model in force before anything has declared one reddens the case that reads `unknown`,
 and dropping the declaration entry from the walk reddens the case written for it. That last is the
@@ -265,8 +264,9 @@ the case written for that fallback and reddened three, because a reopened sessio
 branch; narrowed to leave that branch alone, it reddens the one case and nothing else. A prediction
 short of the kill set is the finding, not the disappointment.
 
-The last line of the block is a command, and which of the two forms it takes depends on where the
-session is kept, so six further mutations separate them. Printing the identifier whatever the
+The last two lines of the block are a command, and which of the two forms it takes depends on where
+the session is kept, so six further mutations separate them. Every case below reads that command;
+the ones added with it that read the block's counts instead survive all six. Printing the identifier whatever the
 directory says reddens five: the three unit cases holding a session outside the harness's default
 session directory, the one that quotes a path a shell would split, and the pair driven through the
 pseudo-terminal on a session `--session-dir` put elsewhere. Printing the file whatever the directory
@@ -283,6 +283,46 @@ cases at once, the two locations swapping lines, which is what says the method i
 than merely being present. The series was itself perturbed before it was believed: replanted on an
 anchor occurring seven times, the driver refused the mutation rather than patching the first hit,
 which is the zero this record would otherwise have had to explain.
+
+The command names `--resume` and prints over two lines in the theme's own grey, and nine further
+mutations across `src/chrome.mts` and `bin/lm` separate the three claims in that sentence. Writing
+the command as `lm --session` again reddens eight: the five unit cases that read the last paragraph
+of the block, the two driven through a pseudo-terminal that read it back off the screen, and the one
+counting the resume lines the screen ends on, which comes back 1 because the second line no longer
+carries the word. Printing the two lines with no colour on them reddens two, the unit case that
+reads the block built with a theme's grey and the pseudo-terminal case that reads the escapes back
+off a capture nothing stripped. Not keeping the theme at all, which is the other half of the same
+claim, reddens exactly that second one and no unit case, because every unit case hands the block a
+colour of its own: the block is written after the harness has stopped the TUI, and the only thing
+that can say the header callback kept one for then is a terminal read back with its escapes still
+in it. The five cases that hold the block to what it says survive all three, and the case that quits
+a session holding a question and no answer survives them too.
+
+Four aim at the translation in `bin/lm` and one at the case it exposed. A guard that matches neither
+`--resume` nor `-r` reddens four: the two `tests/cli.mts` cases that read back which session the
+harness was asked for, and the two pseudo-terminal cases that reopen a session by the command the
+block prints. Handing the identifier over and leaving a copy behind reddens three, the two
+pseudo-terminal cases again and the one requiring the reopened chat to have asked the model nothing,
+which is the case that would otherwise survive a mutant of the line it was written for: with the
+translation gone entirely the picker opens, no chat is reached, and a screen with no error on it
+reads exactly like a clean run. Dropping the guard on `--` reddens only the case that reads the
+words the chat was handed back off the harness's JSON mode, and the substitution it makes is visible
+in the failure - `--session,zzzmarker` where `--resume,zzzmarker` was typed - which is why that case
+reads the words rather than asking whether a session was looked up: the harness treats both as text,
+so no lookup happens either way. Taking a flag after `--resume` as the name it wanted reddens only
+its own case, which reads `--continue` back as the session the harness went looking for.
+
+The fifth is the finding. Reading a missing argument as an empty string was predicted to redden the
+case pinning that a bare `--resume` reaches the harness's own list, and reddened nothing: an empty
+name is one the harness reads as no session at all, so it opened a new chat and looked nothing up,
+which is what that case asserted. Two lines produce the same absence and the case could not say
+which. Rewritten to require the picker's own label on the screen, it reddens under the same mutant,
+because a translated bare flag opens a chat and draws no picker. The anchor rule earned its place
+here too, and by a route the earlier series did not meet: `dim(` occurs twice in `src/chrome.mts`
+and both occurrences are on one line, so a gate counting lines reports 1 and passes an anchor a gate
+counting occurrences refuses. Replanted there, the mutant meant for the command patched the label
+above it and returned the kill set of the colour mutant instead - two cases, a clean-looking kill of
+a property nobody was testing.
 
 The harness writes a resume line of its own after that one and the chat drops it as it is written,
 so six further mutations aim at the wrap that does the dropping. Never installing the wrap reddens
@@ -494,8 +534,8 @@ is split across the two runners because the resolution is: `libexec/lm-verb` ans
 `bin/lm` dispatches, and each resolves for itself. `tests/cli.mts` stands `lm` in five kinds of
 directory - a repository with no `tools/` of its own, one shadowing a name the installation ships,
 one adding a name it does not, a directory that is no repository at all, and a run with `LM_TOOLS`
-set - and `tests/registry.mts` drives `list()` over two directories on its own. Counted 2026-08-29
-with `node tests/cli.mts | grep -c '^ok'` at 57 and `node tests/registry.mts | grep -c '^ok'` at 53.
+set - and `tests/registry.mts` drives `list()` over two directories on its own. Counted 2026-08-30
+with `node tests/cli.mts | grep -c '^ok'` at 64 and `node tests/registry.mts | grep -c '^ok'` at 53.
 
 Twelve mutations, each predicted by case name before it was planted and each compared as a name
 set. Dropping the project directory from `bin/lm` reddens the six cases that dispatch a verb, run a
@@ -544,7 +584,7 @@ supplies no rows to glob and the `project` marker is a field on a row, so stdout
 byte-identical, including in the one fixture that isolates the `-d` test, a repository where
 `tools` exists as a regular file. An empty kill set under an equivalent mutant indicts neither the
 mutant nor the cases. The Node runner's own guard is a different matter: dropping
-`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 57 and 53 while
+`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 64 and 53 while
 `node bin/lm --help` run inside a repository that has no `tools/` throws `ENOENT` at `lstat` with
 `registry` on the stack, because `--list` leaves `bin/lm` for the shell runner before `registry()`
 is reached and no case stands the Node runner in such a repository. That is the ordinary case for

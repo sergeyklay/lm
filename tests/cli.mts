@@ -41,6 +41,10 @@ check("the workflows have a listing of their own",
 check("no description reaches the listing", false, help.out.includes("Conventional Commits"));
 check("and it says where the detail is", true, help.out.includes("lm <name> --help"));
 check("a workflow is not named in Usage", false, /^  lm ship /m.test(help.out));
+// The identifier is optional there, and saying so is the whole difference between
+// a flag that reopens the chat the closing block named and one that offers a list.
+check("--resume is named as taking an identifier and not needing one",
+  true, /^  lm --resume \[id\] +\S/m.test(help.out));
 
 // A name in the first position claims the help flag, and what comes back is
 // generated from what the file declares: no tool file answers --help itself.
@@ -98,6 +102,44 @@ check("and is told where the flag goes", true, /'--yes' is a verb's option and g
 const misplaced = forwarded(["--dry-run"]);
 check("a verb flag ahead of its verb exits 2", 2, misplaced.code);
 check("and is named while being told", true, /'--dry-run' is a verb's option and goes after the verb/.test(misplaced.err));
+
+// `--resume` is this program's word for reopening a chat and the harness spells
+// the two halves apart, so an identifier after it is handed over as `--session`
+// and only the bare flag reaches the harness's own picker. A name no session
+// carries is what says which of the two the harness was asked for, and it is
+// answered before a provider is resolved, so the run costs no model call.
+// Nothing here reaches a model: the provider is refused, and the session is
+// looked up before it. What the harness looked up is read back rather than the
+// exit status, because the picker and a name that finds nothing both leave 0.
+const OFFLINE = ["-p", "--provider", "nosuchprov"];
+const sought = (err: string) => /No session found matching '(.*)'/.exec(err)?.[1];
+const soughtBy = (args: string[]) => sought(forwarded([...OFFLINE, ...args]).err);
+check("an identifier after --resume is the session the harness looks for",
+  "nosuchsession", soughtBy(["--resume", "nosuchsession"]));
+check("and -r is the same word", "nosuchsession", soughtBy(["-r", "nosuchsession"]));
+// Naming no session is not the same as offering the list: an empty name is one
+// the harness reads as no session at all and opens a new chat on, so the picker
+// it draws is what says which of the two it was asked for.
+const bare = forwarded([...OFFLINE, "--resume"]).err;
+check("with nothing after it, it names no session", undefined, sought(bare));
+check("and reaches the harness's own list instead", true, /Resume Session/.test(bare));
+check("and a flag after it is a flag rather than the name it wanted",
+  undefined, soughtBy(["--resume", "--continue"]));
+// `lm --help` promises everything after `--` is text, dashes and all. The words
+// the chat was handed are read back off the harness's own JSON mode, because the
+// harness reads them as text either way and no session lookup would notice one of
+// them rewritten. Its own directory, to turn the retries off there: the endpoint
+// points nowhere, and the words are printed before the request that fails.
+const textDir = mkdtempSync(join(tmpdir(), "lm-text-"));
+writeFileSync(join(textDir, "settings.json"), '{"retry":{"enabled":false,"maxRetries":0}}');
+const asText = spawnSync(LM, ["-p", "--mode", "json", "--model", "nosuchmodel", "--", "--resume", "zzzmarker"], {
+  encoding: "utf8", cwd: ROOT,
+  env: { ...process.env, LM_LOG: "", PI_OFFLINE: "1", LM_OLLAMA: "http://127.0.0.1:1", PI_CODING_AGENT_DIR: textDir },
+});
+const asked = [...(asText.stdout ?? "").matchAll(/"role":"user","content":\[\{"type":"text","text":"([^"]*)"/g)];
+check("everything after -- reaches the chat as the words that were typed",
+  ["--resume", "zzzmarker"], [...new Set(asked.map((m) => m[1]))]);
+rmSync(textDir, { recursive: true, force: true });
 rmSync(agentDir, { recursive: true, force: true });
 
 const stats = spawnSync(LM, ["stats"], { encoding: "utf8", cwd: ROOT });

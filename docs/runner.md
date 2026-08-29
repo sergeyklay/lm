@@ -14,9 +14,12 @@ that file declares, while `lm --help` is a question about `lm`. Nothing in a too
 runner's and pass through to it, and `-h` and `--help`, which it answers itself. `--dry-run` and
 `--yes` belong to a verb and go after it, and leading one of them is refused by name and told
 where the flag goes, because the harness that would read it there has never heard of a verb to
-put it behind. Anything else that starts with a dash is the chat's and reaches it unread, so
+put it behind. Anything else that starts with a dash is the chat's, so
 every flag the harness takes is available from `lm` without this file naming one of them, and a
 flag neither side takes is refused by name by the harness that parses it, before a session opens.
+One word of that is read on the way past rather than only forwarded: `--resume` and `-r`, whose
+argument goes over as `--session`, because reopening a chat is what the closing block tells the
+operator to type and the harness spells the naming and the choosing as two different flags.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
 extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`, and every
@@ -117,8 +120,13 @@ of those settings it writes itself, once each and silently, because a message ab
 did not ask for is the noise it removes: the harness lists every resource it loaded on each launch
 unless `quietStartup` is set and there is no flag for it, and the thinking level above is the other.
 A value already there is left alone in both cases. A past session is reopened from `lm` itself rather than from a
-subcommand: `lm --continue` takes the most recent one, `lm --resume` offers the list to choose
-from, and `lm --session` names one by file or by identifier.
+subcommand: `lm --continue` takes the most recent one, and `lm --resume`, or `-r`, takes the
+identifier or the file the closing block printed, or offers the list to choose from when nothing
+follows it. The harness spells those two apart, taking a name on `--session` and nothing at all on
+its own `--resume`, so `lm` hands a name over as the first and leaves the bare flag as the second.
+A flag after `--resume` is a flag rather than the name it wanted, and everything after `--` stays
+text, dashes and all. Untranslated, a name there is a word the harness has no flag for, and it
+would reach the reopened chat as the first thing it was asked.
 
 It wears this project's own header and status rows rather than the harness's. The header is the
 mark, the name and the version `package.json` declares, one dim row naming what to type, and the
@@ -147,8 +155,11 @@ record and no `History` row is printed for it. Every figure is a count, and none
 another, because a share below this project's stated minimum sample is withheld and one session is
 never that sample. A count of zero is printed rather than withheld, so a session that ran no tool
 says `0 ran, 0 failed`: a zero you cannot see cannot be told apart from a figure nothing computes.
-The last line is the command that reopens the session, in the form `lm` itself takes, and which of the
-two forms it takes depends on where the session is kept. An identifier resolves against the harness's
+The block closes on two lines, `Resume this session with:` and the command itself, both in the grey
+the status row spends on the thinking level. The block is written once the harness has stopped the
+TUI, where the theme a header or footer callback is handed is out of scope, so the header callback
+keeps that one colour for then and the block goes out as plain text when no header was ever drawn.
+Which of the two forms the command takes depends on where the session is kept. An identifier resolves against the harness's
 default session directory and nowhere else, so a session held there is named by its identifier, which
 is short and is the same string the row at the top of the block already showed. A session held
 anywhere else, which is what `--session-dir` produces, is named by its file instead, because that path
