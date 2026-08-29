@@ -8,7 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -307,6 +307,28 @@ check("a short session is counted in seconds", "45s", formatDuration(45_000));
 check("a round one drops the seconds", "5m", formatDuration(300_000));
 check("and a long one drops them for the minutes", "2h 5m", formatDuration(7_500_000));
 
+// The harness writes a resume line of its own after the last shutdown handler
+// has returned, saying what the block already said under the name of another
+// program. It is dropped by wrapping the write for one chunk, and the block
+// itself is written through that wrap: what the harness dims is the same word
+// this project's own last line opens on, so the match is on the whole opening
+// of the harness's line and nothing shorter.
+const HARNESS_LINE = "\x1b[2mTo resume this session:\x1b[22m pi --session 01a04900\n";
+const written: unknown[] = [];
+const sink = { write: (chunk: unknown) => { written.push(chunk); return true; } };
+const passthrough = sink.write;
+dropHarnessResume(sink);
+const own = `\n${block(entries)}\n`;
+check("this project's own block is not what the wrap is looking for", own,
+  (sink.write(own), String(written.at(-1))));
+check("and a chunk that is not text is passed on rather than read", "<binary>",
+  (() => { try { sink.write(Buffer.from("<binary>")); return String(written.at(-1)); } catch (e) { return `threw ${e}`; } })());
+check("the harness's own resume line is dropped", 2,
+  (sink.write(HARNESS_LINE), written.length));
+check("and the original write is back the moment it has been", true, sink.write === passthrough);
+check("so a second line like it reaches the terminal", HARNESS_LINE,
+  (sink.write(HARNESS_LINE), String(written.at(-1))));
+
 // The unit cases above say the block is right. This says the harness reaches the
 // handler that prints it, on the quit path and to the terminal it has already
 // restored, which no assertion over `summarize` can show.
@@ -371,9 +393,14 @@ check("the elapsed figure it prints is this sitting alone", true, /^\d+s$/.test(
 check("and the conversation it reopened is the row under it", true, /^\d+h( \d+m)?$/.test(figure("History")));
 check("set off by a blank line from the frame the harness restored", true,
   printed.includes("\n\nSession   01a04900"));
-check("and prints it above the harness's own resume line", true,
-  printed.indexOf("Session   01a04900") >= 0
-    && printed.indexOf("Session   01a04900") < printed.indexOf("To resume this session"));
+// The harness prints a resume line of its own under the name it was installed
+// as, saying what the block already said. It is swallowed as it is written, and
+// this case is what notices a harness that changes its wording, because the
+// operator would otherwise be the one to notice.
+check("and the harness's own resume line never reaches the screen", false,
+  printed.includes("To resume this session"));
+check("leaving one resume line on it, this project's own", 1,
+  printed.split("\n").filter((l) => /[Rr]esume/.test(l)).length);
 
 // A session flag is the chat's and `lm` claims none of them, so the same session
 // reopens without the subcommand in front. The closing block is the proof, because

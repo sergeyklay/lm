@@ -194,7 +194,7 @@ a case nobody wrote for it, and the second entry in this file's record of why a 
 written down first. Dropping the version from the row reddens the case that reads it, and drawing
 the row in the harness's own warning colour reddens the case that requires the theme's grey, each
 leaving the other green, which is what says the text and its colour are pinned apart rather than
-twice. Counted 2026-08-29 with `node tests/chrome.mts | grep -c '^ok'` at 83.
+twice. Counted 2026-08-29 with `node tests/chrome.mts | grep -c '^ok'` at 89.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
@@ -282,6 +282,26 @@ cases at once, the two locations swapping lines, which is what says the method i
 than merely being present. The series was itself perturbed before it was believed: replanted on an
 anchor occurring seven times, the driver refused the mutation rather than patching the first hit,
 which is the zero this record would otherwise have had to explain.
+
+The harness writes a resume line of its own after that one and the chat drops it as it is written,
+so five further mutations aim at the wrap that does the dropping. Never installing the wrap reddens
+exactly two, both driven through the pseudo-terminal: the case requiring the harness's line to be
+absent, and the one counting the resume lines on the screen, which comes back 2. Never restoring the
+original write reddens the two unit cases written for the restore and nothing driven through the
+terminal, because the process writes nothing after that line and exits, so only a second line like
+it, offered to a sink, says whether the wrap came off; under the mutant that sink still holds the
+chunk before it. Reading the chunk without stripping its escapes reddens four, since the harness
+dims its label and the line then no longer opens on the words the match is anchored to. Broadening
+the match to any chunk carrying `resume` reddens nine: this project's own block is written through
+the wrap deliberately, so a match loose enough to take the block takes it, and the eight cases that
+read the block off the terminal go red beside the unit case written for that property. The case
+counting resume lines survives that one and is worth knowing as coarse, because the harness's line
+prints once the wrap has come off on the block and the count is one either way. The fifth is the
+finding: dropping the guard that requires a text chunk was predicted to redden only the case that
+writes a buffer through the wrap and reddened two, the second being the case after it, which counts
+what the sink received and is one short because the throw happened before the buffer got there. That
+buffer case reads a throw as a value rather than letting it end the run, which is the whole reason a
+mutant crashing where it is planted still has a kill set anyone can attribute.
 
 `node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it
 exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,

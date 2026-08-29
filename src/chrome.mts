@@ -262,6 +262,24 @@ export function summaryBlock(s: Summary): string[] {
   ];
 }
 
+// The harness writes a resume line of its own once every shutdown handler has
+// returned, and offers no way to stop it: nothing fires after that event, and
+// neither the line nor the path that writes it is exported. So the write is
+// wrapped for exactly one chunk. This project's own block is written through
+// the wrap, which is what holds the match to the harness's line alone.
+const HARNESS_RESUME = /^To resume this session:/;
+
+export function dropHarnessResume(out: { write: (chunk: any, ...rest: any[]) => boolean }): void {
+  const original = out.write;
+  out.write = function (chunk: any, ...rest: any[]): boolean {
+    if (typeof chunk === "string" && HARNESS_RESUME.test(chunk.replace(ANSI, ""))) {
+      out.write = original;
+      return true;
+    }
+    return original.call(this, chunk, ...rest);
+  };
+}
+
 // Everything this project draws on the chat's screen. Without a terminal there
 // is nothing to draw on.
 export function installChrome(pi: any, updated?: string): void {
@@ -285,7 +303,9 @@ export function installChrome(pi: any, updated?: string): void {
       { launchedAt: performance.timeOrigin, endedAt: Date.now() },
       { file: manager.getSessionFile(), isDefaultDir },
     );
-    if (summary) process.stdout.write(`\n${summaryBlock(summary).join("\n")}\n`);
+    if (!summary) return;
+    dropHarnessResume(process.stdout);
+    process.stdout.write(`\n${summaryBlock(summary).join("\n")}\n`);
   });
 
   // The header is built before extensions initialise, and `setHeader` is a no-op
