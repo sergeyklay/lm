@@ -8,7 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version } from "../src/chrome.mts";
+import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, type Sitting } from "../src/chrome.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
@@ -135,8 +135,13 @@ function load(file: string) {
   return { head: records.find((r) => r.type === "session"), entries: records.filter((r) => r.type !== "session") };
 }
 const { head, entries } = load(FIXTURE);
-const block = (es: any[], h: any = head) => {
-  const s = summarize(h, es);
+// Both fixtures are sessions this launch opened, so the sitting runs from a
+// launch a second ahead of the session record to the moment the last entry was
+// written: what the block says of them is what it said on the day.
+const RECORD = Date.parse("2026-08-28T20:00:00.000Z");
+const OPENED: Sitting = { launchedAt: RECORD - 1000, endedAt: Date.parse("2026-08-28T20:12:30.000Z") };
+const block = (es: any[], h: any = head, sitting: Sitting = OPENED) => {
+  const s = summarize(h, es, sitting);
   return s === null ? null : summaryBlock(s).join("\n");
 };
 const part = (text: string | null, n: number) => String(text).split("\n\n")[n];
@@ -206,15 +211,26 @@ check("and a model declared before the first reply is charged for what ran under
   + "qwen3.8:27b      1     500       0       20\ntotal            1     600       0       25",
   part(block(declared, null), 1));
 
-// The span is the session's own, and the session record is what opens it: the
-// first entry is written after the model and the thinking level are settled.
+// The first figure is this sitting, and a session this launch created opens it at
+// its own record: the first entry is written after the model and the thinking
+// level are settled, and the launch runs before the record exists.
+const record = (ms: number) => ({ id: "01a04900-0000-7000-8000-00000000c0de", timestamp: new Date(ms).toISOString() });
 check("the span opens at the session record rather than at the first entry",
-  "Time      1m", String(block([at(60_000, turn(500, 20))], { id: "01a04900-0000-7000-8000-00000000c0de", timestamp: new Date(0).toISOString() })).split("\n")[2]);
-check("and falls back to the entries when there is no session record",
-  "Tools   0 ran, 0 failed\nTime    0s", part(block([at(60_000, turn(500, 20))], null), 0));
+  "Time      1m 30s",
+  String(block([at(62_000, turn(500, 20))], record(2000), { launchedAt: 1000, endedAt: 92_000 })).split("\n")[2]);
+// A session older than the launch was reopened, so what this sitting cost and
+// what the whole conversation cost are two facts and get a row each.
+check("a session opened before this launch reports the sitting and the conversation under it",
+  "Time      2m\nHistory   12m 30s",
+  String(block(entries, head, { launchedAt: RECORD + 750_000, endedAt: RECORD + 870_000 })).split("\n").slice(2, 4).join("\n"));
+check("and a session this launch opened reports the sitting alone", false,
+  String(block(entries)).includes("History"));
+check("and opens the sitting at the launch when there is no session record",
+  "Tools   0 ran, 0 failed\nTime    1m", part(block([at(60_000, turn(500, 20))], null, { launchedAt: 30_000, endedAt: 90_000 }), 0));
 // Without a session record there is no identifier, and a resume command naming
 // none would not reopen anything.
-check("which also leaves nothing to resume", 2, String(block([at(60_000, turn(500, 20))], null)).split("\n\n").length);
+check("which also leaves nothing to resume", 2,
+  String(block([at(60_000, turn(500, 20))], null, { launchedAt: 30_000, endedAt: 90_000 })).split("\n\n").length);
 
 // Nothing was asked and nothing was answered, so there is nothing to report.
 check("a session that never reached the model prints nothing", null,
@@ -264,6 +280,12 @@ const BLOCK = ["Session   01a04900-0000-7000-8000-00000000c0de", "Tools     3 ra
   "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"];
 check("quitting the chat prints the closing block on the restored terminal", true,
   BLOCK.every((l) => printed.includes(l)));
+// The two figures differ only where a session outlived a launch, and this run is
+// that: the fixture's own record is dated before any run of this suite, while the
+// sitting is the seconds this case spends in the chat before ending it.
+const figure = (label: string) => (new RegExp(`^${label} +(.+)$`, "m").exec(printed)?.[1] ?? "");
+check("the elapsed figure it prints is this sitting alone", true, /^\d+s$/.test(figure("Time")));
+check("and the conversation it reopened is the row under it", true, /^\d+h( \d+m)?$/.test(figure("History")));
 check("set off by a blank line from the frame the harness restored", true,
   printed.includes("\n\nSession   01a04900"));
 check("and prints it above the harness's own resume line", true,

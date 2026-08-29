@@ -188,7 +188,7 @@ four, left-aligning the numeric columns reddens seven, and widening every column
 reddens those seven and the case that holds the block to eighty columns. Blanking the session
 identifier reddens five, writing the resume line as `lm chat --session` reddens three, printing that
 line for a session with no record to name reddens only the case that counts the block's paragraphs,
-and collapsing the elapsed span to zero reddens two. Three narrow the attribution of a model's
+and collapsing the sitting to zero reddens four. Three narrow the attribution of a model's
 spend: ignoring usage an entry carries rather than a message reddens the two compaction cases,
 renaming the model in force before anything has declared one reddens the case that reads `unknown`,
 and dropping the declaration entry from the walk reddens the case written for it. That last is the
@@ -204,8 +204,23 @@ something reads the terminal back. One more is a control for the procedure rathe
 dropping the cached half of the input from the totals the status row is built from reddens nothing
 at all, though the footer read back through the pseudo-terminal shows `↑37.0k` where a clean run
 shows `↑40.0k`. Nothing in the suite reads what the status row counts. Of the duration forms,
-dropping the round-minute case reddens two, the case written for it and the one that pins where the
-elapsed span opens.
+dropping the round-minute case reddens three: the case written for it and the two that read a whole
+number of minutes off the block.
+
+The block carries two elapsed figures, the sitting and the conversation behind it, and six further
+mutations separate them. Neutralising the condition for the second row reddens three, and swapping
+the two figures reddens the same three: the unit case that reads both rows, and the pair driven
+through the pseudo-terminal, which is the only place the two figures differ, because the fixture's
+own record is dated before any run of the suite and the sitting is the seconds the case spends in
+the chat. Opening the
+sitting at the launch whatever the session record says reddens two, the case that pins where a fresh
+sitting opens and the one that reads the whole head of the block off the fixture. Reporting the
+conversation whether or not the session outlived the launch reddens three, among them the case that
+exists because a fresh session prints one row. The sixth is the one worth keeping: opening a
+record-less sitting at the first entry, which is what shipped before, was predicted to redden only
+the case written for that fallback and reddened three, because a reopened session takes the same
+branch; narrowed to leave that branch alone, it reddens the one case and nothing else. A prediction
+short of the kill set is the finding, not the disappointment.
 
 `node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it
 exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,
@@ -213,7 +228,10 @@ which every module under `src/` and `tests/` does, while the same bytes saved as
 rejected as they should be. The gate that works is an import: `node -e 'import(process.argv[1])'`
 on the mutated file throws the `SyntaxError` `--check` swallowed. An ungated mutant that does not
 parse reddens every case at once, which is the shape that reads like coverage and demonstrates
-nothing, so a gate that never objects is worse here than no gate at all.
+nothing, so a gate that never objects is worse here than no gate at all. Give that import an
+absolute path: handed `src/chrome.mts` it dies on `Cannot find package 'src'`, which is a gate that
+rejects every mutant including the ones that parse, and reads exactly like one that objects for the
+right reason.
 One group covers the one `apply` whose command line nothing else sees. Every other verb hands its
 command what `render` already printed, so the golden fixtures cover it without `git` or `gh` being
 called; `issue` assembles a `--label` list from what the human typed, and that list had only ever

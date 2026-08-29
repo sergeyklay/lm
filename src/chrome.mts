@@ -152,8 +152,13 @@ export type Summary = {
   tools: number;
   failed: number;
   models: ModelSpend[];
-  ms: number;
+  sittingMs: number;
+  historyMs: number | undefined;
 };
+
+// When this launch began and when it ended. The first bounds the sitting the
+// operator just had; a session record older than it is one they reopened.
+export type Sitting = { launchedAt: number; endedAt: number };
 
 // A compaction is a model call whose entry names no model, so usage that names
 // none is charged to the model in force when it was spent.
@@ -180,19 +185,23 @@ function spendByModel(entries: Iterable<any>): ModelSpend[] {
 // Every figure here is a count of what this session did. None is divided by
 // another, because a share below this project's stated minimum sample is
 // withheld and one session is never that sample.
-export function summarize(header: any, entries: any[]): Summary | null {
+export function summarize(header: any, entries: any[], sitting: Sitting): Summary | null {
   const messages = entries.filter((e) => e?.type === "message");
   if (!messages.some((e) => e.message?.role === "assistant")) return null;
   const results = messages.filter((e) => e.message?.role === "toolResult");
   const stamps = [header?.timestamp, ...entries.map((e) => e?.timestamp)]
     .map((t) => Date.parse(String(t)))
     .filter((n) => Number.isFinite(n));
+  const opened = Date.parse(String(header?.timestamp));
+  const resumed = opened < sitting.launchedAt;
+  const started = Number.isFinite(opened) && !resumed ? opened : sitting.launchedAt;
   return {
     id: typeof header?.id === "string" ? header.id : undefined,
     tools: results.length,
     failed: results.filter((e) => e.message.isError === true).length,
     models: spendByModel(entries),
-    ms: stamps.length > 1 ? Math.max(...stamps) - Math.min(...stamps) : 0,
+    sittingMs: sitting.endedAt - started,
+    historyMs: resumed ? Math.max(...stamps) - Math.min(...stamps) : undefined,
   };
 }
 
@@ -223,7 +232,8 @@ export function summaryBlock(s: Summary): string[] {
   const head: string[][] = [
     ...(s.id ? [["Session", s.id]] : []),
     ["Tools", `${s.tools} ran, ${s.failed} failed`],
-    ["Time", formatDuration(s.ms)],
+    ["Time", formatDuration(s.sittingMs)],
+    ...(s.historyMs === undefined ? [] : [["History", formatDuration(s.historyMs)]]),
   ];
   const label = Math.max(...head.map(([name]) => name.length));
   return [
@@ -243,7 +253,13 @@ export function installChrome(pi: any): void {
   // by then, so it goes to the restored terminal rather than to a frame.
   pi.on("session_shutdown", (event: any, ctx: any) => {
     if (event?.reason !== "quit" || !ctx.hasUI) return;
-    const summary = summarize(ctx.sessionManager.getHeader(), ctx.sessionManager.getEntries());
+    // The launch is the process's own start rather than the first session_start,
+    // which fires again for a reload and rebuilds this extension while the same
+    // sitting carries on.
+    const summary = summarize(ctx.sessionManager.getHeader(), ctx.sessionManager.getEntries(), {
+      launchedAt: performance.timeOrigin,
+      endedAt: Date.now(),
+    });
     if (summary) process.stdout.write(`\n${summaryBlock(summary).join("\n")}\n`);
   });
 

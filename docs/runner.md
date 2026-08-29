@@ -93,15 +93,21 @@ and footer while it tears the extension UI down, so the last frame you see on qu
 not this one's.
 
 Quitting then prints a block of what the session did: the session's identifier, how many tools it
-ran and how many of those failed, how long it lasted, and a table of what each model was asked and
-what it spent, one row per model with a total row under them when more than one answered. The
-elapsed figure is measured from the session's own first record to its last rather than from a clock
-this code starts; resuming a session and quitting therefore reports the whole span, including the
-part that happened before the resume. Every figure is a count, and none is divided by another,
-because a share below this project's stated minimum sample is withheld and one session is never that
-sample. A count of zero is printed rather than withheld, so a session that ran no tool says
-`0 ran, 0 failed`: a zero you cannot see cannot be told apart from a figure nothing computes. The
-last line is the command that reopens the session, in the form `lm` itself takes. A session that
+ran and how many of those failed, how long the sitting lasted under `Time`, and a table of what each
+model was asked and what it spent, one row per model with a total row under them when more than one
+answered. `Time` is this sitting alone, from the moment the session opened in this launch to the
+moment you quit. A session whose own record was written before this launch started is one you
+reopened, and a second row, `History`, carries the whole conversation's span, from that record to
+the newest entry in it. The condition for that row is exact rather than a threshold and compares no
+durations, so a session opened fresh prints `Time` and nothing else. The launch is the process's own
+start rather than the first `session_start` event: the harness fires that again for a reload, and
+rebuilds this extension with it, while the chat carries on. A session the launch itself creates, at
+startup or through `/new`, has a record younger than the process, so its sitting opens at that
+record and no `History` row is printed for it. Every figure is a count, and none is divided by
+another, because a share below this project's stated minimum sample is withheld and one session is
+never that sample. A count of zero is printed rather than withheld, so a session that ran no tool
+says `0 ran, 0 failed`: a zero you cannot see cannot be told apart from a figure nothing computes.
+The last line is the command that reopens the session, in the form `lm` itself takes. A session that
 never reached the model prints nothing at all, since nothing was asked and nothing was answered. The
 block is written on `session_shutdown`, which also fires for a reload and for each of the three ways
 a session is replaced, so only the quit reason prints one. By then the harness has stopped the TUI,
