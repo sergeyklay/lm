@@ -4,6 +4,7 @@
 // directory, so the property under test is that nothing here knows the names:
 // a fifth tool file has to be offered without a file being edited.
 
+import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -169,6 +170,73 @@ check("and the chat reports that refusal too", true, /Declined\. Nothing was app
 
 server.close();
 rmSync(dialogWork, { recursive: true, force: true });
+
+// ---- Which caller the record names. ----------------------------------------
+// The two callers write the same fields, so a verb the chat ran for the operator
+// reads back as one he ran himself. Each side is entered the way it is entered in
+// earnest: `bin/lm` as a process of its own, and the registration above. The
+// fixture refuses in `collect`, so neither side reaches a model.
+
+const callerWork = mkdtempSync(join(tmpdir(), "lm-caller-"));
+const callerTools = join(callerWork, "tools");
+const callerLog = join(callerWork, "log.jsonl");
+mkdirSync(callerTools, { recursive: true });
+writeFileSync(join(callerTools, "refuses.sh"), [
+  'name="refuses"', 'description="refuses before it reaches the model"',
+  'collect() { echo "lm: nothing to work on" >&2; return 3; }',
+  `schema() { echo '{"type":"object"}'; }`,
+  "validate() { cat >/dev/null; }",
+  "render() { cat; }",
+  "",
+].join("\n"));
+writeFileSync(join(callerTools, "flow.sh"), [
+  'name="flow"', 'description="runs the refusing verb and nothing beside it"',
+  'verbs="refuses"', "",
+].join("\n"));
+
+const logged = () => readFileSync(callerLog, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+
+async function ranByTheChat(name: string) {
+  const tools: any[] = [];
+  registerVerbs({ registerTool: (t: any) => tools.push(t) }, list([callerTools]));
+  const was = { cwd: process.cwd(), log: process.env.LM_LOG };
+  process.chdir(callerWork);
+  process.env.LM_LOG = callerLog;
+  try {
+    await tools.filter((t) => t.name === name)[0].execute("id", {}, undefined, undefined, { hasUI: false });
+  } finally {
+    process.chdir(was.cwd);
+    if (was.log === undefined) delete process.env.LM_LOG; else process.env.LM_LOG = was.log;
+  }
+}
+
+spawnSync(join(ROOT, "bin/lm"), ["refuses"], { encoding: "utf8", cwd: callerWork,
+  env: { ...process.env, LM_TOOLS: callerTools, LM_LOG: callerLog } });
+await ranByTheChat("refuses");
+const [typed, chatted] = logged();
+check("a verb the operator typed names the command line", "cli", typed.caller);
+check("and the same verb the chat ran names the chat", "chat", chatted.caller);
+// Without the field these two records are one, so the case reads the whole record
+// rather than the field: a run's timestamp and its wall clock are its own.
+const perRun = ["ts", "ms"];
+check("and nothing else in the record tells the two apart", ["caller"],
+  Object.keys(typed).filter((k) => !perRun.includes(k)
+    && JSON.stringify(typed[k]) !== JSON.stringify(chatted[k])));
+
+// A delivery is where the tag already said something about its caller, and said it
+// in a shape nothing parses. Both fields reach every verb a composition runs.
+await ranByTheChat("flow");
+const composed = logged().slice(-1)[0];
+check("a verb a composition ran for the chat names the chat too", "chat", composed.caller);
+check("beside the composition it belonged to", true, /^flow-[0-9]+-[0-9]+$/.test(composed.composition));
+
+// The set is the code's and not the caller's: a name it does not hold would put a
+// value in the log that `lm stats` has no way to group by.
+spawnSync(join(ROOT, "bin/lm"), ["refuses"], { encoding: "utf8", cwd: callerWork,
+  env: { ...process.env, LM_TOOLS: callerTools, LM_LOG: callerLog, LM_CALLER: "scheduler" } });
+check("a name outside the set is not a caller", "cli", logged().slice(-1)[0].caller);
+
+rmSync(callerWork, { recursive: true, force: true });
 
 // What the chat opens on. `LM_MODEL` is the verb's model and the chat's default,
 // and a model the operator saved inside the chat is their explicit choice: the

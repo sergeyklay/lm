@@ -5,6 +5,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { homedir } from "node:os";
 import { call, apply, applyAsk, meta, type Ask } from "./registry.mts";
+import { callerOf, type Caller } from "./caller.mts";
 import { resolveModel } from "./model.mts";
 import { modelId } from "./provider.mts";
 
@@ -101,8 +102,8 @@ function localIso(d: Date): string {
     + (off < 0 ? "-" : "+") + pad(off / 60) + ":" + pad(off % 60);
 }
 
-// One JSON object per run, in the twenty-one fields `libexec/lm-verb` writes and
-// in that order: `lm stats` is the only reader and every rate rests on the shape.
+// One JSON object per run, in the fields `libexec/lm-verb` writes and in that
+// order: `lm stats` is the only reader and every rate rests on the shape.
 // The six the model reports are null here because /v1/chat/completions carries no
 // timing field at all, and a key set that still matches is what keeps the log one
 // population rather than two.
@@ -111,6 +112,7 @@ function record(r: {
   ms: number; head0: string | null; prompt: string; answer: string | undefined;
   consent: Consent;
   composition: string | null;
+  caller: Caller;
 }): void {
   const log = process.env.LM_LOG ?? `${homedir()}/.lm/runs.jsonl`;
   if (!log) return;
@@ -129,6 +131,7 @@ function record(r: {
       ms: r.ms,
       head_moved: head !== null && head !== r.head0,
       composition: r.composition ?? (process.env.LM_COMPOSITION || null),
+      caller: r.caller,
       which: null,
       prompt_hash: sha(r.prompt),
       answer_hash: r.answer === undefined ? null : sha(r.answer),
@@ -175,7 +178,8 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   // and any other status from a body that reached its question means it was yes.
   const finish = (code: number, prompt: string, consent: Consent = null): Outcome => {
     record({ verb: name, dry: parsed.dry, calls, violations: firstViolations, exit: code,
-             ms: Date.now() - t0, head0, prompt, answer, consent, composition });
+             ms: Date.now() - t0, head0, prompt, answer, consent, composition,
+             caller: callerOf({ ...process.env, ...env }) });
     return { code, calls, attempts };
   };
 

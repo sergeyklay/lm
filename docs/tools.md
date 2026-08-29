@@ -319,6 +319,35 @@ asserted the exit code alone, which the very next guard produces as well, so rem
 under test left the case green - a case that reads a status two lines can produce has to read the
 words too, or it cannot tell which line answered.
 
+Which caller a run came from is written by both runners and read by neither, so its group spans
+the three suites that hold the record's shape: `tests/runner.sh` for the shell writer,
+`tests/chat.mts` for the Node one, and `tests/stats.sh` for a log holding records written on both
+sides of the field's arrival. `tests/chat.mts` enters each caller the way it is entered in earnest,
+`bin/lm` as a process of its own against the registration the chat itself uses, over a fixture that
+refuses in `collect` so neither side reaches a model. Counted 2026-08-29 with `grep -c '^ok'` over
+each suite's output: `tests/runner.sh` at 79, `tests/chat.mts` at 28 and `tests/stats.sh` at 17.
+
+Eight mutations, each predicted by case name before it was planted, each gated, and each confirmed
+by the value the mutated line put in the record. On the Node side: the chat declaring no caller
+reddens 3, giving both callers `cli` and collapsing the case that requires the two records to
+differ in that one field; dropping the field from the record reddens 5, which is every case in the
+group but the one reading the composition tag beside it; `runComposition` dropping the environment
+it is handed reddens only the composed case; and `callerOf` returning whatever it was given rather
+than a member of the set reddens only the case that hands it a name the set does not hold. On the
+shell side: the same widening reddens the same one case, dropping `caller` from the `jq` object
+reddens 4, and hardcoding `cli` reddens the 2 that expect something else, which is what says the
+two callers are pinned apart rather than merely pinned.
+
+The prediction that was wrong is the one worth keeping. Counting only records that carry a caller,
+in the table's own query in `libexec/lm-stats`, was predicted to redden the one case reading the
+runs column and reddened three: the `awk` reads that column as the denominator of the clean share
+too, so an older case pinning the share over a heap died with it. New code killed by a case nobody
+wrote for it, which is the second time this file records that shape.
+
+That mutant is also the group's only evidence for its control. `libexec/lm-stats` is not edited
+here and names no caller, so no mutation of what was written can redden the case that reads a log
+of both shapes; the inserted filter is what shows the case could fail at all.
+
 The last group in the live suite covers the shell the chat carries beside the verbs, and its shape
 is a concession rather than a preference. Asked plainly to commit, this model reached for the shell
 in 4 of 6 sessions measured on 2026-08-27, taking the refusal at its word in the other two, so an
@@ -382,8 +411,8 @@ is split across the two runners because the resolution is: `libexec/lm-verb` ans
 `bin/lm` dispatches, and each resolves for itself. `tests/cli.mts` stands `lm` in five kinds of
 directory - a repository with no `tools/` of its own, one shadowing a name the installation ships,
 one adding a name it does not, a directory that is no repository at all, and a run with `LM_TOOLS`
-set - and `tests/registry.mts` drives `list()` over two directories on its own. Counted 2026-08-28
-with `node tests/cli.mts | grep -c '^ok'` at 57 and `node tests/registry.mts | grep -c '^ok'` at 53.
+set - and `tests/registry.mts` drives `list()` over two directories on its own. Counted 2026-08-29
+with `node tests/cli.mts | grep -c '^ok'` at 56 and `node tests/registry.mts | grep -c '^ok'` at 53.
 
 Twelve mutations, each predicted by case name before it was planted and each compared as a name
 set. Dropping the project directory from `bin/lm` reddens the six cases that dispatch a verb, run a

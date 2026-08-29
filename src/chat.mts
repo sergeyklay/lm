@@ -1,3 +1,4 @@
+import { CALLER } from "./caller.mts";
 import { meta } from "./registry.mts";
 import { runVerb, type Io } from "./verb.mts";
 import { runComposition, type IoFor } from "./composition.mts";
@@ -68,12 +69,14 @@ export function registerVerbs(pi: any, files: string[]): string[] {
           },
         });
 
-        // The tag is per run and not per process: one chat session is one pid, so
+        // The chat declares itself rather than letting the runner infer it from the
+        // tag, which is per run and not per process: one chat session is one pid, so
         // `$$` would tag every delivery of a session identically and `lm stats`
         // would read them as one.
+        const env = { LM_CALLER: CALLER.chat };
         const result = composed
-          ? await runComposition(file, files, argv, `${info.name}-${process.pid}-${++runs}`, io)
-          : await runVerb(file, argv, {}, io(info.name));
+          ? await runComposition(file, files, argv, `${info.name}-${process.pid}-${++runs}`, io, env)
+          : await runVerb(file, argv, env, io(info.name));
 
         const text = [said.trim(), outcome(result.code)].filter((p) => p.length > 0).join("\n\n");
         return {

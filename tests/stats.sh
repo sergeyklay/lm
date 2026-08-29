@@ -110,6 +110,17 @@ check "an unknown argument still exits 2"  "2" "$rc"
 check "and the options are named"          "1" "$(grep -c -- '--all and --since' <<<"$out")"
 teardown
 
+# The record grew a caller after every field above it was settled, so a real log
+# holds both shapes at once. The reader names neither, and a run written before the
+# field has to count exactly as one written after it.
+setup
+period "$BEFORE" 8 8
+for ((i = 0; i < 7; i++)); do rec "$SINCE" true "$REPO" | jq -c '. + {caller:"chat"}' >> "$LM_LOG"; done
+out=$("$STATS" 2>&1)
+check "a log written across the field's arrival is one population" "15" "$(awk '/^stub /{print $2}' <<<"$out")"
+check "and the share is read over all of it"                       "100%" "$(awk '/^stub /{print $3}' <<<"$out")"
+teardown
+
 # An emptied LM_LOG turns logging off, so there is no log to read and no period to
 # report. The refusal comes before the arguments are parsed.
 setup

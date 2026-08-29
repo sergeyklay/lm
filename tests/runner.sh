@@ -189,6 +189,22 @@ lm stub refuse >/dev/null 2>&1
 check "a typed run names none"  "null"    "$(jq -r '.composition' "$work/log.jsonl" | tail -1)"
 teardown
 
+# The caller is a closed set the runner owns, and it sits beside the composition
+# rather than inside it: a delivery still names itself, and a bare run now names
+# whoever asked for it. The command line is the base case and names itself nowhere.
+setup
+lm stub refuse >/dev/null 2>&1
+check "a run nobody claimed is the command line's" "cli"  "$(jq -r '.caller' "$work/log.jsonl")"
+LM_CALLER=chat lm stub refuse >/dev/null 2>&1
+check "a caller that named itself is recorded"     "chat" "$(jq -r '.caller' "$work/log.jsonl" | tail -1)"
+# Free text would let a caller invent a value lm stats cannot group by.
+LM_CALLER=scheduler lm stub refuse >/dev/null 2>&1
+check "a name outside the set is not a caller"     "cli"  "$(jq -r '.caller' "$work/log.jsonl" | tail -1)"
+LM_CALLER=chat LM_COMPOSITION=ship-42 lm stub refuse >/dev/null 2>&1
+check "a composed run carries both"  "ship-42 chat" \
+  "$(jq -r '[.composition,.caller]|join(" ")' "$work/log.jsonl" | tail -1)"
+teardown
+
 # --which can say that nothing serves the request. Without a refusal member the
 # enum forces a verb, and §9.3's «a task that cannot be named as a verb» signal has
 # no surface able to report it.

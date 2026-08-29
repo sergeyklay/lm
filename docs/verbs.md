@@ -52,6 +52,14 @@ composition the run belonged to, or `null` when you typed the verb yourself. A `
 run is logged in the same shape: it names `--which` where a run names its verb, and carries
 the verb it picked, or `none`, in a field every other run leaves `null`.
 
+Each record names the caller it came from, under `caller`: `cli` when you ran the verb yourself,
+`chat` when the chat ran it for you. It sits beside `composition` rather than inside it, so a
+delivery says both which composition a run belonged to and who asked for the delivery, and a run
+that belongs to no composition still says who asked for it. The set is closed and the command line
+is the base case: a caller that is not a person at a prompt names itself in `LM_CALLER` before it
+runs `lm`, and a value the set does not hold is read as `cli`. A record written before the field
+carries no `caller` at all, and `lm stats` reads it beside the rest.
+
 Each record says what happened to the question the verb asked, under `consent`: `given` when you
 answered it, `withheld` when you declined or let the wait run out, `assumed` when the run carried
 `--yes` and nobody was asked, and `null` when the run never got that far - a rehearsal, a verb with

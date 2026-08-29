@@ -20,6 +20,7 @@ export async function runComposition(
   argv: string[],
   tag: string,
   io: IoFor = terminalFor,
+  env: Record<string, string> = {},
 ): Promise<Outcome> {
   const info = meta(file);
   const own = io(info.name);
@@ -31,8 +32,8 @@ export async function runComposition(
 
   // The flags reach the hooks the way they reach a tool: parseArgs turns --here
   // into LM_HERE, so a hook reads its own flag and nothing parses twice.
-  const env = { ...parsed.env, LM_COMPOSITION: tag };
-  const opts = { cwd: process.cwd(), env };
+  const runEnv = { ...parsed.env, ...env, LM_COMPOSITION: tag };
+  const opts = { cwd: process.cwd(), env: runEnv };
   const verbArgv = [
     ...(parsed.dry ? ["--dry-run"] : []),
     ...(parsed.text.length > 0 ? ["--", ...parsed.text] : []),
@@ -74,7 +75,7 @@ export async function runComposition(
     const before = step(`before_${verb}`);
     if (before !== 0) return { code: before, calls, attempts };
 
-    const r = await runVerb(tool, verbArgv, env, io(verb), tag);
+    const r = await runVerb(tool, verbArgv, runEnv, io(verb), tag);
     calls += r.calls;
     attempts += r.attempts;
     code = r.code;
