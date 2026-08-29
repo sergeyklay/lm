@@ -134,7 +134,9 @@ spawnSync(join(ROOT, "bin/lm"), [
   cwd: work,
   encoding: "utf8",
   stdio: ["ignore", "pipe", "pipe"],
-  env: { ...process.env, LM_TOOLS: tools, LM_LOG: chatLog },
+  // A launch updates the harness, so the registry is pointed nowhere: a suite
+  // may not install into the tree it is testing.
+  env: { ...process.env, LM_TOOLS: tools, LM_LOG: chatLog, npm_config_registry: "http://127.0.0.1:1" },
   timeout: 600_000,
 });
 
@@ -186,7 +188,7 @@ function session(f: ReturnType<typeof fixture>, prompt: string, extra: string[])
     cwd: f.repo,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, LM_LOG: f.log, LM_TOOLS: join(ROOT, "tools") },
+    env: { ...process.env, LM_LOG: f.log, LM_TOOLS: join(ROOT, "tools"), npm_config_registry: "http://127.0.0.1:1" },
   });
   return existsSync(f.log)
     ? readFileSync(f.log, "utf8").trim().split("\n").filter((l) => l).map((l) => JSON.parse(l))
