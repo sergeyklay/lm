@@ -78,6 +78,39 @@ declaration that only the refresh produced would be a declaration the operator's
 sees: it would reach the model selector and not the request. `PI_OFFLINE` switches that first read
 off exactly as it switches the refresh off.
 
+The chat never advertises its own updates, and never needs to, because it installs them itself
+before the harness is imported. The harness carries a version check of its own that draws a banner
+above the prompt naming a command to run, and `bin/lm` sets `PI_SKIP_VERSION_CHECK` to retire it: a
+variable the program sets travels with the clone, where a settings key would have to be put on every
+machine by hand. In its place the launch reads the range `package.json` declares for the harness,
+asks npm's own configured registry which versions exist, so an operator on a private one is asked
+the same registry npm will install from, and takes the newest that range admits. `^0.84.3`
+carries every `0.84.x` by itself; the move to `0.85` is a commit, because that is the move that can
+break the extension this project registers. When the version it picks is the one already installed,
+nothing is installed and nothing is said. Otherwise npm installs it into this clone alone, under
+`--no-save`, which leaves `package.json` and `package-lock.json` byte for byte as they were, so the
+operator's working tree stays clean and the range still says what the operator wrote. Because it
+lands before the harness is imported, the session opens on the new version and no restart is asked
+for: the header carries one dim row naming the version it moved to, and a launch that moved nothing
+carries no row.
+
+Only the chat pays for any of this. A verb makes no registry request and no version check, so
+`lm commit` costs what it always did. The one request the launch does make is bounded at two
+seconds, as the catalogue read beside it is, and asks for the abbreviated packument rather than the
+whole document. Measured on 2026-08-29: 66822 bytes against 232475, and 113 ms cold then 32 ms warm
+over five requests. `curl -s -H 'accept: application/vnd.npm.install-v1+json'
+https://registry.npmjs.org/@earendil-works%2fpi-coding-agent | wc -c` re-derives the first size, and
+the same command without the header the second. The install that may follow is not bounded, because
+killing npm part way through leaves a half-written package tree nothing here could repair, and it
+is paid once per release rather than once per launch. Every other way this can go wrong is silent:
+no network, no npm, an install directory nothing may write to, a registry that answers slowly or
+with rubbish, each leaves the chat opening on the version already installed with nothing printed,
+because an update that did not happen is not news. `PI_OFFLINE` switches the request off entirely,
+as it switches the catalogue read off.
+
+The one thing this leaves for the operator is `npm ci`, which reinstalls from the lock and so puts
+the harness back to the version the lock names. The next launch installs the newest in range again.
+
 The chat keeps its settings, its credentials and its session history in the harness's own
 directory under the home directory, outside this repository, and writes there as you use it. Two
 of those settings it writes itself, once each and silently, because a message about a setting you
@@ -88,7 +121,8 @@ subcommand: `lm --continue` takes the most recent one, `lm --resume` offers the 
 from, and `lm --session` names one by file or by identifier.
 
 It wears this project's own header and status rows rather than the harness's. The header is the
-mark, the name and the version `package.json` declares, and one dim row naming what to type; the
+mark, the name and the version `package.json` declares, one dim row naming what to type, and the
+update row above when a launch installed one; the
 status rows carry the working directory, the branch when there is one and the model, then the
 context against its window, what the session has spent beside it, and the thinking level the
 session is at. Both are installed on `session_start`,

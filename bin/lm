@@ -3,6 +3,13 @@ import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { existsSync, realpathSync } from "node:fs";
 
+// The harness advertises its own updates on a banner above the prompt, and this
+// program installs them itself instead. The variable is the switch its own
+// version check reads, and it is set here rather than in a settings file so it
+// travels with the clone and needs nothing installed on the machine. Every
+// import of the harness below is dynamic, so this runs first.
+process.env.PI_SKIP_VERSION_CHECK = "1";
+
 const libexec = join(dirname(realpathSync(process.argv[1])), "..", "libexec");
 const argv = process.argv.slice(2);
 
@@ -152,6 +159,12 @@ if (argv.length > 0 && argv[0] !== "chat" && !argv[0].startsWith("-")) {
   process.exit((await runVerb(file, argv.slice(1))).code);
 }
 
+// Before the harness is imported, so the session opens on whatever this
+// installed and no module is replaced under a running chat. `PI_OFFLINE` is the
+// harness's own switch and is honoured here as `catalogue()` honours it.
+const { updateHarness } = await import("../src/update.mts");
+const updated = await updateHarness({ allowNetwork: process.env.PI_OFFLINE === undefined });
+
 const { main, SettingsManager } = await import("@earendil-works/pi-coding-agent");
 const { providerConfig } = await import("../src/provider.mts");
 const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts");
@@ -186,7 +199,7 @@ await main([...selection, ...argv.slice(argv[0] === "chat" ? 1 : 0)], {
       factory: (pi) => {
         pi.registerProvider("ollama", { ...providerConfig(), ...(models ? { models } : {}), refreshModels: catalogue });
         registerVerbs(pi, files);
-        installChrome(pi);
+        installChrome(pi, updated);
       },
     },
   ],

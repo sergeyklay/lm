@@ -30,6 +30,14 @@ Put the `export` in your shell's profile to keep it. Nothing else is written unt
 verb: the run log appears at `$HOME/.lm/runs.jsonl` on the first run, and the chat keeps its own
 session history in the harness's directory under your home directory.
 
+Keeping it up to date is `git pull` and `npm ci` for `lm` itself. The chat harness that `npm ci`
+installed updates itself: every launch installs the newest release the range in
+`package.json` admits, into this clone alone, and the chat's header says which version it moved to
+when one arrived. It writes nothing to `package.json` or `package-lock.json`, so your working tree
+stays clean, and a launch with no network, no npm or nothing new to fetch opens on what is already
+installed and says nothing at all. A later `npm ci` puts the harness back to the version the lock
+names, and the launch after it moves forward again.
+
 ## First run
 
 ```bash
@@ -61,4 +69,4 @@ in supplies prints `project` in a third.
 
 What each verb does to the repository is in [what this repository ships](instruments.md). What
 the exit codes mean, which environment variables are read and where the registry comes from is in
-[running a verb](verbs.md).
+[running a verb](verbs.md). What the chat does at launch is in [the runner](runner.md).

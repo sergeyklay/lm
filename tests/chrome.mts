@@ -9,6 +9,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
@@ -50,6 +51,49 @@ check("the second row tells the operator what to type", true,
   plain(header[1]).includes("/ for commands") && plain(header[1]).includes("@ for a file path"));
 check("and it is dim rather than loud", true, styled(header[1], "dim"));
 check("both rows carry the mark", true, header.every((l) => l.includes("█")));
+
+// What a launch that updated the harness says, and what one that did not says
+// instead. The session is already on the version named, so the row reports
+// rather than instructs, and a launch that moved nothing adds no row at all.
+const moved = headerLines(theme, "0.84.4");
+check("a launch that updated the harness adds a third row", 3, moved.length);
+check("naming the version it moved to", true, plain(moved[2]).includes("harness updated to 0.84.4"));
+check("without telling the operator to restart", false, /restart|Run |update the/.test(plain(moved[2])));
+check("dim rather than loud", true, styled(moved[2], "dim"));
+check("and aligned under the name above it", true, plain(moved[2]).startsWith(`${" ".repeat(visibleWidth("█ █▀█") + 2)}harness`));
+check("a launch that moved nothing adds no row", 2, headerLines(theme, undefined).length);
+
+// Which version a launch installs, off the registry. The range `package.json`
+// declares is the whole of the policy, so the arithmetic is pinned against a
+// list of releases rather than against what npm happens to be publishing.
+check("the newest release the range admits is the target", "0.84.4",
+  pickTarget(["0.83.9", "0.84.3", "0.84.4", "0.85.0", "1.0.0"], "^0.84.3", "0.84.3"));
+check("a newer release outside the range is refused", undefined,
+  pickTarget(["0.85.0", "1.0.0"], "^0.84.3", "0.84.3"));
+check("and nothing moves when the newest in range is already installed", undefined,
+  pickTarget(["0.84.3", "0.84.4", "0.85.0"], "^0.84.3", "0.84.4"));
+
+const npm: string[] = [];
+check("a launch installs the target and reports the version it moved to", "0.84.4",
+  await updateHarness({ published: async () => ["0.84.3", "0.84.4", "0.85.0"], install: (v) => { npm.push(v); return true; } }));
+check("naming that version to npm and no other", ["0.84.4"], npm);
+check("a launch already on the newest in range reports nothing", undefined,
+  await updateHarness({ published: async () => ["0.84.3"], install: () => true }));
+
+// Every way this can fail leaves the chat opening on the version installed, with
+// nothing printed and nothing thrown: an update that did not happen is not news.
+check("PI_OFFLINE asks the registry nothing at all", undefined,
+  await updateHarness({ allowNetwork: false, published: async () => { throw new Error("asked"); }, install: () => true })
+    .catch((e) => `threw ${e}`));
+check("a registry that cannot be reached is silent rather than an error", undefined,
+  await updateHarness({ published: async () => { throw new Error("no route to host"); }, install: () => true })
+    .catch((e) => `threw ${e}`));
+check("a registry answering rubbish is silent too", undefined,
+  await updateHarness({ published: async () => ["not a version"], install: () => true })
+    .catch((e) => `threw ${e}`));
+check("and an install that fails reports no version", undefined,
+  await updateHarness({ published: async () => ["0.84.4"], install: () => false })
+    .catch((e) => `threw ${e}`));
 
 const chrome = {
   cwd: "/home/ubuntu/lm",

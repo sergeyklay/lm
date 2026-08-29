@@ -68,13 +68,17 @@ export type Chrome = {
   thinking: string | undefined;
 };
 
-export function headerLines(theme: any): string[] {
+export function headerLines(theme: any, updated?: string): string[] {
   const v = version();
   const name = theme.bold(theme.fg("text", v ? `lm v${v}` : "lm"));
   const hint = theme.fg("dim", "/ for commands · @ for a file path · ! to run bash");
+  // The session is already on the version this names, so it says what happened
+  // rather than what to do about it. A launch that moved nothing adds no row.
+  const gutter = " ".repeat(visibleWidth(MARK[0]) + 2);
   return [
     `${theme.fg("accent", MARK[0])}  ${name}`,
     `${theme.fg("borderAccent", MARK[1])}  ${hint}`,
+    ...(updated ? [`${gutter}${theme.fg("dim", `harness updated to ${updated}`)}`] : []),
   ];
 }
 
@@ -260,7 +264,7 @@ export function summaryBlock(s: Summary): string[] {
 
 // Everything this project draws on the chat's screen. Without a terminal there
 // is nothing to draw on.
-export function installChrome(pi: any): void {
+export function installChrome(pi: any, updated?: string): void {
   // The same event fires for a reload and for each of the three ways a session
   // is replaced, where the chat carries on and a closing block would be a lie.
   // Only quitting ends the session, and the harness has already stopped the TUI
@@ -290,7 +294,7 @@ export function installChrome(pi: any): void {
   pi.on("session_start", (_event: unknown, ctx: any) => {
     if (!ctx.hasUI) return;
     const autoCompact = compactionEnabled(ctx.cwd);
-    ctx.ui.setHeader((_tui: unknown, theme: any) => ({ render: () => headerLines(theme) }));
+    ctx.ui.setHeader((_tui: unknown, theme: any) => ({ render: () => headerLines(theme, updated) }));
     ctx.ui.setFooter((_tui: unknown, theme: any, footerData: any) => ({
       render: (width: number) => {
         const usage = ctx.getContextUsage();

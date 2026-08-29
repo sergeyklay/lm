@@ -64,7 +64,7 @@ bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
-node tests/chrome.mts             # what the chat's header, status rows and closing block say, and at what width
+node tests/chrome.mts             # what the chat's header, its update row, status rows and closing block say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
 node tests/chat-request.mts       # what the chat asks the model for, off the wire
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
@@ -171,6 +171,30 @@ where three mutations each redden exactly one case and each was run before it wa
 guessing the auto-compact label instead of reading the setting reddens the case that asserts an
 unread setting prints no mode, right-aligning the branch reddens the case that pins it near the
 middle, and dropping the version reddens the case that reads the name.
+
+What the chat installs before it opens, and the row it draws when it did, is a group of its own in
+the same suite. The version arithmetic and the message are both pure, so they are pinned off the
+network with the registry and npm behind seams a case supplies, and no case reaches either. Two
+suites drive the whole program through `bin/lm` and so pay the launch's own request: they point
+`npm_config_registry` at a refused port, because `PI_OFFLINE` would also switch off the catalogue
+read one of them exists to measure. Without that they install a release into the clone they are
+running against, which is how the leak was found. Six
+mutations, each predicted by case name before it was planted, each gated by importing the mutated
+file on an absolute path, and each confirmed by the value the mutated line produced. Satisfying `*`
+instead of the range `package.json` declares reddens five: the three that read the arithmetic and
+the two that watch what a launch hands npm, which come back `1.0.0` and `0.85.0` where the range
+admits `0.84.4`. Dropping the comparison against the installed version reddens the two cases that
+require a launch already on the newest in range to report nothing, and both come back naming the
+version they are already on. Rethrowing rather than swallowing reddens exactly the one case that
+hands the registry an error, and reddens it as `threw Error: no route to host` rather than by
+crashing the suite, because that case awaits a rejection it expects not to get. Of the row itself:
+drawing it whatever the launch did reddens three rather than the two predicted, the third an older
+case requiring every header row to carry the mark, which a row of text does not - new code killed by
+a case nobody wrote for it, and the second entry in this file's record of why a prediction is
+written down first. Dropping the version from the row reddens the case that reads it, and drawing
+the row in the harness's own warning colour reddens the case that requires the theme's grey, each
+leaving the other green, which is what says the text and its colour are pinned apart rather than
+twice. Counted 2026-08-29 with `node tests/chrome.mts | grep -c '^ok'` at 83.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
@@ -445,7 +469,7 @@ is split across the two runners because the resolution is: `libexec/lm-verb` ans
 directory - a repository with no `tools/` of its own, one shadowing a name the installation ships,
 one adding a name it does not, a directory that is no repository at all, and a run with `LM_TOOLS`
 set - and `tests/registry.mts` drives `list()` over two directories on its own. Counted 2026-08-29
-with `node tests/cli.mts | grep -c '^ok'` at 56 and `node tests/registry.mts | grep -c '^ok'` at 53.
+with `node tests/cli.mts | grep -c '^ok'` at 57 and `node tests/registry.mts | grep -c '^ok'` at 53.
 
 Twelve mutations, each predicted by case name before it was planted and each compared as a name
 set. Dropping the project directory from `bin/lm` reddens the six cases that dispatch a verb, run a
@@ -494,7 +518,7 @@ supplies no rows to glob and the `project` marker is a field on a row, so stdout
 byte-identical, including in the one fixture that isolates the `-d` test, a repository where
 `tools` exists as a regular file. An empty kill set under an equivalent mutant indicts neither the
 mutant nor the cases. The Node runner's own guard is a different matter: dropping
-`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 56 and 53 while
+`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 57 and 53 while
 `node bin/lm --help` run inside a repository that has no `tools/` throws `ENOENT` at `lstat` with
 `registry` on the stack, because `--list` leaves `bin/lm` for the shell runner before `registry()`
 is reached and no case stands the Node runner in such a repository. That is the ordinary case for

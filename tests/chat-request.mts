@@ -88,6 +88,9 @@ async function throughTheProgram(extra: Record<string, string> = {}) {
       LM_TOOLS: work,
       LM_LOG: "",
       PI_CODING_AGENT_DIR: join(work, "agent"),
+      // The launch asks npm which harness releases exist. Pointed at a refused
+      // port it asks nothing and installs nothing into the clone under test.
+      npm_config_registry: "http://127.0.0.1:1",
       ...extra,
     },
   });

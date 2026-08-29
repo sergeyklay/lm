@@ -159,7 +159,12 @@ check("a silent ollama offers no list either, once the deadline passes", "no lis
 const child = spawn(join(ROOT, "bin", "lm"), ["chat", "-p", "Say hello."], {
   cwd: silentWork,
   stdio: ["ignore", "ignore", "ignore"],
-  env: { ...process.env, LM_TOOLS: silentWork, LM_LOG: "", PI_CODING_AGENT_DIR: join(silentWork, "agent") },
+  // The launch also asks npm which harness releases exist, and this case cannot
+  // have `PI_OFFLINE`, which would switch off the read it exists to measure. The
+  // package registry is pointed at a refused port instead, so no case here
+  // reaches the network or installs anything into the clone it is running from.
+  env: { ...process.env, LM_TOOLS: silentWork, LM_LOG: "",
+    PI_CODING_AGENT_DIR: join(silentWork, "agent"), npm_config_registry: "http://127.0.0.1:1" },
 });
 const patience = setTimeout(() => child.kill("SIGKILL"), 30_000);
 await new Promise((r) => child.on("close", r));
