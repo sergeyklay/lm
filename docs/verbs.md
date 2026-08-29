@@ -58,7 +58,8 @@ delivery says both which composition a run belonged to and who asked for the del
 that belongs to no composition still says who asked for it. The set is closed and the command line
 is the base case: a caller that is not a person at a prompt names itself in `LM_CALLER` before it
 runs `lm`, and a value the set does not hold is read as `cli`. A record written before the field
-carries no `caller` at all, and `lm stats` reads it beside the rest.
+carries no `caller` at all: every figure `lm stats` reads over the whole log counts it beside the
+rest, and the one block that counts callers leaves it out of both its numbers.
 
 Each record says what happened to the question the verb asked, under `consent`: `given` when you
 answered it, `withheld` when you declined or let the wait run out, `assumed` when the run carried
@@ -88,11 +89,19 @@ a run is recorded after the verb applies and every verb waits for your answer at
 first, so the wait is inside the one and outside the other. A run whose record holds no model
 time is left out of that average, and a verb with no such run shows `-` rather than being
 reported as instant. Then how many `lm commit` runs actually moved `HEAD`, then how many runs came from a
-composition rather than from your hands, then how many `lm --which` requests found no verb at
-all, then the violations the validators printed most often. `--which` is kept out of the table,
+composition rather than from your hands, then how many of them the chat ran, then how many
+`lm --which` requests found no verb at all, then the violations the validators printed most often. `--which` is kept out of the table,
 because it is a run and not a verb and its refusal exits 2, which the table would count as a
 failure. A `--dry-run` reaches the violations but not the rates. One log spans every
 repository `lm` has ever run in, so it counts the one you are in.
+
+The chat's block is two counts rather than a share, and its denominator is narrower than the
+table's: it counts the runs whose record names a caller, not every run. A record written before
+the field names none, and a run that does not say is not a run from the command line, so counting
+it as one prints a number that reads as a chat which ran almost nothing when what it means is a
+log mostly older than the field. A log entirely older than it reports `0 of 0`, which is the
+answer that log holds. Like every count under the table it reads the whole log rather than the
+period `--since` names; that flag splits the clean column and nothing else.
 
 The clean column is the one figure here that is read against a threshold, so it carries the
 sample that threshold needs and prints `n<14` until the verb has fourteen runs. It counts the

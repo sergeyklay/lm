@@ -97,6 +97,15 @@ jq -s -r "${SCOPE[@]}" "map(select($RUN))"'
   | "  \(map(select(.composition)) | length) of \(length)"' "$LM_LOG"
 
 echo
+# A record written before bin/lm carried the field names no caller, and a run that
+# does not say is not a run from the command line. So the denominator is the runs
+# that say, and a log older than the field reports a small sample rather than a
+# chat that ran almost nothing.
+echo "runs from the chat, of the runs that name a caller:"
+jq -s -r "${SCOPE[@]}" "map(select($RUN and .caller != null))"'
+  | "  \(map(select(.caller == "chat")) | length) of \(length)"' "$LM_LOG"
+
+echo
 # The share, not the count: a refusal rate needs the calls that found a verb in
 # its denominator, and a --which run the model failed is in neither number.
 echo "requests --which found no verb for:"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # libexec/lm-stats over a log written by hand. The reader calls no model and keeps
 # no state, so the log is its whole input and a case here is a log and a reading.
-# The clean column split at a date is what these cover: the axis every record
-# carries, which the table itself never reads.
+# What these cover is the two axes every record carries that the table never reads:
+# the clean column split at a date, and which caller the run came from.
 
 set -uo pipefail
 ROOT=$(dirname "$(readlink -f "$0")")/..
@@ -119,6 +119,53 @@ for ((i = 0; i < 7; i++)); do rec "$SINCE" true "$REPO" | jq -c '. + {caller:"ch
 out=$("$STATS" 2>&1)
 check "a log written across the field's arrival is one population" "15" "$(awk '/^stub /{print $2}' <<<"$out")"
 check "and the share is read over all of it"                       "100%" "$(awk '/^stub /{print $3}' <<<"$out")"
+teardown
+
+# The block that reads that axis, over a log holding all three shapes at once: a
+# run the chat ran, a run typed at the command line, and a run written before the
+# field, which names neither and so answers neither number.
+callers() { # ts caller repo n
+  local i
+  for ((i = 0; i < $4; i++)); do rec "$1" true "$3" | jq -c --arg c "$2" '. + {caller:$c}' >> "$LM_LOG"; done
+}
+# the two counts, read out of the caller block alone.
+chatrun() { sed -n '/^runs from the chat/{n;s/^ *//;p;}'; }
+
+setup
+callers "$BEFORE" chat "$REPO" 4
+callers "$BEFORE" cli  "$REPO" 6
+period  "$BEFORE" 9 9
+out=$("$STATS" 2>&1)
+check "the chat's runs are read over the runs that name a caller" "4 of 10" "$(chatrun <<<"$out")"
+check "and the block says what its denominator counts" \
+  "1" "$(grep -c '^runs from the chat, of the runs that name a caller:$' <<<"$out")"
+check "the window leaves the block whole, as it leaves its neighbours" \
+  "4 of 10" "$("$STATS" --since "$CUT" 2>&1 | chatrun)"
+teardown
+
+# A log older than the field cannot answer, and says so with a denominator of none
+# rather than reading those runs as the command line's.
+setup
+period "$BEFORE" 9 9
+check "a log written before the field is in neither number" "0 of 0" "$("$STATS" 2>&1 | chatrun)"
+teardown
+
+# And a log written entirely after it has nothing to withhold, which is the case
+# that says the denominator narrows only where a record is silent.
+setup
+callers "$BEFORE" chat "$REPO" 3
+callers "$BEFORE" cli  "$REPO" 2
+check "a log where every run names a caller counts all of them" "3 of 5" "$("$STATS" 2>&1 | chatrun)"
+teardown
+
+# One log spans every repository, so the block counts the tree it runs in.
+setup
+callers "$BEFORE" chat "$REPO" 2
+callers "$BEFORE" cli  "$REPO" 2
+callers "$BEFORE" chat other   1
+callers "$BEFORE" cli  other   2
+check "another repository is out of the block" "2 of 4" "$("$STATS" 2>&1 | chatrun)"
+check "and --all takes that repository in"     "3 of 7" "$("$STATS" --all 2>&1 | chatrun)"
 teardown
 
 # An emptied LM_LOG turns logging off, so there is no log to read and no period to

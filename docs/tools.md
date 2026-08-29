@@ -59,7 +59,7 @@ bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh` stubbed
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` composition, on the driver `lm` runs it on
-bash tests/stats.sh               # the clean share split at a date, over a log written by hand
+bash tests/stats.sh               # the clean share split at a date and the chat's share of the log
 bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
@@ -325,7 +325,7 @@ the three suites that hold the record's shape: `tests/runner.sh` for the shell w
 sides of the field's arrival. `tests/chat.mts` enters each caller the way it is entered in earnest,
 `bin/lm` as a process of its own against the registration the chat itself uses, over a fixture that
 refuses in `collect` so neither side reaches a model. Counted 2026-08-29 with `grep -c '^ok'` over
-each suite's output: `tests/runner.sh` at 79, `tests/chat.mts` at 28 and `tests/stats.sh` at 17.
+each suite's output: `tests/runner.sh` at 79, `tests/chat.mts` at 28 and `tests/stats.sh` at 24.
 
 Eight mutations, each predicted by case name before it was planted, each gated, and each confirmed
 by the value the mutated line put in the record. On the Node side: the chat declaring no caller
@@ -344,9 +344,24 @@ runs column and reddened three: the `awk` reads that column as the denominator o
 too, so an older case pinning the share over a heap died with it. New code killed by a case nobody
 wrote for it, which is the second time this file records that shape.
 
-That mutant is also the group's only evidence for its control. `libexec/lm-stats` is not edited
-here and names no caller, so no mutation of what was written can redden the case that reads a log
-of both shapes; the inserted filter is what shows the case could fail at all.
+That mutant is also the group's only evidence for its control. `libexec/lm-stats` reads the field
+in a block of its own and nowhere in the table, so no mutation of what writes the field can redden
+the case that reads a log of both shapes through the table; the inserted filter is what shows the
+case could fail at all.
+
+That block has a group of its own, seven cases in `tests/stats.sh` over a log holding all three
+shapes at once: a run the chat ran, a run typed at the command line, and a run written before the
+field, which names neither. Four mutations of `libexec/lm-stats` that `bash -n` accepts and that
+run, each predicted by case name before it was planted and each confirmed by the line the mutated
+code printed. Counting the records that name no caller as the command line's reddens exactly the
+three cases whose logs hold such a record, printing `4 of 19` where the three-shape case wants
+`4 of 10`; dropping the block reddens all seven, including the one that reads the heading; and
+printing a share instead of the two counts reddens six, every one but the heading case, printing
+`40%` for the same log. The three cases whose logs name a caller on every record stay green under
+the first mutation and die under the third, which is what tells the narrowed denominator apart
+from the two counts. The control is the clean minimum lowered to one: it reddens the four cases
+in the group above that expect a period to withhold its share and leaves all seven of these
+green, so what the new cases read is the caller block and not the reader as a whole.
 
 The last group in the live suite covers the shell the chat carries beside the verbs, and its shape
 is a concession rather than a preference. Asked plainly to commit, this model reached for the shell
@@ -461,7 +476,7 @@ supplies no rows to glob and the `project` marker is a field on a row, so stdout
 byte-identical, including in the one fixture that isolates the `-d` test, a repository where
 `tools` exists as a regular file. An empty kill set under an equivalent mutant indicts neither the
 mutant nor the cases. The Node runner's own guard is a different matter: dropping
-`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 57 and 53 while
+`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 56 and 53 while
 `node bin/lm --help` run inside a repository that has no `tools/` throws `ENOENT` at `lstat` with
 `registry` on the stack, because `--list` leaves `bin/lm` for the shell runner before `registry()`
 is reached and no case stands the Node runner in such a repository. That is the ordinary case for
