@@ -155,14 +155,16 @@ if (argv.length > 0 && argv[0] !== "chat" && !argv[0].startsWith("-")) {
 const { main, SettingsManager } = await import("@earendil-works/pi-coding-agent");
 const { providerConfig } = await import("../src/provider.mts");
 const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts");
-const { initialSelection } = await import("../src/selection.mts");
+const { initialSelection, seedThinkingLevel } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup } = await import("../src/chrome.mts");
 const { list } = await import("../src/registry.mts");
 
 silenceStartup();
 
-const selection = initialSelection(SettingsManager.create(process.cwd()));
+const settings = SettingsManager.create(process.cwd());
+seedThinkingLevel(settings);
+const selection = initialSelection(settings);
 const files = list(registry());
 
 // The catalogue is read once before the session opens, not only at the refresh

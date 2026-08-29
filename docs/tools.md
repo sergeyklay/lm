@@ -128,8 +128,8 @@ cases for a card that claims none, the one asked on a refreshed session and the 
 on it. Dropping the verb's own `maxTokens`, which is the regression
 this half most risks, turns one red here and five in `tests/request.mts`; ignoring `LM_THINK` turns
 red the one case that sets it, and thinking by default turns red the one that does not. Dropping the
-level `bin/lm` hands the harness, so its own default decides again, turns red the one case that
-reads what the chat opens at and the four in `tests/chat.mts` that read the flags; ignoring
+seed `bin/lm` writes, so the harness's own default decides again, turns red the one case that
+reads what the chat opens at and nothing at all in `tests/chat.mts`; ignoring
 `LM_MODEL` turns red the two cases that launch on a card claiming no thinking, and two more in
 `tests/chat.mts`. Emptying the
 tag list turns five red rather than the one predicted, and the surplus is the finding: with no
@@ -171,6 +171,24 @@ where three mutations each redden exactly one case and each was run before it wa
 guessing the auto-compact label instead of reading the setting reddens the case that asserts an
 unread setting prints no mode, right-aligning the branch reddens the case that pins it near the
 middle, and dropping the version reddens the case that reads the name.
+
+What the chat opens thinking at is a settings write and not a flag, so its group is over
+`initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
+case name before it was planted, each gated by importing the mutated file on an absolute path, and
+each confirmed by the value the mutated line produced. Handing `--thinking` over again reddens five
+of the group's seven cases in `tests/chat.mts`: the four that read the model flags, which pin the
+whole array, and the one that reads that no launch hands a level over. Seeding over a level already saved
+reddens exactly the case that saves `high` and reads it back, which comes back `low`. Seeding
+nothing reddens exactly the case that reads the seed, which comes back undefined. Seeding `medium`
+instead reddens that case and the one in `tests/chat-request.mts` that reads what the chat opens at
+off the wire. The fifth is the control worth keeping: `bin/lm` never calling the seed reddens
+nothing at all in `tests/chat.mts`, because every case there calls the function itself, and reddens
+that same single case in `tests/chat-request.mts`, which comes back `medium`, the harness's own
+default. The wiring is held by that one case and by nothing else, and its own gate is
+`node --check`, which works on `bin/lm` because `bin/lm` is not a `.mts` file. The trap in the group
+is the write: the harness queues it, so a case reading the settings file on the next line reads the
+file before it. A launch gets the flush for free from the work it does next; a case has to ask for
+it.
 
 The same suite covers the block the chat prints on quitting, over two transcript fixtures in the
 harness's own on-disk shape rather than sessions anyone ran: one where three tools run against a

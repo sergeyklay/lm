@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - An option in the first position that neither `lm` nor the chat takes is now named back by the harness that parses it, exiting 1, rather than by `lm`, exiting 2. `--dry-run` and `--yes` are the exception, because a verb's flag in front of its verb is a word out of order rather than a word misspelt and the harness knows of no verb to name: `lm` still refuses those two itself, exiting 2, and now says where the flag goes rather than listing the options it takes.
 
+### Fixed
+
+- A thinking level you choose in the chat's `/thinking` and keep now survives the next launch. `lm` handed the harness `--thinking low` on every launch, and that flag beats every level the harness has saved, so the level you kept was put back to `low` the next time you opened the chat. The level is now written once into the harness's own settings as its global default, exactly as `quietStartup` is, and a value already there is left alone, so the chat still opens at `low` when you have saved nothing and the harness resolves the rest its own way: the level saved for the model you are on first, the global default second. A model whose card claims no thinking is still clamped to the one level it has.
+
 ## [0.2.0] - 2026-08-29
 
 ### Added

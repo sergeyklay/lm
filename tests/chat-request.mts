@@ -98,15 +98,18 @@ async function throughTheProgram(extra: Record<string, string> = {}) {
 const printed = await throughTheProgram();
 check("the chat reached the completions endpoint", true, paths.some((p) => p.includes("/chat/completions")));
 check("and asked for no answer budget under either name", "", budget(printed));
-// The chat opens on a thinking model at the level `bin/lm` names, one notch below
-// the harness's own default: open, because that is the difference between a
-// person thinking with the model and a batch verb spending nothing on it, and
-// named, because a default is the harness's to move.
+// The chat opens on a thinking model one notch below the harness's own default:
+// open, because that is the difference between a person thinking with the model
+// and a batch verb spending nothing on it. `bin/lm` seeds that level into the
+// harness's settings rather than handing `--thinking` over, and this is the only
+// case that holds the seeding: every case in `tests/chat.mts` calls the seed
+// itself.
 check("and opened one notch below the harness's default", "low", printed.reasoning_effort);
 
-// The same launch on a card that claims no thinking. `off` is the only level the
-// harness offers such a model, so the level the launch names has to arrive there
-// rather than refusing the model or reaching the wire as an effort it cannot take.
+// The same launch on a card that claims no thinking, over the settings the launch
+// above seeded. `off` is the only level the harness offers such a model, so the
+// saved level has to arrive there rather than refusing the model or reaching the
+// wire as an effort it cannot take.
 const plainLaunch = await throughTheProgram({ LM_MODEL: PLAIN });
 check("a launch on a card that claims no thinking still reaches the model", PLAIN, plainLaunch.model);
 check("and opens on the one level that card has", false, "reasoning_effort" in plainLaunch);

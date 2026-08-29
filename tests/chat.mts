@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerVerbs } from "../src/chat.mts";
-import { initialSelection } from "../src/selection.mts";
+import { initialSelection, seedThinkingLevel } from "../src/selection.mts";
 import { list, meta } from "../src/registry.mts";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
 
@@ -241,9 +241,7 @@ rmSync(callerWork, { recursive: true, force: true });
 // What the chat opens on. `LM_MODEL` is the verb's model and the chat's default,
 // and a model the operator saved inside the chat is their explicit choice: the
 // harness reads it for itself when no --model is handed to it, so handing one
-// would overrule that choice on every launch. The thinking level is handed over
-// whatever is saved, because nothing else keeps the harness's own default off
-// the session. What that level does to the request is `tests/chat-request.mts`.
+// would overrule that choice on every launch.
 const agentDir = mkdtempSync(join(tmpdir(), "lm-agent-"));
 const settingsAt = (settings: Record<string, unknown>) => {
   writeFileSync(join(agentDir, "settings.json"), JSON.stringify(settings));
@@ -252,18 +250,39 @@ const settingsAt = (settings: Record<string, unknown>) => {
 
 process.env.LM_MODEL = "phi3:mini";
 check("with no saved choice the chat opens on LM_MODEL",
-  ["--provider", "ollama", "--model", "phi3:mini", "--thinking", "low"],
+  ["--provider", "ollama", "--model", "phi3:mini"],
   initialSelection(settingsAt({})));
 check("a saved choice is left to the harness to read",
-  ["--thinking", "low"],
+  [],
   initialSelection(settingsAt({ defaultProvider: "ollama", defaultModel: "gpt-oss:20b" })));
 check("and half a saved choice is no choice",
-  ["--provider", "ollama", "--model", "phi3:mini", "--thinking", "low"],
+  ["--provider", "ollama", "--model", "phi3:mini"],
   initialSelection(settingsAt({ defaultModel: "gpt-oss:20b" })));
 delete process.env.LM_MODEL;
 check("with neither, the model this project ships with opens it",
-  ["--provider", "ollama", "--model", "qwen3.8:27b", "--thinking", "low"],
+  ["--provider", "ollama", "--model", "qwen3.8:27b"],
   initialSelection(settingsAt({})));
+
+// The thinking level is the same choice one layer down, and the flag has no
+// gate to put it behind: `--thinking` beats the harness's global default and the
+// per-model level alike, and `bin/lm` has resolved no model yet, so it cannot
+// know which per-model entry a launch would land on. The level is seeded into
+// the harness's own settings instead and resolved there. What it does to the
+// request is `tests/chat-request.mts`.
+const savedLevel = () => JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8")).defaultThinkingLevel;
+
+check("no launch hands the harness a thinking level", false,
+  initialSelection(settingsAt({})).includes("--thinking"));
+// The settings file is written off a queue, so what reaches disk is read after
+// the flush the harness's own launch gets from the work it does next.
+const seeded = settingsAt({});
+seedThinkingLevel(seeded);
+await seeded.flush();
+check("the level a chat opens on is seeded into the settings instead", "low", savedLevel());
+const chosen = settingsAt({ defaultThinkingLevel: "high" });
+seedThinkingLevel(chosen);
+await chosen.flush();
+check("and a level the operator saved is left alone", "high", savedLevel());
 rmSync(agentDir, { recursive: true, force: true });
 
 if (fail) { console.log("FAILED"); process.exit(1); }

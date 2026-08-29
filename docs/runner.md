@@ -61,8 +61,14 @@ as closed: `off` sends no field, and no field is the state this model thinks in,
 registration maps `off` to `none`, which is the only form measured to close the channel on `/v1`.
 The chat opens at `low` rather than at `off`, because the chat is where a person thinks with the
 model, and one notch below the harness's own default because the levels above it buy no more
-reasoning on this model than the one below. A verb is batch and asks for `none` unless `LM_THINK`
-says otherwise.
+reasoning on this model than the one below. That level is a seed and not a flag: `--thinking` beats
+every level the harness has saved, both its global default and the per-model one, and `bin/lm` has
+resolved no model when it builds its flags, so it cannot know which per-model entry a launch would
+land on. It writes `low` into the harness's settings as the global default when none is saved there
+and hands no `--thinking` over at all. So a level chosen through `/thinking` and kept survives every
+later launch, and the order that decides one is the harness's own: the level saved for the model in
+force, then the global default. A card that claims no thinking is clamped to `off` whatever is
+saved. A verb is batch and asks for `none` unless `LM_THINK` says otherwise.
 The second status row shows the level the session is at, and shows nothing for a model that has no
 level to report.
 
@@ -73,11 +79,11 @@ sees: it would reach the model selector and not the request. `PI_OFFLINE` switch
 off exactly as it switches the refresh off.
 
 The chat keeps its settings, its credentials and its session history in the harness's own
-directory under the home directory, outside this repository, and writes there as you use it. One
-of those settings it writes itself, once: the harness lists every resource it loaded on each
-launch unless `quietStartup` is set, and there is no flag for it, so the chat sets it and says
-nothing, because a message about a setting you did not ask for is the noise it removes. A value
-already there is left alone. A past session is reopened from `lm` itself rather than from a
+directory under the home directory, outside this repository, and writes there as you use it. Two
+of those settings it writes itself, once each and silently, because a message about a setting you
+did not ask for is the noise it removes: the harness lists every resource it loaded on each launch
+unless `quietStartup` is set and there is no flag for it, and the thinking level above is the other.
+A value already there is left alone in both cases. A past session is reopened from `lm` itself rather than from a
 subcommand: `lm --continue` takes the most recent one, `lm --resume` offers the list to choose
 from, and `lm --session` names one by file or by identifier.
 
@@ -200,7 +206,7 @@ through. The test process already stands in the repository and a child inherits 
 `cwd` from the bridge leaves every one of them green; the case that tests it runs against a
 temporary directory. That was found by perturbing the bridge, not by reading it.
 
-No dependency and no build step: Node strips the types and runs the file. `node --check` is this
-half of the repository's `bash -n`: run it on a mutant before believing what the mutant killed,
-and confirm it rejects a deliberately
-broken file first.
+No dependency and no build step: Node strips the types and runs the file. A mutant of one still
+has to be gated before anything it killed is believed, and the gate is an import rather than
+`node --check`, which exits 0 on a `.mts` file it cannot parse; [`tools.md`](tools.md) carries the
+command and the measurement behind it.
