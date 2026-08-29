@@ -165,12 +165,13 @@ so the block lands on the restored terminal.
 The harness writes a resume line of its own straight after that, saying what the block already said
 under the name of whichever program it was installed as, and it offers no way to switch that off: no
 event fires after `session_shutdown`, and neither the line's formatter nor the shutdown path that
-writes it is exported. So the handler wraps `process.stdout.write` before it prints the block, drops
-the one chunk whose text opens `To resume this session:` and puts the original write back on that
-same chunk. The block is written through the wrap on purpose, because that is what holds the match to
-the harness's line: this project's own last line opens on the same word, and a match loose enough to
-take it would swallow the block instead. Escape sequences are stripped before the text is read, since
-the harness dims its label.
+writes it is exported. So the handler wraps `process.stdout.write` the moment it sees the quit,
+before it has built the block and whether or not there will be one to print, drops the one chunk
+whose text opens `To resume this session:` and puts the original write back on that same chunk. The
+block is written through the wrap on purpose, because that is what holds the match to the harness's
+line: this project's own last line opens on the same word, and a match loose enough to take it would
+swallow the block instead. Escape sequences are stripped before the text is read, since the harness
+dims its label.
 
 This rests on wording that is the harness's to change, and it degrades to what it replaced rather
 than to anything worse. A line that no longer opens that way is matched by nothing, so the wrap stays

@@ -337,12 +337,13 @@ check("so a second line like it reaches the terminal", HARNESS_LINE,
 async function quitAfterOpening(
   argv: (session: string, dir: string) => string,
   holds: (quit: string) => string = (quit) => quit,
+  from: string = FIXTURE,
 ): Promise<{ printed: string; session: string }> {
   const quit = mkdtempSync(join(tmpdir(), "lm-quit-"));
   const dir = holds(quit);
   mkdirSync(dir, { recursive: true });
   const session = join(dir, "2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl");
-  copyFileSync(FIXTURE, session);
+  copyFileSync(from, session);
   const capture = join(quit, "capture.txt");
   const chat = spawn("script", ["-qc", `${ROOT}/bin/lm ${argv(session, dir)}`, capture], {
     cwd: ROOT,
@@ -420,6 +421,17 @@ check("a session held where the harness keeps its own is resumed by its identifi
     && atHome.printed.includes("Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"));
 check("and names no file, which is the longer line for nothing", false,
   atHome.printed.includes(`Resume: lm --session ${atHome.session}`));
+
+// A session that never reached the model reports nothing, and the harness's line
+// is dropped all the same, because the wrap goes in before the block is built
+// rather than after it. The first case is the control: with no block on the
+// screen to read back, a chat that never opened would satisfy the second.
+const askedNothing = await quitAfterOpening((s, d) => `--session ${s} --session-dir ${d}`, undefined,
+  join(ROOT, "tests/fixtures/session-asked-nothing.jsonl"));
+check("a session that asked nothing opens the chat like any other", true,
+  askedNothing.printed.includes("for commands"));
+check("and quitting it leaves no resume line on the screen, this project's or the harness's", 0,
+  askedNothing.printed.split("\n").filter((l) => /[Rr]esume/.test(l)).length);
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");

@@ -289,6 +289,7 @@ export function installChrome(pi: any, updated?: string): void {
   // by then, so it goes to the restored terminal rather than to a frame.
   pi.on("session_shutdown", (event: any, ctx: any) => {
     if (event?.reason !== "quit" || !ctx.hasUI) return;
+    dropHarnessResume(process.stdout);
     // The launch is the process's own start rather than the first session_start,
     // which fires again for a reload and rebuilds this extension while the same
     // sitting carries on.
@@ -304,7 +305,6 @@ export function installChrome(pi: any, updated?: string): void {
       { file: manager.getSessionFile(), isDefaultDir },
     );
     if (!summary) return;
-    dropHarnessResume(process.stdout);
     process.stdout.write(`\n${summaryBlock(summary).join("\n")}\n`);
   });
 

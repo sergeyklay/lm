@@ -214,10 +214,11 @@ is the write: the harness queues it, so a case reading the settings file on the 
 file before it. A launch gets the flush for free from the work it does next; a case has to ask for
 it.
 
-The same suite covers the block the chat prints on quitting, over two transcript fixtures in the
+The same suite covers the block the chat prints on quitting, over three transcript fixtures in the
 harness's own on-disk shape rather than sessions anyone ran: one where three tools run against a
-single model, and one where two run across a model change, which is the only thing that exercises
-the table's second row and the total under it. Flipping the one tool result the first fixture
+single model, one where two run across a model change, which is the only thing that exercises
+the table's second row and the total under it, and one holding a question and no answer, which is a
+session that never reached the model and reports nothing. Flipping the one tool result the first fixture
 records as failed reddens three cases: the one that reads the counts, and the pair that drives `lm`
 on a copy of the fixture through a pseudo-terminal and ends it with an end of input. It leaves green
 the case that derives an all-worked session from the same fixture, and that pair is what separates
@@ -284,7 +285,7 @@ anchor occurring seven times, the driver refused the mutation rather than patchi
 which is the zero this record would otherwise have had to explain.
 
 The harness writes a resume line of its own after that one and the chat drops it as it is written,
-so five further mutations aim at the wrap that does the dropping. Never installing the wrap reddens
+so six further mutations aim at the wrap that does the dropping. Never installing the wrap reddens
 exactly two, both driven through the pseudo-terminal: the case requiring the harness's line to be
 absent, and the one counting the resume lines on the screen, which comes back 2. Never restoring the
 original write reddens the two unit cases written for the restore and nothing driven through the
@@ -301,7 +302,12 @@ finding: dropping the guard that requires a text chunk was predicted to redden o
 writes a buffer through the wrap and reddened two, the second being the case after it, which counts
 what the sink received and is one short because the throw happened before the buffer got there. That
 buffer case reads a throw as a value rather than letting it end the run, which is the whole reason a
-mutant crashing where it is planted still has a kill set anyone can attribute.
+mutant crashing where it is planted still has a kill set anyone can attribute. The sixth aims at
+where the wrap is installed rather than at what it matches: installing it only once there is a block
+to print, which is what shipped before, reddens exactly one, the pseudo-terminal case that quits the
+session holding a question and no answer, which counts one resume line on the screen where a clean
+run counts none. Every case that reads a block off the terminal stays green under it, and that green
+is what says the moved call ran at all.
 
 `node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it
 exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,
