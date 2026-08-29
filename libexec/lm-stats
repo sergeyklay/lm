@@ -89,12 +89,14 @@ jq -s -r "${SCOPE[@]}" "map(select(.verb == \"commit\" and $RUN))"'
   | "  \(map(select(.head_moved)) | length) of \(length)"' "$LM_LOG"
 
 echo
-# A record written before bin/lm carried the field has no composition and counts as
+# A record written before bin/lm carried the field has no workflow and counts as
 # typed, which is what it was: the alternative is to guess, and adjacency guessed
-# 23 of 28 pr records at 122 records on 2026-08-26.
-echo "runs from a composition:"
+# 23 of 28 pr records at 122 records on 2026-08-26. A record written while the
+# field was called `composition` is read under that name too, so a rename of the
+# key costs no run its column.
+echo "runs from a workflow:"
 jq -s -r "${SCOPE[@]}" "map(select($RUN))"'
-  | "  \(map(select(.composition)) | length) of \(length)"' "$LM_LOG"
+  | "  \(map(select(.workflow // .composition)) | length) of \(length)"' "$LM_LOG"
 
 echo
 # A record written before bin/lm carried the field names no caller, and a run that

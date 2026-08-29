@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The `lm ship` composition, driven the way the operator drives it: `bin/lm` into
-# runComposition over tools/ship.sh, with commit and pr stubbed as tool files of
-# their own. Everything the composition owns is testable without a GPU because
+# The `lm ship` workflow, driven the way the operator drives it: `bin/lm` into
+# runWorkflow over tools/ship.sh, with commit and pr stubbed as tool files of
+# their own. Everything the workflow owns is testable without a GPU because
 # none of it is the model's: which branch the commit lands on, what that branch
 # ends up named, what a refusal leaves behind, and what a rehearsal may touch,
 # which is nothing.
@@ -70,7 +70,7 @@ export LM_LOG=
 # $1 becomes the stubbed commit's exit status, standing in for what `confirm`
 # returns: 0 is a yes, 7 the refusal a human makes.
 setup() {
-  # The registry sits outside the fixture repository, so the tree the composition
+  # The registry sits outside the fixture repository, so the tree the workflow
   # stages is the operator's work and nothing this suite put there.
   work=$(mktemp -d); tools=$(mktemp -d)
   cp "$ROOT/tools/ship.sh" "$tools/ship.sh"
@@ -79,7 +79,7 @@ name="commit"
 description="stub"
 collect() {
   git diff --cached --quiet && { echo "lm: nothing staged" >&2; return 3; }
-  printf 'stub=commit comp=%s yes=%s args=[%s]\n' "${LM_COMPOSITION:-none}" "${LM_YES:-unset}" "$*"
+  printf 'stub=commit flow=%s yes=%s args=[%s]\n' "${LM_WORKFLOW:-none}" "${LM_YES:-unset}" "$*"
 }
 schema() { printf '%s\n' '{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}'; }
 validate() { cat >/dev/null; }
@@ -93,7 +93,7 @@ EOF
   cat > "$tools/pr.sh" <<'EOF'
 name="pr"
 description="stub"
-collect() { printf 'stub=pr comp=%s yes=%s args=[%s]\n' "${LM_COMPOSITION:-none}" "${LM_YES:-unset}" "$*"; }
+collect() { printf 'stub=pr flow=%s yes=%s args=[%s]\n' "${LM_WORKFLOW:-none}" "${LM_YES:-unset}" "$*"; }
 schema() { printf '%s\n' '{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}'; }
 validate() { cat >/dev/null; }
 render() { jq -r .a; }
@@ -146,7 +146,7 @@ check "--here made no commit"             "chore: seed" "$(git log -1 --format='
 teardown
 
 # An unstaged tree ships without a git add. g.txt is untracked on purpose: git diff
-# never reports one and git add takes it, which is the difference the composition
+# never reports one and git add takes it, which is the difference the workflow
 # rests on. Silence is the assertion too: staging is the expected case now.
 setup 0
 git reset -q
@@ -172,17 +172,17 @@ out=$(ship 2>&1)
 check "a clean tree is named" "1" "$(grep -c 'nothing to stage' <<<"$out")"
 teardown
 
-# Both verbs of one composition carry the same name, and it is not empty. The log
-# cannot tell a composed run from a typed one without it: lm writes one record per
-# verb, so one delivery leaves two that look like two the operator typed.
+# Both verbs of one workflow carry the same name, and it is not empty. The log
+# cannot tell a run from a workflow apart from a typed one without it: lm writes one
+# record per verb, so one delivery leaves two that look like two the operator typed.
 setup 0
 ship >/dev/null 2>&1
-check "both verbs saw a composition" "2" "$(grep -c 'comp=ship-' "$SRVLOG")"
-check "and it was the same one"      "1" "$(grep -o 'comp=ship-[0-9]*' "$SRVLOG" | sort -u | wc -l)"
+check "both verbs saw a workflow" "2" "$(grep -c 'flow=ship-' "$SRVLOG")"
+check "and it was the same one"   "1" "$(grep -o 'flow=ship-[0-9]*' "$SRVLOG" | sort -u | wc -l)"
 teardown
 
-# Consent belongs to the composition. A verb takes it as a flag, and both verbs here
-# are run by the composition rather than typed, so the flag is consumed once and the
+# Consent belongs to the workflow. A verb takes it as a flag, and both verbs here
+# are run by the workflow rather than typed, so the flag is consumed once and the
 # variable is what reaches them.
 setup 0
 ship --yes >/dev/null 2>&1
@@ -195,14 +195,14 @@ ship >/dev/null 2>&1
 check "without it the verbs are asked as before" "2" "$(grep -c 'yes=unset' "$SRVLOG")"
 teardown
 
-# Free text is the one thing a composition forwards, because it is what the
+# Free text is the one thing a workflow forwards, because it is what the
 # operator meant the delivery to be and both verbs write from it.
 setup 0
 ship widen the scope >/dev/null 2>&1
 check "the text reaches both verbs" "2" "$(grep -c 'args=\[widen the scope\]' "$SRVLOG")"
 teardown
 
-# --dry-run is the whole composition's rehearsal and not only its verbs'. ship's
+# --dry-run is the whole workflow's rehearsal and not only its verbs'. ship's
 # side effects are its hooks, so a rehearsal runs none of them and the repository
 # reads back exactly as it did.
 setup 0

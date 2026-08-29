@@ -67,7 +67,7 @@ rmSync(work, { recursive: true, force: true });
 // `tests/registry.mts` hands `applyAsk` an Ask of its own and never enters
 // `src/chat.mts`, and the live case runs in print mode where `hasUI` is false,
 // so the refusal there is the runner's rather than a person's. What no case had
-// ever read is the composition below: the rendered artefact and the tool's own
+// ever read is the pairing below: the rendered artefact and the tool's own
 // question, joined, because the human is approving something the chat has not
 // shown them yet.
 
@@ -224,11 +224,11 @@ check("and nothing else in the record tells the two apart", ["caller"],
     && JSON.stringify(typed[k]) !== JSON.stringify(chatted[k])));
 
 // A delivery is where the tag already said something about its caller, and said it
-// in a shape nothing parses. Both fields reach every verb a composition runs.
+// in a shape nothing parses. Both fields reach every verb a workflow runs.
 await ranByTheChat("flow");
-const composed = logged().slice(-1)[0];
-check("a verb a composition ran for the chat names the chat too", "chat", composed.caller);
-check("beside the composition it belonged to", true, /^flow-[0-9]+-[0-9]+$/.test(composed.composition));
+const fromWorkflow = logged().slice(-1)[0];
+check("a verb a workflow ran for the chat names the chat too", "chat", fromWorkflow.caller);
+check("beside the workflow it belonged to", true, /^flow-[0-9]+-[0-9]+$/.test(fromWorkflow.workflow));
 
 // The set is the code's and not the caller's: a name it does not hold would put a
 // value in the log that `lm stats` has no way to group by.

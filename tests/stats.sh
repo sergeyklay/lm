@@ -22,7 +22,7 @@ rec() { # ts clean repo
   jq -nc --arg ts "$1" --argjson clean "$2" --arg repo "$3" '
     {ts:$ts, repo:$repo, verb:"stub", model:"m", dry:false,
      calls:(if $clean then 1 else 2 end), violations:[], exit:0, ms:10,
-     head_moved:false, composition:null, which:null,
+     head_moved:false, workflow:null, which:null,
      prompt_hash:null, answer_hash:null, answer_len:null,
      total_duration:null, load_duration:null, prompt_eval_count:null,
      prompt_eval_duration:null, eval_count:null, eval_duration:null}'
@@ -166,6 +166,20 @@ callers "$BEFORE" chat other   1
 callers "$BEFORE" cli  other   2
 check "another repository is out of the block" "2 of 4" "$("$STATS" 2>&1 | chatrun)"
 check "and --all takes that repository in"     "3 of 7" "$("$STATS" --all 2>&1 | chatrun)"
+teardown
+
+# The field that names the workflow a run belonged to was called `composition`
+# before it was called `workflow`, so a real log holds both names and a run under
+# either counts once. A record under neither belonged to no workflow.
+flowrun() { sed -n '/^runs from a workflow/{n;s/^ *//;p;}'; }
+
+setup
+rec "$BEFORE" true "$REPO" | jq -c '. + {workflow:"ship-1"}'                  >> "$LM_LOG"
+rec "$BEFORE" true "$REPO" | jq -c 'del(.workflow) + {composition:"ship-2"}'  >> "$LM_LOG"
+rec "$BEFORE" true "$REPO"                                                    >> "$LM_LOG"
+out=$("$STATS" 2>&1)
+check "a run under either name counts as a workflow's" "2 of 3" "$(flowrun <<<"$out")"
+check "and the block is named for the kind"            "1" "$(grep -c '^runs from a workflow:$' <<<"$out")"
 teardown
 
 # An emptied LM_LOG turns logging off, so there is no log to read and no period to

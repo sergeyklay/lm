@@ -180,16 +180,16 @@ HOME="$work" LM_LOG='' lm stub refuse >/dev/null 2>&1
 check "an emptied LM_LOG logs nothing" "" "$(cat "$work/.lm/runs.jsonl" 2>/dev/null)"
 teardown
 
-# The runner copies the composition into the record, and records none when there
+# The runner copies the workflow into the record, and records none when there
 # was none. This is the half tests/ship.sh cannot see: there the verb is stubbed.
 setup
-LM_COMPOSITION=ship-42 lm stub refuse >/dev/null 2>&1
-check "a composed run names it" "ship-42" "$(jq -r '.composition' "$work/log.jsonl")"
+LM_WORKFLOW=ship-42 lm stub refuse >/dev/null 2>&1
+check "a run from a workflow names it" "ship-42" "$(jq -r '.workflow' "$work/log.jsonl")"
 lm stub refuse >/dev/null 2>&1
-check "a typed run names none"  "null"    "$(jq -r '.composition' "$work/log.jsonl" | tail -1)"
+check "a typed run names none"         "null"    "$(jq -r '.workflow' "$work/log.jsonl" | tail -1)"
 teardown
 
-# The caller is a closed set the runner owns, and it sits beside the composition
+# The caller is a closed set the runner owns, and it sits beside the workflow
 # rather than inside it: a delivery still names itself, and a bare run now names
 # whoever asked for it. The command line is the base case and names itself nowhere.
 setup
@@ -200,9 +200,9 @@ check "a caller that named itself is recorded"     "chat" "$(jq -r '.caller' "$w
 # Free text would let a caller invent a value lm stats cannot group by.
 LM_CALLER=scheduler lm stub refuse >/dev/null 2>&1
 check "a name outside the set is not a caller"     "cli"  "$(jq -r '.caller' "$work/log.jsonl" | tail -1)"
-LM_CALLER=chat LM_COMPOSITION=ship-42 lm stub refuse >/dev/null 2>&1
-check "a composed run carries both"  "ship-42 chat" \
-  "$(jq -r '[.composition,.caller]|join(" ")' "$work/log.jsonl" | tail -1)"
+LM_CALLER=chat LM_WORKFLOW=ship-42 lm stub refuse >/dev/null 2>&1
+check "a run from a workflow carries both"  "ship-42 chat" \
+  "$(jq -r '[.workflow,.caller]|join(" ")' "$work/log.jsonl" | tail -1)"
 teardown
 
 # --which can say that nothing serves the request. Without a refusal member the

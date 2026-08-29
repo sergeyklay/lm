@@ -27,15 +27,15 @@ check("bin holds one command", "lm", readdirSync(join(ROOT, "bin")).join(","));
 
 const help = run(LM, ["--help"]);
 check("--help exits 0", 0, help.code);
-for (const line of ["open a chat", "lm <workflow>", "lm stats", "--dry-run", "--which", "LM_MODEL"]) {
+for (const line of ["open a chat", "lm <verb>", "lm <workflow>", "lm stats", "--dry-run", "--which", "LM_MODEL"]) {
   check(`--help covers ${line}`, true, help.out.includes(line));
 }
 // A description is prose written for the router by whoever wrote the file, so its
 // length is not this help to bound: the listing carries names and the detail is
 // one command away. A workflow is listed too, and never named in Usage beside
 // `lm stats`, which is `lm` itself rather than something this repository ships.
-check("the tools are listed as names alone",
-  true, /^Available tools:\n  changelog, commit, issue, pr$/m.test(help.out));
+check("the verbs are listed as names alone",
+  true, /^Available verbs:\n  changelog, commit, issue, pr$/m.test(help.out));
 check("the workflows have a listing of their own",
   true, /^Available workflows:\n  ship$/m.test(help.out));
 check("no description reaches the listing", false, help.out.includes("Conventional Commits"));
@@ -50,7 +50,7 @@ check("what it does is the first line, not a label",
 check("and the usage names it once", true, /^  lm commit \[options\] \[text\]$/m.test(own.out));
 check("and exits 0", 0, own.code);
 // Which kind it is shows in whether there is a sequence to name.
-check("a tool names no sequence", false, own.out.includes("Runs in order:"));
+check("a verb names no sequence", false, own.out.includes("Runs in order:"));
 const flow = run(LM, ["ship", "--help"]);
 check("a workflow names the verbs it runs, in order",
   true, /^Runs in order:\n  commit, pr$/m.test(flow.out));
@@ -173,7 +173,7 @@ check("and hands back the tool's own refusal", 3, direct.code);
 const viaHelp = runIn(onlyDir, ["--help"]).out;
 const named = (label: string) => (new RegExp(`^Available ${label}:\\n  (.*)$`, "m").exec(viaHelp)?.[1] ?? "").split(", ");
 check("and both runners name the same registry",
-  listed(only.out), [...named("tools"), ...named("workflows")].sort());
+  listed(only.out), [...named("verbs"), ...named("workflows")].sort());
 
 // Outside a repository there is no project half, so there is nothing to prefer.
 const loose = mkdtempSync(join(tmpdir(), "lm-loose-"));

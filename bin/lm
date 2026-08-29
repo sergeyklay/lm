@@ -76,23 +76,23 @@ if (wantsHelp) {
   // happens to ship, and they are names alone: a description belongs to whoever
   // wrote the file, and `lm <name> --help` is where it is read.
   const names = (kind) => declared.filter((d) => (d.verbs.length > 0) === kind).map((d) => d.name);
-  const tools = names(false);
-  const flows = names(true);
-  const flowUsage = flows.length > 0 ? "\n  lm <workflow> [options] [text]  run one workflow" : "";
-  const rows = `  ${tools.join(", ")}`;
-  const flowRows = flows.length === 0 ? "" : `\n\nAvailable workflows:\n  ${flows.join(", ")}`;
+  const verbs = names(false);
+  const workflows = names(true);
+  const workflowUsage = workflows.length > 0 ? "\n  lm <workflow> [options] [text]  run one workflow" : "";
+  const verbRows = `  ${verbs.join(", ")}`;
+  const workflowRows = workflows.length === 0 ? "" : `\n\nAvailable workflows:\n  ${workflows.join(", ")}`;
   process.stdout.write(`lm - local developer verbs and a chat, against a model on your own machine
 
 Usage:
   lm                              open a chat with the local model
-  lm <tool> [options] [text]      run one tool${flowUsage}
+  lm <verb> [options] [text]      run one verb${workflowUsage}
   lm --continue                   reopen the last chat where it left off
   lm --resume                     choose a past chat to reopen
   lm stats [--all]                what the run log says about this repository
   lm stats --since <date>         the same, split into before and since that date
 
-Available tools:
-${rows}${flowRows}
+Available verbs:
+${verbRows}${workflowRows}
 
 Run 'lm <name> --help' for what one does and how to call it.
 
@@ -142,10 +142,10 @@ if (argv.length > 0 && argv[0] !== "chat" && !argv[0].startsWith("-")) {
     process.exit(2);
   }
   // What the file declares decides how it runs: one that names verbs is a
-  // composition, one that does not is a verb.
+  // workflow, one that does not is a verb.
   if (meta(file).verbs.length > 0) {
-    const { runComposition } = await import("../src/composition.mts");
-    const { code } = await runComposition(file, files, argv.slice(1), `${argv[0]}-${process.pid}`);
+    const { runWorkflow } = await import("../src/workflow.mts");
+    const { code } = await runWorkflow(file, files, argv.slice(1), `${argv[0]}-${process.pid}`);
     process.exit(code);
   }
   const { runVerb } = await import("../src/verb.mts");

@@ -2,7 +2,7 @@
 
 `lm` itself is [the runner](runner.md), the contract in [running a verb](verbs.md) and the
 registry contract in [adding a tool](tools.md). This page is the other half: the four verbs and
-the one composition that happen to sit in `tools/` here. A project that installs `lm` puts its
+the one workflow that happen to sit in `tools/` here. A project that installs `lm` puts its
 own there, and none of them is part of `lm`.
 
 ## The verbs

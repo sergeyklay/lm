@@ -77,7 +77,7 @@ rc=$(under_pty '{ sleep 0.2; printf "n\n"; sleep 60; }')
 check "a refusal is still a refusal"          "7" "$rc"
 check "and is not reported as a timeout"      "0" "$(grep -c 'no answer in' "$work/out")"
 
-# The variable is the half a composition reaches: lm ship drives the shell runner,
+# The variable is the half a workflow reaches: lm ship drives the shell runner,
 # which never sees the flag. Without a terminal at all, so the capability is the only
 # thing that can let it through.
 cat > "$work/unattended.sh" <<'INNER'

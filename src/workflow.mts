@@ -7,14 +7,14 @@ import { parseArgs, runVerb, terminal, type Io, type Outcome } from "./verb.mts"
 export type IoFor = (label: string) => Io;
 export const terminalFor: IoFor = () => terminal;
 
-// A composition names the verbs it runs and defines the work around them, and the
+// A workflow names the verbs it runs and defines the work around them, and the
 // runner runs both halves. A script could only reach a verb by spawning one, and
 // in that process `confirm` reads /dev/tty, which the chat does not have, so the
 // human would never be asked at all.
 //
 // The tag is the caller's because its scope is the caller's: one process per
 // `lm ship` on the command line, one session per chat and a counter inside it.
-export async function runComposition(
+export async function runWorkflow(
   file: string,
   files: string[],
   argv: string[],
@@ -32,7 +32,7 @@ export async function runComposition(
 
   // The flags reach the hooks the way they reach a tool: parseArgs turns --here
   // into LM_HERE, so a hook reads its own flag and nothing parses twice.
-  const runEnv = { ...parsed.env, ...env, LM_COMPOSITION: tag };
+  const runEnv = { ...parsed.env, ...env, LM_WORKFLOW: tag };
   const opts = { cwd: process.cwd(), env: runEnv };
   const verbArgv = [
     ...(parsed.dry ? ["--dry-run"] : []),
@@ -43,9 +43,9 @@ export async function runComposition(
   let calls = 0;
   let attempts = 0;
 
-  // --dry-run stops a verb before apply(), and a composition's hooks are its
+  // --dry-run stops a verb before apply(), and a workflow's hooks are its
   // apply. The guard is here rather than in each hook, because a guard a hook
-  // has to remember is one the next composition forgets.
+  // has to remember is one the next workflow forgets.
   const step = (fn: string): number => {
     if (parsed.dry) return 0;
     const r = hook(file, fn, opts);
@@ -56,7 +56,7 @@ export async function runComposition(
 
   // The rehearsal is thinner than the run and the difference is not the flag's to
   // imply: a verb that refuses for want of what prepare() would have done is
-  // otherwise read as the composition being broken.
+  // otherwise read as the workflow being broken.
   if (parsed.dry) {
     own.err(`lm: --dry-run: ${info.name}'s own steps do not run, so each verb rehearses the repository as it stands\n`);
   }

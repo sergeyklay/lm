@@ -23,8 +23,8 @@ export type Args =
 export type Consent = "given" | "withheld" | "assumed" | null;
 
 // The flag is the interface and the variable is the transport: a person types the
-// flag, and a composition either forwards it or exports the variable the way it
-// already exports LM_COMPOSITION. It is a function rather than an inline `||` so
+// flag, and a workflow either forwards it or exports the variable the way it
+// already exports LM_WORKFLOW. It is a function rather than an inline `||` so
 // that both affordances have a case; a chat session is not covered either way,
 // because it has a person in it by construction and its dialog is R14's.
 export function unattended(flag: boolean, env: NodeJS.ProcessEnv = process.env): boolean {
@@ -111,7 +111,7 @@ function record(r: {
   verb: string; dry: boolean; calls: number; violations: string; exit: number;
   ms: number; head0: string | null; prompt: string; answer: string | undefined;
   consent: Consent;
-  composition: string | null;
+  workflow: string | null;
   caller: Caller;
 }): void {
   const log = process.env.LM_LOG ?? `${homedir()}/.lm/runs.jsonl`;
@@ -130,7 +130,7 @@ function record(r: {
       exit: r.exit,
       ms: r.ms,
       head_moved: head !== null && head !== r.head0,
-      composition: r.composition ?? (process.env.LM_COMPOSITION || null),
+      workflow: r.workflow ?? (process.env.LM_WORKFLOW || null),
       caller: r.caller,
       which: null,
       prompt_hash: sha(r.prompt),
@@ -149,7 +149,7 @@ function record(r: {
   }
 }
 
-export async function runVerb(file: string, argv: string[], env: Record<string, string> = {}, io: Io = terminal, composition: string | null = null): Promise<Outcome> {
+export async function runVerb(file: string, argv: string[], env: Record<string, string> = {}, io: Io = terminal, workflow: string | null = null): Promise<Outcome> {
   const t0 = Date.now();
   const head0 = git("rev-parse", "HEAD");
   const info = meta(file);
@@ -178,7 +178,7 @@ export async function runVerb(file: string, argv: string[], env: Record<string, 
   // and any other status from a body that reached its question means it was yes.
   const finish = (code: number, prompt: string, consent: Consent = null): Outcome => {
     record({ verb: name, dry: parsed.dry, calls, violations: firstViolations, exit: code,
-             ms: Date.now() - t0, head0, prompt, answer, consent, composition,
+             ms: Date.now() - t0, head0, prompt, answer, consent, workflow,
              caller: callerOf({ ...process.env, ...env }) });
     return { code, calls, attempts };
   };

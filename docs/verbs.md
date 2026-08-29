@@ -21,12 +21,12 @@ verb is a verb's flag. `lm ship --yes` takes it as well and carries it to both v
 whole delivery goes through with nobody at the terminal. What neither reaches is a chat session: a
 chat has a person in it by construction, and its dialog is still asked.
 
-On a composition `--dry-run` covers the whole delivery and not only the verbs inside it. `lm ship`
+On a workflow `--dry-run` covers the whole delivery and not only the verbs inside it. `lm ship`
 opens a branch and stages the tree around the verbs it runs, and those are side effects like any
 other, so a rehearsal runs none of them: after `lm ship --dry-run` the working tree, the branch you
 are on, the branches that exist, `HEAD` and the reflog all read exactly as they did before it. What
 you see is each verb rehearsed against the repository as it stands, which is thinner than the run,
-and the composition says so on stderr. A verb whose input an earlier step would have made refuses
+and the workflow says so on stderr. A verb whose input an earlier step would have made refuses
 the way it would if you ran it yourself now: on a tree nothing was staged in, `lm ship --dry-run`
 reaches `commit` and `commit` exits 3.
 
@@ -40,7 +40,7 @@ with no terminal at all does not reach that wait: it exits 7 at once, because th
 `/dev/tty` to read. `lm --which`
 picks the verb for a request by reading the same one-line descriptions `lm --list` prints. When
 no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
-exits 2, so a composition that pipes it into `lm` stops rather than running the nearest match.
+exits 2, so a workflow that pipes it into `lm` stops rather than running the nearest match.
 Either answer is logged, so how often the registry has no verb for what you asked is a share
 `lm stats` prints rather than something you have to remember.
 
@@ -48,14 +48,16 @@ Either answer is logged, so how often the registry has no verb for what you aske
 
 Every run appends one JSON object to `$LM_LOG`: the verb, the repository, how many model
 calls it took, what the validator rejected, the exit code, whether `HEAD` moved, and which
-composition the run belonged to, or `null` when you typed the verb yourself. A `lm --which`
+workflow the run belonged to, under `workflow`, or `null` when you typed the verb yourself. A `lm --which`
 run is logged in the same shape: it names `--which` where a run names its verb, and carries
-the verb it picked, or `none`, in a field every other run leaves `null`.
+the verb it picked, or `none`, in a field every other run leaves `null`. A record written while the
+kind went by another name carries that field as `composition`, and `lm stats` reads either name,
+so an older log loses none of its runs to the one word.
 
 Each record names the caller it came from, under `caller`: `cli` when you ran the verb yourself,
-`chat` when the chat ran it for you. It sits beside `composition` rather than inside it, so a
-delivery says both which composition a run belonged to and who asked for the delivery, and a run
-that belongs to no composition still says who asked for it. The set is closed and the command line
+`chat` when the chat ran it for you. It sits beside `workflow` rather than inside it, so a
+delivery says both which workflow a run belonged to and who asked for the delivery, and a run
+that belongs to no workflow still says who asked for it. The set is closed and the command line
 is the base case: a caller that is not a person at a prompt names itself in `LM_CALLER` before it
 runs `lm`, and a value the set does not hold is read as `cli`. A record written before the field
 carries no `caller` at all: every figure `lm stats` reads over the whole log counts it beside the
@@ -89,7 +91,7 @@ a run is recorded after the verb applies and every verb waits for your answer at
 first, so the wait is inside the one and outside the other. A run whose record holds no model
 time is left out of that average, and a verb with no such run shows `-` rather than being
 reported as instant. Then how many `lm commit` runs actually moved `HEAD`, then how many runs came from a
-composition rather than from your hands, then how many of them the chat ran, then how many
+workflow rather than from your hands, then how many of them the chat ran, then how many
 `lm --which` requests found no verb at all, then the violations the validators printed most often. `--which` is kept out of the table,
 because it is a run and not a verb and its refusal exits 2, which the table would count as a
 failure. A `--dry-run` reaches the violations but not the rates. One log spans every
@@ -217,7 +219,7 @@ Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= 
 
 ## Exit codes
 
-A composition stops on any of these. 7 is the one that is not a failure: it is you saying no.
+A workflow stops on any of these. 7 is the one that is not a failure: it is you saying no.
 
 | Code | Meaning |
 | --- | --- |

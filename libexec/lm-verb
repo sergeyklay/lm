@@ -80,7 +80,7 @@ _read() { local rc=0
   [ "$rc" -le 128 ] || printf '\nlm: no answer in %ss, nothing was applied\n' "$CONFIRM_TIMEOUT_SECONDS" >&2
   [ "$rc" = 0 ] || exit 7; }
 # LM_YES is the transport half of --yes: the flag is the Node runner's to parse, and
-# a composition reaches this runner through the variable instead. Without this the
+# a workflow reaches this runner through the variable instead. Without this the
 # published sentence that the variable works on every verb is false for lm ship.
 confirm() { [ "${LM_YES:-}" = 1 ] && return 0; local a; _read a "$1"; [ "$a" = y ] || exit 7; }
 ask() { [ "${LM_YES:-}" = 1 ] && return 0; local a; _read a "$1"; printf '%s' "$a"; }
@@ -110,13 +110,13 @@ log_run() { # $1 exit status. Never fails the run it is reporting on.
   jq -nc --arg ts "$(date -Is)" --arg repo "$REPO" --arg verb "$VERB" --arg model "$LM_MODEL" \
     --arg viol "$VIOL" --argjson dry "$DRY" --argjson calls "$CALLS" --argjson rc "$1" \
     --argjson ms "$(( $(date +%s%3N) - T0 ))" --argjson moved "$moved" \
-    --arg comp "${LM_COMPOSITION:-}" --arg caller "$CALLER" --arg which "$WHICH" \
+    --arg flow "${LM_WORKFLOW:-}" --arg caller "$CALLER" --arg which "$WHICH" \
     --arg phash "$(sha "${PROMPT:-}")" --arg ahash "$(sha "${OUT:-}")" --argjson alen "$alen" \
     --argjson msum "$([ "$MODEL_N" -gt 0 ] && echo "$MODEL_SUM" || echo null)" \
     --arg consent "$([ "$SOUGHT" = 1 ] && { [ "${LM_YES:-}" = 1 ] && echo assumed || { [ "$1" = 7 ] && echo withheld || echo given; }; })" \
     '{ts:$ts,repo:$repo,verb:$verb,model:$model,dry:($dry==1),calls:$calls,
       violations:($viol|split("\n")|map(select(length>0))),exit:$rc,ms:$ms,head_moved:$moved,
-      composition:(if $comp == "" then null else $comp end),
+      workflow:(if $flow == "" then null else $flow end),
       caller:$caller,
       which:(if $which == "" then null else $which end),
       prompt_hash:(if $phash == "" then null else $phash end),

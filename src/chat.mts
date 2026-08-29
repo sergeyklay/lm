@@ -1,12 +1,12 @@
 import { CALLER } from "./caller.mts";
 import { meta } from "./registry.mts";
 import { runVerb, type Io } from "./verb.mts";
-import { runComposition, type IoFor } from "./composition.mts";
+import { runWorkflow, type IoFor } from "./workflow.mts";
 
 // What a verb looks like from inside the chat: the arguments a human types, and
 // nothing about the verb's own answer. The chat's model chooses the verb and the
 // text; the verb still writes its own prompt from the repository and asks the
-// model itself, so what it commits is what `lm commit` commits. A composition
+// model itself, so what it commits is what `lm commit` commits. A workflow
 // offers the same two, because `--here` and `--no-stage` decide where a commit
 // lands and neither is in «ship these changes».
 const PARAMETERS = {
@@ -30,12 +30,12 @@ export function registerVerbs(pi: any, files: string[]): string[] {
   const registered: string[] = [];
   // The index is the directory listing here as everywhere else, so a fifth tool
   // file is offered in the next session with no file edited. What a file is is
-  // declared in the file: one that names verbs is a composition the runner
+  // declared in the file: one that names verbs is a workflow the runner
   // drives, one that does not is a verb it runs.
   let runs = 0;
   for (const file of files) {
     const info = meta(file);
-    const composed = info.verbs.length > 0;
+    const isWorkflow = info.verbs.length > 0;
     registered.push(info.name);
     pi.registerTool({
       name: info.name,
@@ -74,8 +74,8 @@ export function registerVerbs(pi: any, files: string[]): string[] {
         // `$$` would tag every delivery of a session identically and `lm stats`
         // would read them as one.
         const env = { LM_CALLER: CALLER.chat };
-        const result = composed
-          ? await runComposition(file, files, argv, `${info.name}-${process.pid}-${++runs}`, io, env)
+        const result = isWorkflow
+          ? await runWorkflow(file, files, argv, `${info.name}-${process.pid}-${++runs}`, io, env)
           : await runVerb(file, argv, env, io(info.name));
 
         const text = [said.trim(), outcome(result.code)].filter((p) => p.length > 0).join("\n\n");

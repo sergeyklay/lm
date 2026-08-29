@@ -30,7 +30,7 @@ function check(name: string, want: unknown, got: unknown) {
 }
 
 // The capability has two affordances and they are not the same one twice: a person
-// types the flag, and a composition or a script exports the variable instead.
+// types the flag, and a workflow or a script exports the variable instead.
 const flagged = parseArgs("v", [], ["--yes"]);
 check("the flag alone asks for it", true, flagged.ok && unattended(flagged.yes, {}));
 check("and reaches the tool's own shell as well", "1", flagged.ok ? flagged.env.LM_YES : "absent");

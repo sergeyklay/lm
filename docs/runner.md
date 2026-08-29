@@ -1,7 +1,7 @@
 # The runner
 
 `lm` is the only command. With no arguments it opens a chat against the local model; with a verb
-it runs that verb; `lm ship` and `lm stats` reach the composition and the run log. Everything it
+it runs that verb; `lm ship` and `lm stats` reach the workflow and the run log. Everything it
 dispatches to lives in `libexec/`, which is not on anyone's `PATH`.
 
 `lm --help` is written by `lm` itself and lists everything it dispatches, because the shell

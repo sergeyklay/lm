@@ -98,7 +98,7 @@ export function call(file: string, fn: Fn, opts: Opts = {}): Result {
   return bash(SOURCE, [file, fn, ...(opts.args ?? [])], opts);
 }
 
-// A composition's own step, around the verbs it names. A step nobody wrote is not
+// A workflow's own step, around the verbs it names. A step nobody wrote is not
 // a failure: the file defines only the hooks it needs, so an undefined one is a
 // no-op rather than a `command not found`.
 export function hook(file: string, fn: string, opts: Opts = {}): Result {

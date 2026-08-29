@@ -58,7 +58,7 @@ node tests/cli.mts                # what `lm` dispatches, and its help
 bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh` stubbed
 bash tests/golden.sh              # every verb except the model call
-bash tests/ship.sh                # the `lm ship` composition, on the driver `lm` runs it on
+bash tests/ship.sh                # the `lm ship` workflow, on the driver `lm` runs it on
 bash tests/stats.sh               # the clean share split at a date and the chat's share of the log
 bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
@@ -343,14 +343,14 @@ the three suites that hold the record's shape: `tests/runner.sh` for the shell w
 sides of the field's arrival. `tests/chat.mts` enters each caller the way it is entered in earnest,
 `bin/lm` as a process of its own against the registration the chat itself uses, over a fixture that
 refuses in `collect` so neither side reaches a model. Counted 2026-08-29 with `grep -c '^ok'` over
-each suite's output: `tests/runner.sh` at 79, `tests/chat.mts` at 28 and `tests/stats.sh` at 24.
+each suite's output: `tests/runner.sh` at 79, `tests/chat.mts` at 31 and `tests/stats.sh` at 26.
 
 Eight mutations, each predicted by case name before it was planted, each gated, and each confirmed
 by the value the mutated line put in the record. On the Node side: the chat declaring no caller
 reddens 3, giving both callers `cli` and collapsing the case that requires the two records to
 differ in that one field; dropping the field from the record reddens 5, which is every case in the
-group but the one reading the composition tag beside it; `runComposition` dropping the environment
-it is handed reddens only the composed case; and `callerOf` returning whatever it was given rather
+group but the one reading the workflow tag beside it; `runWorkflow` dropping the environment
+it is handed reddens only the case run by a workflow; and `callerOf` returning whatever it was given rather
 than a member of the set reddens only the case that hands it a name the set does not hold. On the
 shell side: the same widening reddens the same one case, dropping `caller` from the `jq` object
 reddens 4, and hardcoding `cli` reddens the 2 that expect something else, which is what says the
@@ -411,10 +411,10 @@ The two affordances are not one thing twice, so `tests/request.mts` drives the s
 apart from the run that uses it: the flag alone, the variable alone, neither, and a variable set to
 something other than `1`. Three mutations, each killing exactly one of them - the seam ignoring the
 variable, the seam ignoring the flag, and the flag no longer reaching the tool's own shell.
-`lm ship --yes` has cases of its own in `tests/ship.sh`, because a composition runs its verbs
+`lm ship --yes` has cases of its own in `tests/ship.sh`, because a workflow runs its verbs
 rather than letting anyone type a flag at them: `parseArgs` in `src/verb.mts` turns the flag into
-`LM_YES=1` in the environment `runComposition` hands each verb, the way that environment already
-carries `LM_COMPOSITION`. Dropping that assignment reddens the one case that counts how many verbs
+`LM_YES=1` in the environment `runWorkflow` hands each verb, the way that environment already
+carries `LM_WORKFLOW`. Dropping that assignment reddens the one case that counts how many verbs
 saw the variable. The mutation that reddens nothing is worth as much - forwarding `--yes` as an
 argument to each verb kills no case, because the runner declares that flag and every verb consumes
 it rather than refusing it, so the defect this group was first written for cannot happen on this
@@ -456,7 +456,7 @@ registry and requires the same answer, which must die whenever either resolver b
 only case that can say the two agree; every other case belongs to one runner alone, which is what
 says the two are pinned apart rather than once. Removing the shell runner's dedup reddens 2,
 removing the Node one reddens
-3, two of them the workflow's, because a composition builds a `Map` from the listing and a repeated
+3, two of them the workflow's, because `runWorkflow` builds a `Map` from the listing and a repeated
 name resolves to the last entry rather than the first. Never marking an entry `project` reddens 3;
 never collapsing two identical directories in the shell runner reddens the one case that runs
 inside this repository; taking the sort off the shell listing reddens 3; pointing the shell
@@ -502,7 +502,7 @@ anyone who installs `lm` and runs a verb in a project of their own, and it is th
 hole rather than a coarse assertion.
 
 The delivery has a group of its own, and it sits on the driver the operator uses rather than
-beside it. `tests/ship.sh` runs `bin/lm ship` into `runComposition` over `tools/ship.sh`, with
+beside it. `tests/ship.sh` runs `bin/lm ship` into `runWorkflow` over `tools/ship.sh`, with
 `commit` and `pr` written as tool files of the suite's own and a recording server answering the one
 model call each makes, so every line a delivery runs is run here and none of it needs a GPU.
 `grep -c '^check ' tests/ship.sh` counts the cases, at 36 as this is written.
@@ -512,13 +512,13 @@ planted and each compared as a name set. Taking the `git switch -q -c` out of `p
 `main` is untouched, and not the case reading the branch name: `after_commit` renames whatever
 branch is current, so a commit made on `main` still ends up on a branch called after its subject,
 and the prediction that the branch cases would die was wrong for that reason. Dropping
-`LM_COMPOSITION` from the environment `runComposition` builds reddens the two cases that read the
+`LM_WORKFLOW` from the environment `runWorkflow` builds reddens the two cases that read the
 tag and leaves the branch names alone, which is the `:-ship` fallback in `_branch()` working.
-Dropping the `--dry-run` guard from the composition's own `step()` reddens six: the four that read
+Dropping the `--dry-run` guard from the workflow's own `step()` reddens six: the four that read
 the repository back after a rehearsal, the one that says a rehearsal stages nothing, and the one
 that reads the refusal a rehearsed verb makes on its own account. Its evidence is what the mutant
 left behind - a branch renamed to `chore/seed`, after a commit the run never made. Removing the
-line that says the composition's own steps did not run reddens only the case that reads it.
+line that says the workflow's own steps did not run reddens only the case that reads it.
 
 Then one property each: `_name()` returning a constant reddens the case reading the branch name;
 cutting the placeholder whether or not `--here` was given reddens the two `--here` cases that read
@@ -548,7 +548,7 @@ committed, so the mutation that always stages left it green; it reads the workin
 Five cases no mutation reddens, and they are controls rather than assertions: that a refusal leaves
 no commit, with and without `--here`; that the work is still staged after one; that a rehearsal
 exits 0; and that it still prints what `commit` would do. Each holds an absence or a completion
-that no mutation of the composition can manufacture on its own.
+that no mutation of the workflow can manufacture on its own.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which

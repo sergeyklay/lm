@@ -23,7 +23,7 @@ _name() {
 
 # Every function here is its own bash process, so $$ differs in each and the run's
 # own tag is what names the branch instead.
-_branch() { printf 'lm-%s' "${LM_COMPOSITION:-ship}"; }
+_branch() { printf 'lm-%s' "${LM_WORKFLOW:-ship}"; }
 
 # The operator should not have to decide which branch they are on, so a thematic
 # one is what happens when nothing is said. Its name is unknown until the commit
