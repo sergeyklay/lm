@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A past chat is reopened from `lm` itself: `lm --resume` offers the list to choose from, `lm --continue` takes the most recent one, and `lm --session <file or id>` names one outright. `lm` claims `--list`, `--which`, `-h` and `--help` in the first position and hands every leading flag but a verb's own two to the chat unread, so every session flag the harness takes is available without this repository keeping a list of them in step with it. Before, each of these had to be typed as `lm chat --resume` and the shorter form was refused as an option `lm` does not take.
+
+### Changed
+
+- An option in the first position that neither `lm` nor the chat takes is now named back by the harness that parses it, exiting 1, rather than by `lm`, exiting 2. `--dry-run` and `--yes` are the exception, because a verb's flag in front of its verb is a word out of order rather than a word misspelt and the harness knows of no verb to name: `lm` still refuses those two itself, exiting 2, and now says where the flag goes rather than listing the options it takes.
+
 ## [0.2.0] - 2026-08-29
 
 ### Added

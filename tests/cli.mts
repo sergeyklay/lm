@@ -71,23 +71,34 @@ const unknown = run(LM, ["nosuch"]);
 check("a subcommand's exit status arrives", 2, unknown.code);
 check("and its message arrives", true, /no such tool 'nosuch'/.test(unknown.err));
 
+// A leading flag lm does not claim reaches the chat, which keeps no list of the
+// harness's own options: one neither of them takes is named back by the parser
+// that read it. A launch writes to the harness's directory, so these get a
+// scratch one rather than the operator's, and ask for no catalogue.
+const agentDir = mkdtempSync(join(tmpdir(), "lm-forwarded-"));
+const forwarded = (args: string[]) => {
+  const r = spawnSync(LM, args, { encoding: "utf8", cwd: ROOT,
+    env: { ...process.env, LM_LOG: "", PI_OFFLINE: "1", PI_CODING_AGENT_DIR: agentDir } });
+  return { err: r.stderr ?? "", code: r.status ?? 0 };
+};
+
+const mistyped = forwarded(["--hlp"]);
+check("a mistyped option is refused rather than opening a chat", 1, mistyped.code);
+check("and is named back", true, /Unknown option: --hlp/.test(mistyped.err));
 // A mistyped option is not a verb name, and the verb list is a set that cannot
 // contain it, so answering with that list answers a question nobody asked.
-const mistyped = run(LM, ["--hlp"]);
-check("a mistyped option exits 2", 2, mistyped.code);
-check("and is named back", true, /'--hlp' is not an option of lm/.test(mistyped.err));
 check("and is not reported as a missing verb", false, /no such tool/.test(mistyped.err));
-check("and the options it could have meant are listed", true, /--list, --which, -h, --help/.test(mistyped.err));
 
 // The capability is a verb's flag, so it goes after the verb exactly like --dry-run
-// does and the first-position guard is untouched by it.
-const preYes = run(LM, ["--yes", "commit"]);
+// does. Neither is the chat's to answer, and the harness that would answer it knows
+// of no verb to put it behind, so lm keeps these two and says where they go.
+const preYes = forwarded(["--yes", "commit"]);
 check("--yes ahead of its verb exits 2", 2, preYes.code);
-check("and is named as a misplaced verb flag", true, /A verb takes .*--yes/.test(preYes.err));
-
-const misplaced = run(LM, ["--dry-run"]);
+check("and is told where the flag goes", true, /'--yes' is a verb's option and goes after the verb/.test(preYes.err));
+const misplaced = forwarded(["--dry-run"]);
 check("a verb flag ahead of its verb exits 2", 2, misplaced.code);
-check("and is told where the flag goes", true, /A verb takes --dry-run/.test(misplaced.err));
+check("and is named while being told", true, /'--dry-run' is a verb's option and goes after the verb/.test(misplaced.err));
+rmSync(agentDir, { recursive: true, force: true });
 
 const stats = spawnSync(LM, ["stats"], { encoding: "utf8", cwd: ROOT });
 check("stats reaches the run log", true, /^verb\s+runs\s+clean/m.test(stats.stdout ?? ""));

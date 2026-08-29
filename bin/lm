@@ -86,6 +86,8 @@ if (wantsHelp) {
 Usage:
   lm                              open a chat with the local model
   lm <tool> [options] [text]      run one tool${flowUsage}
+  lm --continue                   reopen the last chat where it left off
+  lm --resume                     choose a past chat to reopen
   lm stats [--all]                what the run log says about this repository
   lm stats --since <date>         the same, split into before and since that date
 
@@ -116,16 +118,21 @@ Environment:
 }
 
 const OPTIONS = ["--list", "--which"];
-if (argv[0]?.startsWith("-") && !OPTIONS.includes(argv[0])) {
-  process.stderr.write(`lm: '${argv[0]}' is not an option of lm.\n`);
-  process.stderr.write(`    Known: ${OPTIONS.join(", ")}, -h, --help. A verb takes --dry-run and --yes.\n`);
-  process.exit(2);
-}
 
 if (argv[0] === "stats") hand("lm-stats", argv.slice(1));
 if (OPTIONS.includes(argv[0])) hand("lm-verb", argv);
 
-if (argv.length > 0 && argv[0] !== "chat") {
+// A leading flag `lm` does not claim is the chat's, so every session flag the
+// harness takes works from here with no list to keep in step with it. One
+// neither takes is refused by the harness, which parses it. A verb's own two are
+// the exception: there they are a word out of order rather than a word misspelt,
+// and the harness has never heard of a verb to say where they go.
+if (argv[0] === "--dry-run" || argv[0] === "--yes") {
+  process.stderr.write(`lm: '${argv[0]}' is a verb's option and goes after the verb, as in 'lm <verb> ${argv[0]}'.\n`);
+  process.exit(2);
+}
+
+if (argv.length > 0 && argv[0] !== "chat" && !argv[0].startsWith("-")) {
   const { list, meta } = await import("../src/registry.mts");
   const files = list(registry());
   const file = files.find((f) => basename(f, ".sh") === argv[0]);

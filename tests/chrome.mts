@@ -176,38 +176,50 @@ check("and a long one drops them for the minutes", "2h 5m", formatDuration(7_500
 // The unit cases above say the line is right. This says the harness reaches the
 // handler that prints it, on the quit path and to the terminal it has already
 // restored, which no assertion over `summarize` can show.
-const quit = mkdtempSync(join(tmpdir(), "lm-quit-"));
-const session = join(quit, "2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl");
-copyFileSync(FIXTURE, session);
-const capture = join(quit, "capture.txt");
 // The model is never asked: nothing is submitted, the catalogue read is off and
 // the endpoint points nowhere, so a chat that tried would fail rather than run.
-const chat = spawn("script", ["-qc", `${ROOT}/bin/lm chat --session ${session} --session-dir ${quit}`, capture], {
-  cwd: ROOT,
-  stdio: ["pipe", "ignore", "ignore"],
-  env: { ...process.env, PI_CODING_AGENT_DIR: join(quit, "agent"), PI_OFFLINE: "1",
-    LM_OLLAMA: "http://127.0.0.1:1", TERM: "xterm-256color", COLUMNS: "100", LINES: "30" },
-});
-const seen = () => (existsSync(capture) ? readFileSync(capture, "utf8") : "");
-const exited = new Promise<void>((r) => chat.on("exit", () => r()));
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const deadline = Date.now() + 60_000;
-while (Date.now() < deadline && !seen().includes("for commands")) await wait(200);
-// Repeated because the key reaches a TUI that may still be drawing its first
-// frame, and an end of input it has not started reading is an end of input lost.
-while (Date.now() < deadline && chat.exitCode === null) {
-  chat.stdin.write(String.fromCharCode(4));
-  await Promise.race([exited, wait(500)]);
+async function quitAfterOpening(argv: (session: string, dir: string) => string): Promise<string> {
+  const quit = mkdtempSync(join(tmpdir(), "lm-quit-"));
+  const session = join(quit, "2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl");
+  copyFileSync(FIXTURE, session);
+  const capture = join(quit, "capture.txt");
+  const chat = spawn("script", ["-qc", `${ROOT}/bin/lm ${argv(session, quit)}`, capture], {
+    cwd: ROOT,
+    stdio: ["pipe", "ignore", "ignore"],
+    env: { ...process.env, PI_CODING_AGENT_DIR: join(quit, "agent"), PI_OFFLINE: "1",
+      LM_OLLAMA: "http://127.0.0.1:1", TERM: "xterm-256color", COLUMNS: "100", LINES: "30" },
+  });
+  const seen = () => (existsSync(capture) ? readFileSync(capture, "utf8") : "");
+  const exited = new Promise<void>((r) => chat.on("exit", () => r()));
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline && !seen().includes("for commands")) await wait(200);
+  // Repeated because the key reaches a TUI that may still be drawing its first
+  // frame, and an end of input it has not started reading is an end of input lost.
+  while (Date.now() < deadline && chat.exitCode === null) {
+    chat.stdin.write(String.fromCharCode(4));
+    await Promise.race([exited, wait(500)]);
+  }
+  chat.kill("SIGKILL");
+  await exited;
+  const printed = seen().replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
+  rmSync(quit, { recursive: true, force: true });
+  return printed;
 }
-chat.kill("SIGKILL");
-await exited;
 
-const printed = seen().replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
+const printed = await quitAfterOpening((s, d) => `chat --session ${s} --session-dir ${d}`);
 check("quitting the chat prints the closing line on the restored terminal", true,
   printed.includes("3 tools ran, 1 failed. ↑40.0k ↓1.2k over "));
 check("and prints it above the harness's own resume line", true,
   printed.indexOf("tools ran") >= 0 && printed.indexOf("tools ran") < printed.indexOf("To resume this session"));
-rmSync(quit, { recursive: true, force: true });
+
+// A session flag is the chat's and `lm` claims none of them, so the same session
+// reopens without the subcommand in front. The closing line is the proof, because
+// the harness computes it from the entries it loaded: a run that reopened nothing
+// has nothing to count.
+const noSubcommand = await quitAfterOpening((s, d) => `--session ${s} --session-dir ${d}`);
+check("a session reopens without naming the chat first", true,
+  noSubcommand.includes("3 tools ran, 1 failed. ↑40.0k ↓1.2k over "));
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");

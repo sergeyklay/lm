@@ -10,10 +10,13 @@ position claims the flag: `lm commit --help` is a question about `commit` and is
 that file declares, while `lm --help` is a question about `lm`. Nothing in a tool file answers
 `--help`, and nothing has to.
 
-An argument in the first position that starts with a dash and is none of `lm`'s own options is
-refused by name, with the options it could have meant, before anything is dispatched. `--list`
-and `--which` are the shell runner's and pass through. `--dry-run` belongs to a verb, and the
-refusal says so rather than listing it as though `lm` took it.
+`lm` claims four options in the first position: `--list` and `--which`, which are the shell
+runner's and pass through to it, and `-h` and `--help`, which it answers itself. `--dry-run` and
+`--yes` belong to a verb and go after it, and leading one of them is refused by name and told
+where the flag goes, because the harness that would read it there has never heard of a verb to
+put it behind. Anything else that starts with a dash is the chat's and reaches it unread, so
+every flag the harness takes is available from `lm` without this file naming one of them, and a
+flag neither side takes is refused by name by the harness that parses it, before a session opens.
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
 extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`, and every
@@ -74,7 +77,9 @@ directory under the home directory, outside this repository, and writes there as
 of those settings it writes itself, once: the harness lists every resource it loaded on each
 launch unless `quietStartup` is set, and there is no flag for it, so the chat sets it and says
 nothing, because a message about a setting you did not ask for is the noise it removes. A value
-already there is left alone.
+already there is left alone. A past session is reopened from `lm` itself rather than from a
+subcommand: `lm --continue` takes the most recent one, `lm --resume` offers the list to choose
+from, and `lm --session` names one by file or by identifier.
 
 It wears this project's own header and status rows rather than the harness's. The header is the
 mark, the name and the version `package.json` declares, and one dim row naming what to type; the
