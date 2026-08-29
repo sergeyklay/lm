@@ -222,6 +222,25 @@ the case written for that fallback and reddened three, because a reopened sessio
 branch; narrowed to leave that branch alone, it reddens the one case and nothing else. A prediction
 short of the kill set is the finding, not the disappointment.
 
+The last line of the block is a command, and which of the two forms it takes depends on where the
+session is kept, so six further mutations separate them. Printing the identifier whatever the
+directory says reddens five: the three unit cases holding a session outside the harness's default
+session directory, the one that quotes a path a shell would split, and the pair driven through the
+pseudo-terminal on a session `--session-dir` put elsewhere. Printing the file whatever the directory
+says was predicted to redden four and reddened five, and the surplus is the finding: a file path is
+longer than an identifier, so the case holding the block to eighty columns goes red beside them,
+which is the whole reason the identifier is the line where it resolves. Dropping the quoting reddens
+only the case with a space in the path, and reading a directory the harness will not answer for as
+the default one reddens only the case written for it. The last two are aimed at the method that
+decides, which the harness ships on the session manager and leaves out of the type it hands an
+extension: never calling it reddens exactly the two cases that reopen a session from the harness's
+own directory and no unit case at all, which is why that pair is driven through a pseudo-terminal
+rather than asserted over `summarize`; negating what it returns reddens all four pseudo-terminal
+cases at once, the two locations swapping lines, which is what says the method is answering rather
+than merely being present. The series was itself perturbed before it was believed: replanted on an
+anchor occurring seven times, the driver refused the mutation rather than patching the first hit,
+which is the zero this record would otherwise have had to explain.
+
 `node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it
 exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,
 which every module under `src/` and `tests/` does, while the same bytes saved as `.mjs` are

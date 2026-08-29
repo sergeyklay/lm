@@ -149,6 +149,7 @@ export type ModelSpend = { model: string; requests: number; input: number; cache
 
 export type Summary = {
   id: string | undefined;
+  resume: string | undefined;
   tools: number;
   failed: number;
   models: ModelSpend[];
@@ -159,6 +160,12 @@ export type Summary = {
 // When this launch began and when it ended. The first bounds the sitting the
 // operator just had; a session record older than it is one they reopened.
 export type Sitting = { launchedAt: number; endedAt: number };
+
+// Where the session's records are kept. An identifier resolves against the
+// harness's default session directory and nowhere else, so a session held
+// elsewhere is named by its file; an undefined directory is one the harness
+// would not answer for, and takes the file too.
+export type SessionLocation = { file: string | undefined; isDefaultDir: boolean | undefined };
 
 // A compaction is a model call whose entry names no model, so usage that names
 // none is charged to the model in force when it was spent.
@@ -185,7 +192,7 @@ function spendByModel(entries: Iterable<any>): ModelSpend[] {
 // Every figure here is a count of what this session did. None is divided by
 // another, because a share below this project's stated minimum sample is
 // withheld and one session is never that sample.
-export function summarize(header: any, entries: any[], sitting: Sitting): Summary | null {
+export function summarize(header: any, entries: any[], sitting: Sitting, where: SessionLocation): Summary | null {
   const messages = entries.filter((e) => e?.type === "message");
   if (!messages.some((e) => e.message?.role === "assistant")) return null;
   const results = messages.filter((e) => e.message?.role === "toolResult");
@@ -195,8 +202,10 @@ export function summarize(header: any, entries: any[], sitting: Sitting): Summar
   const opened = Date.parse(String(header?.timestamp));
   const resumed = opened < sitting.launchedAt;
   const started = Number.isFinite(opened) && !resumed ? opened : sitting.launchedAt;
+  const id = typeof header?.id === "string" ? header.id : undefined;
   return {
-    id: typeof header?.id === "string" ? header.id : undefined,
+    id,
+    resume: where.isDefaultDir === true ? id : (where.file ?? id),
     tools: results.length,
     failed: results.filter((e) => e.message.isError === true).length,
     models: spendByModel(entries),
@@ -228,6 +237,11 @@ function spendTable(models: ModelSpend[]): string[] {
   return [row(COLUMNS), ...rows.map(row)];
 }
 
+// The resume line is a command the operator pastes, so a path a shell would read
+// as more than one word is quoted, as the harness quotes its own.
+const shellWord = (s: string) =>
+  /^[A-Za-z0-9_\-./~:@]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`;
+
 export function summaryBlock(s: Summary): string[] {
   const head: string[][] = [
     ...(s.id ? [["Session", s.id]] : []),
@@ -240,7 +254,7 @@ export function summaryBlock(s: Summary): string[] {
     ...head.map(([name, value]) => `${name.padEnd(label)}${GUTTER}${value}`),
     "",
     ...spendTable(s.models),
-    ...(s.id ? ["", `Resume: lm --session ${s.id}`] : []),
+    ...(s.resume ? ["", `Resume: lm --session ${shellWord(s.resume)}`] : []),
   ];
 }
 
@@ -256,10 +270,17 @@ export function installChrome(pi: any): void {
     // The launch is the process's own start rather than the first session_start,
     // which fires again for a reload and rebuilds this extension while the same
     // sitting carries on.
-    const summary = summarize(ctx.sessionManager.getHeader(), ctx.sessionManager.getEntries(), {
-      launchedAt: performance.timeOrigin,
-      endedAt: Date.now(),
-    });
+    const manager = ctx.sessionManager;
+    // The harness ships `usesDefaultSessionDir` and leaves it out of the type it
+    // hands an extension, so a build that keeps its word answers nothing here.
+    const isDefaultDir =
+      typeof manager.usesDefaultSessionDir === "function" ? manager.usesDefaultSessionDir() === true : undefined;
+    const summary = summarize(
+      manager.getHeader(),
+      manager.getEntries(),
+      { launchedAt: performance.timeOrigin, endedAt: Date.now() },
+      { file: manager.getSessionFile(), isDefaultDir },
+    );
     if (summary) process.stdout.write(`\n${summaryBlock(summary).join("\n")}\n`);
   });
 

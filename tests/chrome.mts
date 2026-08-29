@@ -5,10 +5,10 @@
 // theme is the operator's to change, and the position of the branch is not.
 
 import { spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, type SessionLocation, type Sitting } from "../src/chrome.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
@@ -140,8 +140,13 @@ const { head, entries } = load(FIXTURE);
 // written: what the block says of them is what it said on the day.
 const RECORD = Date.parse("2026-08-28T20:00:00.000Z");
 const OPENED: Sitting = { launchedAt: RECORD - 1000, endedAt: Date.parse("2026-08-28T20:12:30.000Z") };
-const block = (es: any[], h: any = head, sitting: Sitting = OPENED) => {
-  const s = summarize(h, es, sitting);
+// An identifier resolves against the harness's default session directory alone,
+// so where the session is kept decides which of the two the resume line can name.
+const FILE = "/home/ubuntu/.pi/sessions/--home-ubuntu-lm--/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl";
+const HOME: SessionLocation = { file: FILE, isDefaultDir: true };
+const AWAY: SessionLocation = { file: "/srv/sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl", isDefaultDir: false };
+const block = (es: any[], h: any = head, sitting: Sitting = OPENED, where: SessionLocation = HOME) => {
+  const s = summarize(h, es, sitting, where);
   return s === null ? null : summaryBlock(s).join("\n");
 };
 const part = (text: string | null, n: number) => String(text).split("\n\n")[n];
@@ -154,6 +159,24 @@ check("the table charges the spend to the model that answered",
   part(block(entries), 1));
 check("and the last line reopens the session from lm itself",
   "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de", part(block(entries), 2));
+// The identifier is the shorter line and the one the operator reads on the row
+// above, but it resolves in one directory. A session kept anywhere else is named
+// by its file, which reopens it wherever it is.
+check("a session outside that directory is named by its file instead",
+  `Resume: lm --session ${AWAY.file}`, part(block(entries, head, OPENED, AWAY), 2));
+// The harness declares no method that answers this, so a build that stops
+// shipping one leaves the question open, and an open question takes the file.
+check("and a directory the harness will not answer for takes the file too",
+  `Resume: lm --session ${AWAY.file}`,
+  part(block(entries, head, OPENED, { file: AWAY.file, isDefaultDir: undefined }), 2));
+check("but with no file to name it falls back to the identifier",
+  "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de",
+  part(block(entries, head, OPENED, { file: undefined, isDefaultDir: undefined }), 2));
+// The line is pasted into a shell, so a path that is more than one word there is
+// quoted rather than printed as a command that would open something else.
+check("a path a shell would split is quoted",
+  "Resume: lm --session '/srv/my sessions/a.jsonl'",
+  part(block(entries, head, OPENED, { file: "/srv/my sessions/a.jsonl", isDefaultDir: false }), 2));
 check("every row of it reads on an eighty-column terminal", true,
   String(block(entries)).split("\n").every((l) => l.length <= 80));
 
@@ -245,12 +268,17 @@ check("and a long one drops them for the minutes", "2h 5m", formatDuration(7_500
 // restored, which no assertion over `summarize` can show.
 // The model is never asked: nothing is submitted, the catalogue read is off and
 // the endpoint points nowhere, so a chat that tried would fail rather than run.
-async function quitAfterOpening(argv: (session: string, dir: string) => string): Promise<string> {
+async function quitAfterOpening(
+  argv: (session: string, dir: string) => string,
+  holds: (quit: string) => string = (quit) => quit,
+): Promise<{ printed: string; session: string }> {
   const quit = mkdtempSync(join(tmpdir(), "lm-quit-"));
-  const session = join(quit, "2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl");
+  const dir = holds(quit);
+  mkdirSync(dir, { recursive: true });
+  const session = join(dir, "2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl");
   copyFileSync(FIXTURE, session);
   const capture = join(quit, "capture.txt");
-  const chat = spawn("script", ["-qc", `${ROOT}/bin/lm ${argv(session, quit)}`, capture], {
+  const chat = spawn("script", ["-qc", `${ROOT}/bin/lm ${argv(session, dir)}`, capture], {
     cwd: ROOT,
     stdio: ["pipe", "ignore", "ignore"],
     env: { ...process.env, PI_CODING_AGENT_DIR: join(quit, "agent"), PI_OFFLINE: "1",
@@ -271,15 +299,26 @@ async function quitAfterOpening(argv: (session: string, dir: string) => string):
   await exited;
   const printed = seen().replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\r/g, "");
   rmSync(quit, { recursive: true, force: true });
-  return printed;
+  return { printed, session };
 }
 
-const printed = await quitAfterOpening((s, d) => `chat --session ${s} --session-dir ${d}`);
+// Where the harness keeps a session by default, and the only directory an
+// identifier resolves in: the agent directory, then the working directory with
+// its separators flattened.
+const defaultSessions = (quit: string) =>
+  join(quit, "agent", "sessions", `--${ROOT.replace(/^\//, "").replace(/\//g, "-")}--`);
+
+const { printed, session: away } = await quitAfterOpening((s, d) => `chat --session ${s} --session-dir ${d}`);
 const BLOCK = ["Session   01a04900-0000-7000-8000-00000000c0de", "Tools     3 ran, 1 failed",
-  "Model         Reqs   Input   Cache   Output", "qwen3.8:27b      3   37.0k    3.0k     1.2k",
-  "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"];
+  "Model         Reqs   Input   Cache   Output", "qwen3.8:27b      3   37.0k    3.0k     1.2k"];
 check("quitting the chat prints the closing block on the restored terminal", true,
   BLOCK.every((l) => printed.includes(l)));
+// The session is not in the directory an identifier resolves in, so the line
+// names the file, which reopens it from wherever it is.
+check("and a session held outside the default directory is resumed by its file", true,
+  printed.includes(`Resume: lm --session ${away}`));
+check("naming no identifier the chat could not have found it by", false,
+  printed.includes("Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"));
 // The two figures differ only where a session outlived a launch, and this run is
 // that: the fixture's own record is dated before any run of this suite, while the
 // sitting is the seconds this case spends in the chat before ending it.
@@ -298,7 +337,18 @@ check("and prints it above the harness's own resume line", true,
 // has nothing to count.
 const noSubcommand = await quitAfterOpening((s, d) => `--session ${s} --session-dir ${d}`);
 check("a session reopens without naming the chat first", true,
-  BLOCK.every((l) => noSubcommand.includes(l)));
+  BLOCK.every((l) => noSubcommand.printed.includes(l)));
+
+// The other half of the same fixture: held where the harness keeps its own, the
+// identifier resolves, and the line is the short one the operator reads above it.
+// Only a live run says so, because the method that decides is one the harness
+// ships and does not declare.
+const atHome = await quitAfterOpening(() => "--session 01a04900-0000-7000-8000-00000000c0de", defaultSessions);
+check("a session held where the harness keeps its own is resumed by its identifier", true,
+  BLOCK.every((l) => atHome.printed.includes(l))
+    && atHome.printed.includes("Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"));
+check("and names no file, which is the longer line for nothing", false,
+  atHome.printed.includes(`Resume: lm --session ${atHome.session}`));
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");

@@ -107,7 +107,16 @@ record and no `History` row is printed for it. Every figure is a count, and none
 another, because a share below this project's stated minimum sample is withheld and one session is
 never that sample. A count of zero is printed rather than withheld, so a session that ran no tool
 says `0 ran, 0 failed`: a zero you cannot see cannot be told apart from a figure nothing computes.
-The last line is the command that reopens the session, in the form `lm` itself takes. A session that
+The last line is the command that reopens the session, in the form `lm` itself takes, and which of the
+two forms it takes depends on where the session is kept. An identifier resolves against the harness's
+default session directory and nowhere else, so a session held there is named by its identifier, which
+is short and is the same string the row at the top of the block already showed. A session held
+anywhere else, which is what `--session-dir` produces, is named by its file instead, because that path
+reopens the session from wherever it is while the identifier would not find it at all. A directory the
+harness declines to answer for takes the file too: the file is right in both cases and the identifier
+in only one. A path a shell would read as more than one word is quoted, and a long one is the single
+row of the block that can run past eighty columns, which is what the identifier buys where it works. A
+session that
 never reached the model prints nothing at all, since nothing was asked and nothing was answered. The
 block is written on `session_shutdown`, which also fires for a reload and for each of the three ways
 a session is replaced, so only the quit reason prints one. By then the harness has stopped the TUI,
