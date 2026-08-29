@@ -92,18 +92,20 @@ terminal without truecolor gets the theme's approximation. The harness restores 
 and footer while it tears the extension UI down, so the last frame you see on quitting is its,
 not this one's.
 
-Quitting then prints one closing line. It says how many tools the session ran and how many of those
-failed, what the session spent in tokens, and how long it lasted, measured from the session's own
-first record to its last rather than from a clock this code starts; resuming a session and quitting
-therefore reports the whole span, including the part that happened before the resume. Every figure
-is a count, and none is divided by another, because a share below this project's stated minimum
-sample is withheld and one session is never that sample. A session whose tools all worked says
-nothing about failures, a session that ran no tool says nothing about tools, and a session that
-never reached the model prints nothing at all: none of the three is news to the person who was
-watching it happen. The line is written on `session_shutdown`, which also fires for a reload and
-for each of the three ways a session is replaced, so only the quit reason prints one. By then the
-harness has stopped the TUI, so the line lands on the restored terminal, immediately above the
-harness's own resume command.
+Quitting then prints a block of what the session did: the session's identifier, how many tools it
+ran and how many of those failed, how long it lasted, and a table of what each model was asked and
+what it spent, one row per model with a total row under them when more than one answered. The
+elapsed figure is measured from the session's own first record to its last rather than from a clock
+this code starts; resuming a session and quitting therefore reports the whole span, including the
+part that happened before the resume. Every figure is a count, and none is divided by another,
+because a share below this project's stated minimum sample is withheld and one session is never that
+sample. A count of zero is printed rather than withheld, so a session that ran no tool says
+`0 ran, 0 failed`: a zero you cannot see cannot be told apart from a figure nothing computes. The
+last line is the command that reopens the session, in the form `lm` itself takes. A session that
+never reached the model prints nothing at all, since nothing was asked and nothing was answered. The
+block is written on `session_shutdown`, which also fires for a reload and for each of the three ways
+a session is replaced, so only the quit reason prints one. By then the harness has stopped the TUI,
+so the block lands on the restored terminal, immediately above the harness's own resume command.
 
 `libexec/lm-verb` is the shell runner and still runs every verb. The Node side under `src/` is
 the half being built to replace it, and it reads the same registry, so a tool file does not know

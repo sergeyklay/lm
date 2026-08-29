@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The chat's closing summary is now a block rather than one line: the session's identifier, how many tools ran and how many of those failed, how long the session lasted, and a table of what each model was asked and what it spent in input, cache and output tokens, one row per model with a total under them when more than one answered, closing on the `lm --session <id>` command that reopens the session. Every count is printed whatever it is, so a session that ran no tool now says `0 ran, 0 failed`. Before, the tool counts were withheld on exactly the sessions where they were zero, and a zero nobody can see reads as a feature that was never built.
 - An option in the first position that neither `lm` nor the chat takes is now named back by the harness that parses it, exiting 1, rather than by `lm`, exiting 2. `--dry-run` and `--yes` are the exception, because a verb's flag in front of its verb is a word out of order rather than a word misspelt and the harness knows of no verb to name: `lm` still refuses those two itself, exiting 2, and now says where the flag goes rather than listing the options it takes.
 
 ## [0.2.0] - 2026-08-29

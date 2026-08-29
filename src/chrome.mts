@@ -145,7 +145,37 @@ function totals(entries: Iterable<any>): { input: number; output: number } {
   return { input, output };
 }
 
-export type Summary = { tools: number; failed: number; input: number; output: number; ms: number };
+export type ModelSpend = { model: string; requests: number; input: number; cache: number; output: number };
+
+export type Summary = {
+  id: string | undefined;
+  tools: number;
+  failed: number;
+  models: ModelSpend[];
+  ms: number;
+};
+
+// A compaction is a model call whose entry names no model, so usage that names
+// none is charged to the model in force when it was spent.
+function spendByModel(entries: Iterable<any>): ModelSpend[] {
+  const rows = new Map<string, ModelSpend>();
+  let inForce = "unknown";
+  for (const entry of entries) {
+    const message = entry?.type === "message" ? entry.message : undefined;
+    if (entry?.type === "model_change" && entry.modelId) inForce = String(entry.modelId);
+    if (message?.role === "assistant" && message.model) inForce = String(message.model);
+    const usage = message ? message.usage : entry?.usage;
+    const answered = message?.role === "assistant";
+    if (!usage && !answered) continue;
+    const row = rows.get(inForce) ?? { model: inForce, requests: 0, input: 0, cache: 0, output: 0 };
+    rows.set(inForce, row);
+    if (answered) row.requests += 1;
+    row.input += usage?.input ?? 0;
+    row.cache += (usage?.cacheRead ?? 0) + (usage?.cacheWrite ?? 0);
+    row.output += usage?.output ?? 0;
+  }
+  return [...rows.values()];
+}
 
 // Every figure here is a count of what this session did. None is divided by
 // another, because a share below this project's stated minimum sample is
@@ -158,34 +188,63 @@ export function summarize(header: any, entries: any[]): Summary | null {
     .map((t) => Date.parse(String(t)))
     .filter((n) => Number.isFinite(n));
   return {
+    id: typeof header?.id === "string" ? header.id : undefined,
     tools: results.length,
     failed: results.filter((e) => e.message.isError === true).length,
-    ...totals(entries),
+    models: spendByModel(entries),
     ms: stamps.length > 1 ? Math.max(...stamps) - Math.min(...stamps) : 0,
   };
 }
 
-// A session that ran no tool and a session whose tools all worked are both the
-// expected case, so neither is said. What is left is the clause a person acts
-// on: the tool that failed, and what the session cost in tokens and in time.
-export function summaryLine(s: Summary): string {
-  const ran = s.tools === 1 ? "1 tool ran" : `${s.tools} tools ran`;
-  const failed = s.failed > 0 ? `, ${s.failed} failed` : "";
-  const spent = `↑${formatTokens(s.input)} ↓${formatTokens(s.output)} over ${formatDuration(s.ms)}`;
-  return s.tools > 0 ? `${ran}${failed}. ${spent}.` : `${spent}.`;
+const COLUMNS = ["Model", "Reqs", "Input", "Cache", "Output"];
+const GUTTER = "   ";
+
+function spendTable(models: ModelSpend[]): string[] {
+  const cells = (m: ModelSpend) =>
+    [m.model, String(m.requests), formatTokens(m.input), formatTokens(m.cache), formatTokens(m.output)];
+  const rows = models.map(cells);
+  if (rows.length > 1) {
+    const sum = (of: (m: ModelSpend) => number) => models.reduce((n, m) => n + of(m), 0);
+    rows.push(cells({
+      model: "total",
+      requests: sum((m) => m.requests),
+      input: sum((m) => m.input),
+      cache: sum((m) => m.cache),
+      output: sum((m) => m.output),
+    }));
+  }
+  const width = COLUMNS.map((c, i) => Math.max(c.length, ...rows.map((r) => r[i].length)));
+  const row = (r: string[]) =>
+    r.map((c, i) => (i === 0 ? c.padEnd(width[i]) : c.padStart(width[i]))).join(GUTTER).trimEnd();
+  return [row(COLUMNS), ...rows.map(row)];
+}
+
+export function summaryBlock(s: Summary): string[] {
+  const head: string[][] = [
+    ...(s.id ? [["Session", s.id]] : []),
+    ["Tools", `${s.tools} ran, ${s.failed} failed`],
+    ["Time", formatDuration(s.ms)],
+  ];
+  const label = Math.max(...head.map(([name]) => name.length));
+  return [
+    ...head.map(([name, value]) => `${name.padEnd(label)}${GUTTER}${value}`),
+    "",
+    ...spendTable(s.models),
+    ...(s.id ? ["", `Resume: lm --session ${s.id}`] : []),
+  ];
 }
 
 // Everything this project draws on the chat's screen. Without a terminal there
 // is nothing to draw on.
 export function installChrome(pi: any): void {
   // The same event fires for a reload and for each of the three ways a session
-  // is replaced, where the chat carries on and a closing line would be a lie.
+  // is replaced, where the chat carries on and a closing block would be a lie.
   // Only quitting ends the session, and the harness has already stopped the TUI
-  // by then, so the line goes to the restored terminal rather than to a frame.
+  // by then, so it goes to the restored terminal rather than to a frame.
   pi.on("session_shutdown", (event: any, ctx: any) => {
     if (event?.reason !== "quit" || !ctx.hasUI) return;
     const summary = summarize(ctx.sessionManager.getHeader(), ctx.sessionManager.getEntries());
-    if (summary) process.stdout.write(`${summaryLine(summary)}\n`);
+    if (summary) process.stdout.write(`\n${summaryBlock(summary).join("\n")}\n`);
   });
 
   // The header is built before extensions initialise, and `setHeader` is a no-op

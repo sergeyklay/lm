@@ -8,7 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryLine, visibleWidth, version } from "../src/chrome.mts";
+import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version } from "../src/chrome.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
@@ -127,53 +127,104 @@ check("and nothing else in the file is disturbed", "light",
 rmSync(work, { recursive: true, force: true });
 
 // What the chat says on the way out. The figures are counts of what this session
-// did and never one divided by another, so the fixture is a transcript in the
-// harness's own on-disk shape and the expectations are read off it by hand.
+// did and never one divided by another, so the fixtures are transcripts in the
+// harness's own on-disk shape and the expectations are read off them by hand.
 const FIXTURE = join(ROOT, "tests/fixtures/session-three-tools.jsonl");
-const records = readFileSync(FIXTURE, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-const head = records.find((r) => r.type === "session");
-const entries = records.filter((r) => r.type !== "session");
-const line = (es: any[], h: any = head) => {
+function load(file: string) {
+  const records = readFileSync(file, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  return { head: records.find((r) => r.type === "session"), entries: records.filter((r) => r.type !== "session") };
+}
+const { head, entries } = load(FIXTURE);
+const block = (es: any[], h: any = head) => {
   const s = summarize(h, es);
-  return s === null ? null : summaryLine(s);
+  return s === null ? null : summaryBlock(s).join("\n");
 };
+const part = (text: string | null, n: number) => String(text).split("\n\n")[n];
 
-check("the closing line counts the tools and the one that failed", true,
-  String(line(entries)).startsWith("3 tools ran, 1 failed."));
-check("and says what the session spent over how long it lasted",
-  "3 tools ran, 1 failed. ↑40.0k ↓1.2k over 12m 30s.", line(entries));
+check("the block opens on the session, what it ran and how long it took",
+  "Session   01a04900-0000-7000-8000-00000000c0de\nTools     3 ran, 1 failed\nTime      12m 30s",
+  part(block(entries), 0));
+check("the table charges the spend to the model that answered",
+  "Model         Reqs   Input   Cache   Output\nqwen3.8:27b      3   37.0k    3.0k     1.2k",
+  part(block(entries), 1));
+check("and the last line reopens the session from lm itself",
+  "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de", part(block(entries), 2));
+check("every row of it reads on an eighty-column terminal", true,
+  String(block(entries)).split("\n").every((l) => l.length <= 80));
 
-// A session whose tools all worked is the expected case, and so is one that ran
-// no tool at all. Neither is worth telling a person who was watching it happen.
+// A zero the operator cannot see is a feature they cannot tell from one that was
+// never built, which is what the suppressed clauses cost. Both counts are printed
+// whatever they are.
 const worked = entries.map((e) =>
   e.message?.role === "toolResult" ? { ...e, message: { ...e.message, isError: false } } : e);
-check("a session whose tools all worked says nothing about failures",
-  "3 tools ran. ↑40.0k ↓1.2k over 12m 30s.", line(worked));
-check("a session that ran no tool says nothing about tools",
-  "↑40.0k ↓1.2k over 10m.", line(entries.filter((e) => e.message?.role !== "toolResult")));
+check("a session whose tools all worked prints the failure count as a zero",
+  "Tools     3 ran, 0 failed", String(block(worked)).split("\n")[1]);
+check("a session that ran no tool prints both counts as zeroes",
+  "Tools     0 ran, 0 failed",
+  String(block(entries.filter((e) => e.message?.role !== "toolResult"))).split("\n")[1]);
+
+// One model is one row, and a total row would repeat it. Two models are two rows
+// and a sum the reader would otherwise do by hand.
+const two = load(join(ROOT, "tests/fixtures/session-two-models.jsonl"));
+check("a second model gets a row of its own and a total under both",
+  "Model         Reqs   Input   Cache   Output\n"
+  + "qwen3.8:27b      2    8.0k    1.0k      300\n"
+  + "gpt-oss:20b      1    2.0k     500      150\n"
+  + "total            3   10.0k    1.5k      450",
+  part(block(two.entries, two.head), 1));
+check("and the columns are still as wide as the widest cell in them", true,
+  part(block(two.entries, two.head), 1).split("\n").every((l) => l.length === 43));
 
 const at = (ms: number, message: any) => ({ type: "message", timestamp: new Date(ms).toISOString(), message });
 const turn = (input: number, output: number) =>
-  ({ role: "assistant", usage: { input, output, cacheRead: 0, cacheWrite: 0 } });
+  ({ role: "assistant", model: "qwen3.8:27b", usage: { input, output, cacheRead: 0, cacheWrite: 0 } });
 const one = [at(1000, turn(500, 20)), at(4000, { role: "toolResult", toolName: "commit", isError: false })];
-check("one tool is not two", "1 tool ran. ↑500 ↓20 over 3s.", line(one, { timestamp: new Date(1000).toISOString() }));
+check("one tool is counted like any other", "Tools     1 ran, 0 failed",
+  String(block(one, { id: "01a04900-0000-7000-8000-00000000c0de", timestamp: new Date(1000).toISOString() })).split("\n")[1]);
+
+// A compaction is a model call, and its entry names no model, so the tokens it
+// spent belong to whichever model was in force when it ran.
+const compacted = [
+  at(1000, turn(500, 20)),
+  { type: "compaction", timestamp: new Date(2000).toISOString(), usage: { input: 100, output: 5 } },
+];
+check("a compaction is charged to the model in force when it ran",
+  "Model         Reqs   Input   Cache   Output\nqwen3.8:27b      1     600       0       25",
+  part(block(compacted, null), 1));
+check("and an answer that names no model is charged to no model rather than dropped",
+  "Model     Reqs   Input   Cache   Output\nunknown      1     500       0       20",
+  part(block([at(1000, { role: "assistant", usage: { input: 500, output: 20 } })], null), 1));
+// The harness declares the model in an entry of its own before any reply carries
+// one, so a compaction before that reply is charged to the model then in force.
+const declared = [
+  { type: "model_change", timestamp: new Date(500).toISOString(), modelId: "gpt-oss:20b" },
+  { type: "compaction", timestamp: new Date(1000).toISOString(), usage: { input: 100, output: 5 } },
+  at(2000, turn(500, 20)),
+];
+check("and a model declared before the first reply is charged for what ran under it",
+  "Model         Reqs   Input   Cache   Output\ngpt-oss:20b      0     100       0        5\n"
+  + "qwen3.8:27b      1     500       0       20\ntotal            1     600       0       25",
+  part(block(declared, null), 1));
 
 // The span is the session's own, and the session record is what opens it: the
 // first entry is written after the model and the thinking level are settled.
 check("the span opens at the session record rather than at the first entry",
-  "↑500 ↓20 over 1m.", line([at(60_000, turn(500, 20))], { timestamp: new Date(0).toISOString() }));
+  "Time      1m", String(block([at(60_000, turn(500, 20))], { id: "01a04900-0000-7000-8000-00000000c0de", timestamp: new Date(0).toISOString() })).split("\n")[2]);
 check("and falls back to the entries when there is no session record",
-  "↑500 ↓20 over 0s.", line([at(60_000, turn(500, 20))], null));
+  "Tools   0 ran, 0 failed\nTime    0s", part(block([at(60_000, turn(500, 20))], null), 0));
+// Without a session record there is no identifier, and a resume command naming
+// none would not reopen anything.
+check("which also leaves nothing to resume", 2, String(block([at(60_000, turn(500, 20))], null)).split("\n\n").length);
 
 // Nothing was asked and nothing was answered, so there is nothing to report.
 check("a session that never reached the model prints nothing", null,
-  line([at(1000, { role: "user" })]));
+  block([at(1000, { role: "user" })]));
 
 check("a short session is counted in seconds", "45s", formatDuration(45_000));
 check("a round one drops the seconds", "5m", formatDuration(300_000));
 check("and a long one drops them for the minutes", "2h 5m", formatDuration(7_500_000));
 
-// The unit cases above say the line is right. This says the harness reaches the
+// The unit cases above say the block is right. This says the harness reaches the
 // handler that prints it, on the quit path and to the terminal it has already
 // restored, which no assertion over `summarize` can show.
 // The model is never asked: nothing is submitted, the catalogue read is off and
@@ -208,18 +259,24 @@ async function quitAfterOpening(argv: (session: string, dir: string) => string):
 }
 
 const printed = await quitAfterOpening((s, d) => `chat --session ${s} --session-dir ${d}`);
-check("quitting the chat prints the closing line on the restored terminal", true,
-  printed.includes("3 tools ran, 1 failed. ↑40.0k ↓1.2k over "));
+const BLOCK = ["Session   01a04900-0000-7000-8000-00000000c0de", "Tools     3 ran, 1 failed",
+  "Model         Reqs   Input   Cache   Output", "qwen3.8:27b      3   37.0k    3.0k     1.2k",
+  "Resume: lm --session 01a04900-0000-7000-8000-00000000c0de"];
+check("quitting the chat prints the closing block on the restored terminal", true,
+  BLOCK.every((l) => printed.includes(l)));
+check("set off by a blank line from the frame the harness restored", true,
+  printed.includes("\n\nSession   01a04900"));
 check("and prints it above the harness's own resume line", true,
-  printed.indexOf("tools ran") >= 0 && printed.indexOf("tools ran") < printed.indexOf("To resume this session"));
+  printed.indexOf("Session   01a04900") >= 0
+    && printed.indexOf("Session   01a04900") < printed.indexOf("To resume this session"));
 
 // A session flag is the chat's and `lm` claims none of them, so the same session
-// reopens without the subcommand in front. The closing line is the proof, because
+// reopens without the subcommand in front. The closing block is the proof, because
 // the harness computes it from the entries it loaded: a run that reopened nothing
 // has nothing to count.
 const noSubcommand = await quitAfterOpening((s, d) => `--session ${s} --session-dir ${d}`);
 check("a session reopens without naming the chat first", true,
-  noSubcommand.includes("3 tools ran, 1 failed. ↑40.0k ↓1.2k over "));
+  BLOCK.every((l) => noSubcommand.includes(l)));
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");

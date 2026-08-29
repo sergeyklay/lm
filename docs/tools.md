@@ -64,7 +64,7 @@ bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
-node tests/chrome.mts             # what the chat's header, status rows and closing line say, and at what width
+node tests/chrome.mts             # what the chat's header, status rows and closing block say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
 node tests/chat-request.mts       # what the chat asks the model for, off the wire
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
@@ -172,26 +172,42 @@ guessing the auto-compact label instead of reading the setting reddens the case 
 unread setting prints no mode, right-aligning the branch reddens the case that pins it near the
 middle, and dropping the version reddens the case that reads the name.
 
-The same suite covers the line the chat prints on quitting, over a transcript fixture in the
-harness's own on-disk shape rather than a session anyone ran. Flipping the one tool result that
-fixture records as failed reddens three cases: the two that read the counts, and the one that
-drives `lm chat` on a copy of the fixture through a pseudo-terminal and ends it with an end of
-input. It leaves green the case that derives an all-worked session from the same fixture, and that
-pair is what separates the count from the clause it prints. Nine mutations of `src/chrome.mts` each
-redden the set predicted for them before they were planted: counting successes as failures reddens
-five, printing the failure clause at zero reddens the two cases written for its silence, printing
-the tool clause at zero reddens three, dropping the session record from the span reddens only the
-case that pins where the span opens, disabling the gate on a session that never reached the model
-reddens only that case, and dropping the cached half of the input from the token totals reddens
-four. Two of the nine redden nothing but the pseudo-terminal pair, and nothing else can: refusing
-the quit reason, and inverting the guard on whether there is a UI, both leave every assertion over
-the summary green, because a line that is never printed reads exactly like a line that is right
-until something reads the terminal back. The three mutations of the duration redden one case each
-except the round-minute form, which reddens two, since the fixture's tool-free variant also lasts a
-round ten minutes: that was the one prediction of the twelve that was wrong, and it was wrong by a
-case it gained rather than one it lost.
+The same suite covers the block the chat prints on quitting, over two transcript fixtures in the
+harness's own on-disk shape rather than sessions anyone ran: one where three tools run against a
+single model, and one where two run across a model change, which is the only thing that exercises
+the table's second row and the total under it. Flipping the one tool result the first fixture
+records as failed reddens three cases: the one that reads the counts, and the pair that drives `lm`
+on a copy of the fixture through a pseudo-terminal and ends it with an end of input. It leaves green
+the case that derives an all-worked session from the same fixture, and that pair is what separates
+the count from the form it prints.
 
-`node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 it
+Eleven mutations of the block in `src/chrome.mts` each redden the set predicted for them before they
+were planted. Restoring the withheld failure clause reddens four, among them the two cases that
+exist because that clause used to be withheld. Dropping the cached half of a model's input reddens
+four, left-aligning the numeric columns reddens seven, and widening every column heading fourfold
+reddens those seven and the case that holds the block to eighty columns. Blanking the session
+identifier reddens five, writing the resume line as `lm chat --session` reddens three, printing that
+line for a session with no record to name reddens only the case that counts the block's paragraphs,
+and collapsing the elapsed span to zero reddens two. Three narrow the attribution of a model's
+spend: ignoring usage an entry carries rather than a message reddens the two compaction cases,
+renaming the model in force before anything has declared one reddens the case that reads `unknown`,
+and dropping the declaration entry from the walk reddens the case written for it. That last is the
+one worth keeping: planted before that case existed it reddened nothing, because every assistant
+record in both fixtures names its own model, and the branch it removes decides only where a
+compaction lands before the first reply under a newly declared model. The case was written for the
+mutant rather than the other way round.
+
+Two further mutants redden nothing but the pseudo-terminal cases, and nothing else can: refusing the
+quit reason and inverting the guard on whether there is a UI both leave every assertion over the
+summary green, because a block that is never printed reads exactly like a block that is right until
+something reads the terminal back. One more is a control for the procedure rather than for the code:
+dropping the cached half of the input from the totals the status row is built from reddens nothing
+at all, though the footer read back through the pseudo-terminal shows `↑37.0k` where a clean run
+shows `↑40.0k`. Nothing in the suite reads what the status row counts. Of the duration forms,
+dropping the round-minute case reddens two, the case written for it and the one that pins where the
+elapsed span opens.
+
+`node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it
 exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,
 which every module under `src/` and `tests/` does, while the same bytes saved as `.mjs` are
 rejected as they should be. The gate that works is an import: `node -e 'import(process.argv[1])'`
