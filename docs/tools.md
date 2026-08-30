@@ -225,7 +225,7 @@ twice in `src/chrome.mts`, the second in `silenceStartup`, so a patch taking the
 in code no case in this group reads and reports an empty kill set, which reads as a hole in the
 suite. Gating on the occurrence count rather than on the patch's exit status refuses it, and
 `grep -c '// The chat opens either way.' src/chrome.mts` returns 2. Counted 2026-08-30 with
-`node tests/chrome.mts | grep -c '^ok'` at 124.
+`node tests/chrome.mts | grep -c '^ok'` at 135.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
@@ -416,6 +416,41 @@ to print, which is what shipped before, reddens exactly one, the pseudo-terminal
 session holding a question and no answer, which counts one resume line on the screen where a clean
 run counts none. Every case that reads a block off the terminal stays green under it, and that green
 is what says the moved call ran at all.
+
+The frame around the block is the last group, and nine mutations of `src/chrome.mts` separate what
+the rows are sized against from how they are drawn. Padding each row to the terminal rather than to
+the interior the frame leaves was predicted to redden three and reddened five, and the surplus is
+the finding: the two eighty-column bounds cases, `every row of it reads on an eighty-column
+terminal` and `and so does one naming the session by its file and the model by a 54-character
+identifier`, assert `visibleWidth(l) <= 80` over the whole row rather than over what the row says,
+so a frame drawn without measuring breaks them too. Five of 138 cases went red and every case
+reading what the block says stayed green, which is the shape a real kill has, and predicting from
+the frame's own cases alone is what misses the other two. Counted 2026-08-30 with
+`node tests/chrome.mts | grep -cE '^(ok|FAIL) '` at 138.
+
+The other eight each reddened exactly the set predicted for them. Forcing the fit gate to `true`
+reddens the two written for it, `a terminal that cannot hold the frame is given the block without
+one` and `and wherever it is drawn it bounds every row to the terminal it was drawn for`. Removing
+the cap on the shared value column reddens four, and taking the table's shared floor to `0` reddens
+one, `and the table's model column is the shared one wide rather than a negative width`. Sizing the
+rule under the table's header to that header rather than to the table's span reddens nine. The last
+four redden a single case each and no two the same one: `.map(ink.accent)` for `.map(ink.bold)`
+reddens `the command that reopens the session is in the accent colour`, `ink.bold("Spend")` for
+`"Spend"` reddens `each section is headed in bold`, dropping the padding rows reddens `set off from
+the border by a blank row under it and another above the foot`, and leaving the top and bottom
+border uncoloured reddens `the frame and the rule under the table's header wear the border colour`.
+Four disjoint single-case kills is not a set a mutant that never ran can produce, and for the
+padding rows and the border colour the mutated file was read back as well rather than the patch's
+exit status trusted.
+
+This series gated on the import rather than on `node --check`, which exits 0 on a hard syntax error
+in a `.mts` file on `node v24.14.1`, and it required that import to catch `SyntaxError` in
+particular, proved first on the unmutated copy, which imports, and on a file with a syntax error,
+which does not. It reproduced the absolute-path trap this file already records. The anchor rule
+earned its place again, and by the same route the `dim(` anchor did: `ink.border(` occurs four
+times over three lines, so `grep -o 'ink\.border(' src/chrome.mts | wc -l` returns 4 where
+`grep -c 'ink\.border(' src/chrome.mts` returns 3, and replanted there the driver refused the
+anchor rather than patching the first hit.
 
 `node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it
 exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,

@@ -149,15 +149,29 @@ terminal without truecolor gets the theme's approximation. The harness restores 
 and footer while it tears the extension UI down, so the last frame you see on quitting is its,
 not this one's.
 
-Quitting then prints a block of what the session did: the session's identifier, how many tools it
-ran and how many of those failed, how long the sitting lasted under `Time`, and a table of what each
-model was asked and what it spent, one row per model with a total row under them when more than one
-answered. The block is as wide as the terminal says it is, read from `process.stdout.columns` at the
-moment it is written, so a two-hundred-column terminal gets two hundred. Where there is no terminal
-to ask, which is what a pipe, a redirect and CI are, and what a pseudo-terminal nobody gave a size
-to reports as a zero, the width falls back to eighty; under twenty it is floored at twenty, the
-floor the harness puts under its own width, because a command broken any finer comes out a character
-to the row. Every column of the table but the model's is already as wide as its own widest cell, so
+Quitting then prints a block of what the session did, drawn inside one frame with a column of
+padding inside it and set out in three headed sections. `Summary` carries the session's identifier,
+how many tools it ran and how many of those failed, and how long the sitting lasted under `Time`.
+`Spend` carries a table of what each model was asked and what it spent, one row per model under a
+header row and a rule, with a total row under them when more than one answered. `Resume` carries the
+command that reopens the session. The headings are bold, the command is in the theme's accent and
+the frame and the rule are in its border colour, while every figure between them is left uncoloured,
+because a colour on a count is a claim about the count. The value column is one column across the
+first two sections, so the figures beside `Session` and the model names begin in the same place; it
+gives way only where holding it would leave the identifier beside `Session` no room, which an
+identifier elided to fit the table can do. The block is as wide as the terminal says it is,
+read from `process.stdout.columns` at the moment it is written, so a two-hundred-column
+terminal gets two hundred. Where there is no terminal to ask, which is what a pipe, a
+redirect and CI are, and what a pseudo-terminal nobody gave a size to reports as a zero,
+the width falls back to eighty; under twenty it is floored at twenty, the floor the harness
+puts under its own width, because a command broken any finer comes out a character
+to the row. The frame costs six of those columns, two for its sides and four for the padding, and
+everything inside it is sized against what it leaves rather than against the terminal, or a row
+would cross the border it was drawn to sit inside. It is drawn only where the terminal can hold it:
+its interior has to clear that same floor of twenty, and every row has to fit that interior, which
+an identifier and the table's four counted columns cannot always be made to do. A terminal that
+fails either test is given the block without a frame, which is what it looked like before there was
+one. Every column of the table but the model's is already as wide as its own widest cell, so
 what the width decides is the room that column is left and how often the command that reopens the
 session has to break. In the table the four counted columns are as wide as the widest cell in them
 and the model column takes whatever they leave, so an identifier wider than that is elided in its
@@ -177,14 +191,16 @@ process, so its sitting opens at that record and no `History` row is printed for
 a count, and none is divided by another, because a share below this project's stated minimum sample
 is withheld and one session is never that sample. A count of zero is printed rather than withheld,
 so a session that ran no tool says `0 ran, 0 failed`: a zero you cannot see cannot be told apart
-from a figure nothing computes. The block closes on `Resume this session with:` and the command
-itself, all of it in the grey the status row spends on the thinking level. The block is written once
-the harness has stopped the TUI, where the theme a header or footer callback is handed is out of
-scope, so the header callback keeps that one colour for then and the block goes out as plain text
-when no header was ever drawn. Which of the two forms the command takes depends on where the session
-is kept. An identifier resolves against the harness's default session directory and nowhere else, so
-a session held there is named by its identifier, which is short and is the same string the row at
-the top of the block already showed. A session held anywhere else, which is what `--session-dir`
+from a figure nothing computes. The block closes on the `Resume` heading and the command itself,
+the command in the theme's accent rather than in the dimmest ink on the screen, because it is the
+one row here that leaves the screen for a shell. The block is written once the harness has stopped
+the TUI, where the theme a header or footer callback is handed is out of scope, so the header
+callback keeps the bold, the accent and the border colour for then, and the block
+goes out as plain text when no header was ever drawn. Which of the two forms the
+command takes depends on where the session is kept. An identifier resolves against
+the harness's default session directory and nowhere else, so a session held there is
+named by its identifier, which is short and is the same string the row at the top of
+the block already showed. A session held anywhere else, which is what `--session-dir`
 produces, is named by its file instead, because that path reopens the session from wherever it is
 while the identifier would not find it at all. A directory the harness declines to answer for takes
 the file too: the file is right in both cases and the identifier in only one. A path a shell would
@@ -193,7 +209,7 @@ that no longer opens the session costs the operator more than a ragged screen do
 shortening would bound the row anyway: the harness names every session file after a timestamp and a
 UUID, so the basename alone is 67 columns before any directory in front of it, which `printf %s
 '2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl' | wc -c` returns. A command
-wider than the terminal is broken across rows with the shell's own line continuation instead, and a
+wider than the block is broken across rows with the shell's own line continuation instead, and a
 paste rejoins exactly the word that was printed. It is the one row of the block that leaves the
 screen for a shell, so a terminal wide enough to hold it whole leaves nothing to rejoin at all. Each
 piece is quoted on its own rather than the whole command being quoted around the break, because a
@@ -210,9 +226,9 @@ writes it is exported. So the handler wraps `process.stdout.write` the moment it
 before it has built the block and whether or not there will be one to print, drops the one chunk
 whose text opens `To resume this session:` and puts the original write back on that same chunk. The
 block is written through the wrap on purpose, because that is what holds the match to the harness's
-line: this project's own last line opens on the same word, and a match loose enough to take it would
-swallow the block instead. Escape sequences are stripped before the text is read, since the harness
-dims its label.
+line: this project's own `Resume` heading opens on the same word, and a match loose enough to take
+it would swallow the block instead. Escape sequences are stripped before the text is read, since the
+harness dims its label.
 
 This rests on wording that is the harness's to change, and it degrades to what it replaced rather
 than to anything worse. A line that no longer opens that way is matched by nothing, so the wrap stays

@@ -270,11 +270,18 @@ const block = (es: any[], h: any = head, sitting: Sitting = OPENED, where: Sessi
   const s = summarize(h, es, sitting, where);
   return s === null ? null : summaryBlock(s, undefined, screenWidth).join("\n");
 };
-const part = (text: string | null, n: number) => String(text).split("\n\n")[n];
-// What the operator would select: the row under the label and every row a
+// What a row says and what encloses it are two properties, so the cases below
+// read the content back through the frame and the frame has cases of its own.
+const unframe = (text: string) => text.split("\n")
+  .filter((l) => !/^[┌└]/.test(l))
+  .map((l) => (/^│ {2}/.test(l) ? l.replace(/^│ {2}/, "").replace(/ {2}│$/, "").trimEnd() : l))
+  .join("\n");
+const part = (text: string | null, n: number) =>
+  unframe(String(text)).replace(/^\n+|\n+$/g, "").split("\n\n")[n];
+// What the operator would select: the row under the heading and every row a
 // continuation carries on to.
 function resumeRows(text: string): string {
-  const rest = text.split("Resume this session with:\n")[1]?.split("\n") ?? [];
+  const rest = unframe(text).split("Resume\n")[1]?.split("\n") ?? [];
   const rows: string[] = [];
   for (const line of rest) {
     rows.push(line);
@@ -289,13 +296,20 @@ const pasted = (text: string) =>
   spawnSync("bash", ["-c", resumeRows(text).replace(/^lm --resume /, "printf %s ")], { encoding: "utf8" }).stdout;
 
 check("the block opens on the session, what it ran and how long it took",
-  "Session   01a04900-0000-7000-8000-00000000c0de\nTools     3 ran, 1 failed\nTime      12m 30s",
+  "Summary\nSession       01a04900-0000-7000-8000-00000000c0de\n"
+  + "Tools         3 ran, 1 failed\nTime          12m 30s",
   part(block(entries), 0));
 check("the table charges the spend to the model that answered",
-  "Model         Reqs   Input   Cache   Output\nqwen3.8:27b      3   37.0k    3.0k     1.2k",
+  "Spend\nModel         Reqs   Input   Cache   Output\n"
+  + "───────────────────────────────────────────\nqwen3.8:27b      3   37.0k    3.0k     1.2k",
   part(block(entries), 1));
 check("and it closes on the command that reopens the session, over two lines",
-  "Resume this session with:\nlm --resume 01a04900-0000-7000-8000-00000000c0de", part(block(entries), 2));
+  "Resume\nlm --resume 01a04900-0000-7000-8000-00000000c0de", part(block(entries), 2));
+// The heading of one section and the figures of the next begin in the same
+// column, so the block reads down one edge rather than three.
+check("the figures and the model names begin in the same column", true,
+  part(block(entries), 0).split("\n")[1].indexOf("01a04900")
+    === part(block(entries), 1).split("\n")[1].indexOf("Reqs"));
 // The identifier is the shorter line and the one the operator reads on the row
 // above, but it resolves in one directory. A session kept anywhere else is named
 // by its file, which reopens it wherever it is.
@@ -304,24 +318,24 @@ check("and it closes on the command that reopens the session, over two lines",
 // than a figure to read: it is broken with the shell's own continuation instead
 // of being shortened, because a path that no longer opens the session costs more
 // than a ragged screen.
-const AWAY_COMMAND = "lm --resume /srv/sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-0000\\\n"
-  + "0000c0de.jsonl";
+const AWAY_COMMAND = "lm --resume /srv/sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-800\\\n"
+  + "0-00000000c0de.jsonl";
 check("a session outside that directory is named by its file instead",
-  `Resume this session with:\n${AWAY_COMMAND}`, part(block(entries, head, OPENED, AWAY), 2));
+  `Resume\n${AWAY_COMMAND}`, part(block(entries, head, OPENED, AWAY), 2));
 check("and a shell reading that back names the file the session is held in",
   AWAY.file, pasted(String(block(entries, head, OPENED, AWAY))));
 // The harness declares no method that answers this, so a build that stops
 // shipping one leaves the question open, and an open question takes the file.
 check("and a directory the harness will not answer for takes the file too",
-  `Resume this session with:\n${AWAY_COMMAND}`,
+  `Resume\n${AWAY_COMMAND}`,
   part(block(entries, head, OPENED, { file: AWAY.file, isDefaultDir: undefined }), 2));
 check("but with no file to name it falls back to the identifier",
-  "Resume this session with:\nlm --resume 01a04900-0000-7000-8000-00000000c0de",
+  "Resume\nlm --resume 01a04900-0000-7000-8000-00000000c0de",
   part(block(entries, head, OPENED, { file: undefined, isDefaultDir: undefined }), 2));
 // The line is pasted into a shell, so a path that is more than one word there is
 // quoted rather than printed as a command that would open something else.
 check("a path a shell would split is quoted",
-  "Resume this session with:\nlm --resume '/srv/my sessions/a.jsonl'",
+  "Resume\nlm --resume '/srv/my sessions/a.jsonl'",
   part(block(entries, head, OPENED, { file: "/srv/my sessions/a.jsonl", isDefaultDir: false }), 2));
 // A backslash inside single quotes is a backslash rather than a break, so a
 // quoted path is broken into one quoted piece per row, which the shell joins
@@ -329,9 +343,9 @@ check("a path a shell would split is quoted",
 const SPACED = "/srv/my sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl";
 const spacedBlock = String(block(entries, head, OPENED, { file: SPACED, isDefaultDir: false }));
 check("a quoted path too wide for the row is broken into quoted pieces",
-  "Resume this session with:\n"
-  + "lm --resume '/srv/my sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000'\\\n"
-  + "-00000000c0de.jsonl",
+  "Resume\n"
+  + "lm --resume '/srv/my sessions/2026-08-28T20-00-00-000Z_01a04900-0000-700'\\\n"
+  + "0-8000-00000000c0de.jsonl",
   part(spacedBlock, 2));
 check("and a shell reading that back names the file with its space intact", SPACED, pasted(spacedBlock));
 
@@ -341,7 +355,7 @@ const WIDE = "hf.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M";
 const retag = (es: any[], model: string) =>
   es.map((e) => (e.message?.model ? { ...e, message: { ...e.message, model } } : e));
 check("every row of it reads on an eighty-column terminal", true,
-  String(block(entries)).split("\n").every((l) => l.length <= 80));
+  String(block(entries)).split("\n").every((l) => visibleWidth(l) <= 80));
 check("and so does one naming the session by its file and the model by a 54-character identifier",
   true, String(block(retag(entries, WIDE), head, OPENED, AWAY)).split("\n").every((l) => visibleWidth(l) <= 80));
 
@@ -350,7 +364,7 @@ check("and so does one naming the session by its file and the model by a 54-char
 // row again wherever the terminal is wide enough to hold it.
 const WIDE_TERMINAL = 100;
 check("a terminal wider than the command leaves it on one row",
-  `Resume this session with:\nlm --resume ${AWAY.file}`,
+  `Resume\nlm --resume ${AWAY.file}`,
   part(block(entries, head, OPENED, AWAY, WIDE_TERMINAL), 2));
 // Every other column is already as wide as its own widest cell, so the model
 // column is the only one a wider terminal changes.
@@ -378,9 +392,39 @@ check("a width under twenty is floored there", bounded(20), narrow);
 const carried = (row: string) => row.replace(/^lm --resume /, "").replace(/\\$/, "");
 check("and every row of the command it breaks carries more than one character of the path", true,
   resumeRows(narrow).split("\n").every((l) => carried(l).length > 1));
-check("and the table's model column is its own heading wide rather than a negative width",
-  "Model   Reqs   Input   Cache   Output\nqw\u20267b      3   37.0k    3.0k     1.2k", part(narrow, 1));
+check("and the table's model column is the shared one wide rather than a negative width",
+  "Spend\nModel     Reqs   Input   Cache   Output\n"
+  + "───────────────────────────────────────\nqwe\u202627b      3   37.0k    3.0k     1.2k", part(narrow, 1));
 check("and a shell reading it back still names the file", AWAY.file, pasted(narrow));
+
+// The frame is one border around the whole block with a column of padding inside
+// it. It costs six of the terminal's columns, so it is drawn against the room it
+// leaves rather than against the terminal: a row sized to the terminal would
+// cross the border it was supposed to sit inside.
+const FRAMED = String(block(entries, head, OPENED, AWAY));
+check("the block is drawn inside one frame", true,
+  FRAMED.startsWith("┌") && FRAMED.endsWith("┘") && FRAMED.split("\n").filter((l) => /^[┌└]/.test(l)).length === 2);
+check("every row of which is exactly the width the terminal reported", [80],
+  [...new Set(FRAMED.split("\n").map(visibleWidth))]);
+check("and every row between the borders is a side, a column of padding and a side", true,
+  FRAMED.split("\n").slice(1, -1).every((l) => /^│ {2}.* {2}│$/.test(l)));
+check("set off from the border by a blank row under it and another above the foot", true,
+  [1, -2].map((i) => FRAMED.split("\n").at(i) ?? "").every((l) => /^│ +│$/.test(l)));
+// The two rows that cannot be shortened are a model identifier elided to fit and
+// a resume command broken to fit, so the bound is read over a block carrying
+// both against the room the frame leaves them rather than the terminal.
+check("a fifty-four-character model identifier is elided against the frame's interior", [80],
+  [...new Set(String(block(retag(entries, WIDE), head, OPENED, AWAY)).split("\n").map(visibleWidth))]);
+// Below the floor the contents are sized against, the resume command comes out a
+// character of the path to the row; above it, a row that cannot shrink that far
+// would still cross the border. Either way the block goes out without a frame,
+// which is what it did before there was one.
+const WIDTHS = [20, 26, 40, 60, 80, 100, 200];
+const isFramed = (w: number) => bounded(w).startsWith("┌");
+check("a terminal that cannot hold the frame is given the block without one",
+  [20, 26, 40], WIDTHS.filter((w) => !isFramed(w)));
+check("and wherever it is drawn it bounds every row to the terminal it was drawn for", true,
+  WIDTHS.filter(isFramed).every((w) => bounded(w).split("\n").every((l) => visibleWidth(l) === w)));
 
 // Which width the block is handed is the shutdown handler's answer, and only the
 // handler says so: the block itself takes whatever it is given. The read happens
@@ -415,69 +459,91 @@ check("the handler bounds the block by the width the terminal it writes to repor
 check("and by eighty when that terminal reports nothing",
   resumeRows(EIGHTY), resumeRows(quitWithColumns(undefined)));
 
-// The two lines are a command to paste rather than a figure to read, so they
-// wear the grey the status row spends on `think`. The block is written once the
-// harness has stopped the TUI, where the theme a render callback is handed is
-// gone, so the colour arrives as an argument instead of being read in here.
-const rowsOf = (dim?: (text: string) => string) => {
-  const s = summarize(head, entries, OPENED, HOME);
-  return s === null ? [] : summaryBlock(s, dim, 80);
+// The block is written once the harness has stopped the TUI, where the theme a
+// render callback is handed is gone, so what it draws with arrives as an
+// argument rather than being read in here. The glyphs are its own and only their
+// colour is the theme's, as the header's mark already is.
+const INK = {
+  bold: (text: string) => theme.bold(theme.fg("text", text)),
+  accent: (text: string) => theme.fg("accent", text),
+  border: (text: string) => theme.fg("borderAccent", text),
 };
-const coloured = rowsOf((text) => theme.fg("dim", text));
-check("the two lines that reopen the session are dim", true,
-  coloured.slice(-2).every((l) => styled(l, "dim")));
-check("and nothing above them carries a colour of its own", true,
-  coloured.slice(0, -2).every((l) => l === plain(l)));
+const rowsOf = (ink?: typeof INK) => {
+  const s = summarize(head, entries, OPENED, HOME);
+  return s === null ? [] : summaryBlock(s, ink, 80);
+};
+const coloured = rowsOf(INK);
+const rowOf = (label: string) => coloured.find((l) => plain(l).includes(label)) ?? "";
+check("each section is headed in bold", true,
+  ["Summary", "Spend", "Resume"].every((h) => rowOf(h).includes("\x1b[1m")));
+// The line the operator pastes is the one thing here that leaves the screen for
+// a shell, so it is the accent rather than the dimmest ink there is.
+check("the command that reopens the session is in the accent colour", true,
+  styled(rowOf("lm --resume"), "accent"));
+check("rather than in the dimmest ink on the screen", false, styled(rowOf("lm --resume"), "dim"));
+check("the frame and the rule under the table's header wear the border colour", true,
+  [coloured[0], coloured.at(-1) ?? "", coloured.find((l) => plain(l).startsWith("│") && plain(l).includes("───")) ?? ""]
+    .every((l) => styled(l, "borderAccent")));
+// Nothing that carries a figure is coloured, because a colour on a count is a
+// claim about it and none of these counts is divided by another.
+check("and the figures between them carry no colour of their own", true,
+  ["3 ran, 1 failed", "qwen3.8:27b", "01a04900"].every((c) => {
+    const row = rowOf(c);
+    return row !== "" && !row.includes("\x1b[1m") && !styled(row, "accent") && !styled(row, "dim");
+  }));
 check("the words are the same ones a terminal without colour reads",
-  part(block(entries), 2), coloured.slice(-2).map(plain).join("\n"));
-check("and with no colour to spend they are printed as text", true,
-  rowsOf().slice(-2).every((l) => l === plain(l)));
+  rowsOf().join("\n"), coloured.map(plain).join("\n"));
+check("and with no colour to spend the block is printed as text", true,
+  rowsOf().every((l) => l === plain(l)));
 
 // A zero the operator cannot see is a feature they cannot tell from one that was
 // never built, which is what the suppressed clauses cost. Both counts are printed
 // whatever they are.
 const worked = entries.map((e) =>
   e.message?.role === "toolResult" ? { ...e, message: { ...e.message, isError: false } } : e);
+const toolRow = (text: string | null) => part(text, 0).split("\n")[2];
 check("a session whose tools all worked prints the failure count as a zero",
-  "Tools     3 ran, 0 failed", String(block(worked)).split("\n")[1]);
+  "Tools         3 ran, 0 failed", toolRow(block(worked)));
 check("a session that ran no tool prints both counts as zeroes",
-  "Tools     0 ran, 0 failed",
-  String(block(entries.filter((e) => e.message?.role !== "toolResult"))).split("\n")[1]);
+  "Tools         0 ran, 0 failed",
+  toolRow(block(entries.filter((e) => e.message?.role !== "toolResult"))));
 
 // One model is one row, and a total row would repeat it. Two models are two rows
 // and a sum the reader would otherwise do by hand.
 const two = load(join(ROOT, "tests/fixtures/session-two-models.jsonl"));
 check("a second model gets a row of its own and a total under both",
-  "Model         Reqs   Input   Cache   Output\n"
+  "Spend\nModel         Reqs   Input   Cache   Output\n"
+  + "───────────────────────────────────────────\n"
   + "qwen3.8:27b      2    8.0k    1.0k      300\n"
   + "gpt-oss:20b      1    2.0k     500      150\n"
   + "total            3   10.0k    1.5k      450",
   part(block(two.entries, two.head), 1));
 check("and the columns are still as wide as the widest cell in them", true,
-  part(block(two.entries, two.head), 1).split("\n").every((l) => l.length === 43));
+  part(block(two.entries, two.head), 1).split("\n").slice(1).every((l) => l.length === 43));
 
 // Until one cell outgrows what the four fixed columns leave it. The identifier
 // is elided in the middle rather than cut, because the tail is what tells one
 // quantization of a model from another and a cut would drop it.
 check("a model identifier wider than the table allows is elided in the middle",
-  "Model                                              Reqs   Input   Cache   Output\n"
-  + "hf.co/unsloth/Qwen3-Code…3B-Instruct-GGUF:Q4_K_M      3   37.0k    3.0k     1.2k",
+  "Spend\nModel                                        Reqs   Input   Cache   Output\n"
+  + "──────────────────────────────────────────────────────────────────────────\n"
+  + "hf.co/unsloth/Qwen3-C…Instruct-GGUF:Q4_K_M      3   37.0k    3.0k     1.2k",
   part(block(retag(entries, WIDE)), 1));
 const quantized = two.entries.map((e) => (e.message?.model
   ? { ...e, message: { ...e.message, model: e.message.model === "qwen3.8:27b" ? WIDE : `${WIDE.slice(0, -6)}Q8_0` } }
   : e));
-const quantTable = part(block(quantized, two.head), 1).split("\n");
+const quantTable = part(block(quantized, two.head), 1).split("\n").slice(1);
 check("two identifiers sharing a prefix are still told apart",
-  2, new Set(quantTable.slice(1, 3).map((l) => l.slice(0, quantTable[0].indexOf("Reqs")))).size);
+  2, new Set(quantTable.slice(2, 4).map((l) => l.slice(0, quantTable[0].indexOf("Reqs")))).size);
 check("and the total row still lines up under both", true,
-  quantTable.every((l) => l.length === 80));
+  quantTable.every((l) => l.length === 74));
 
 const at = (ms: number, message: any) => ({ type: "message", timestamp: new Date(ms).toISOString(), message });
 const turn = (input: number, output: number) =>
   ({ role: "assistant", model: "qwen3.8:27b", usage: { input, output, cacheRead: 0, cacheWrite: 0 } });
 const one = [at(1000, turn(500, 20)), at(4000, { role: "toolResult", toolName: "commit", isError: false })];
-check("one tool is counted like any other", "Tools     1 ran, 0 failed",
-  String(block(one, { id: "01a04900-0000-7000-8000-00000000c0de", timestamp: new Date(1000).toISOString() })).split("\n")[1]);
+check("one tool is counted like any other", "Tools         1 ran, 0 failed",
+  toolRow(block(one, { id: "01a04900-0000-7000-8000-00000000c0de", timestamp: new Date(1000).toISOString() })));
 
 // A compaction is a model call, and its entry names no model, so the tokens it
 // spent belong to whichever model was in force when it ran.
@@ -486,10 +552,12 @@ const compacted = [
   { type: "compaction", timestamp: new Date(2000).toISOString(), usage: { input: 100, output: 5 } },
 ];
 check("a compaction is charged to the model in force when it ran",
-  "Model         Reqs   Input   Cache   Output\nqwen3.8:27b      1     600       0       25",
+  "Spend\nModel         Reqs   Input   Cache   Output\n"
+  + "───────────────────────────────────────────\nqwen3.8:27b      1     600       0       25",
   part(block(compacted, null), 1));
 check("and an answer that names no model is charged to no model rather than dropped",
-  "Model     Reqs   Input   Cache   Output\nunknown      1     500       0       20",
+  "Spend\nModel     Reqs   Input   Cache   Output\n"
+  + "───────────────────────────────────────\nunknown      1     500       0       20",
   part(block([at(1000, { role: "assistant", usage: { input: 500, output: 20 } })], null), 1));
 // The harness declares the model in an entry of its own before any reply carries
 // one, so a compaction before that reply is charged to the model then in force.
@@ -499,7 +567,8 @@ const declared = [
   at(2000, turn(500, 20)),
 ];
 check("and a model declared before the first reply is charged for what ran under it",
-  "Model         Reqs   Input   Cache   Output\ngpt-oss:20b      0     100       0        5\n"
+  "Spend\nModel         Reqs   Input   Cache   Output\n"
+  + "───────────────────────────────────────────\ngpt-oss:20b      0     100       0        5\n"
   + "qwen3.8:27b      1     500       0       20\ntotal            1     600       0       25",
   part(block(declared, null), 1));
 
@@ -508,21 +577,23 @@ check("and a model declared before the first reply is charged for what ran under
 // level are settled, and the launch runs before the record exists.
 const record = (ms: number) => ({ id: "01a04900-0000-7000-8000-00000000c0de", timestamp: new Date(ms).toISOString() });
 check("the span opens at the session record rather than at the first entry",
-  "Time      1m 30s",
-  String(block([at(62_000, turn(500, 20))], record(2000), { launchedAt: 1000, endedAt: 92_000 })).split("\n")[2]);
+  "Time          1m 30s",
+  part(block([at(62_000, turn(500, 20))], record(2000), { launchedAt: 1000, endedAt: 92_000 }), 0).split("\n")[3]);
 // A session older than the launch was reopened, so what this sitting cost and
 // what the whole conversation cost are two facts and get a row each.
 check("a session opened before this launch reports the sitting and the conversation under it",
-  "Time      2m\nHistory   12m 30s",
-  String(block(entries, head, { launchedAt: RECORD + 750_000, endedAt: RECORD + 870_000 })).split("\n").slice(2, 4).join("\n"));
+  "Time          2m\nHistory       12m 30s",
+  part(block(entries, head, { launchedAt: RECORD + 750_000, endedAt: RECORD + 870_000 }), 0).split("\n").slice(3).join("\n"));
 check("and a session this launch opened reports the sitting alone", false,
   String(block(entries)).includes("History"));
 check("and opens the sitting at the launch when there is no session record",
-  "Tools   0 ran, 0 failed\nTime    1m", part(block([at(60_000, turn(500, 20))], null, { launchedAt: 30_000, endedAt: 90_000 }), 0));
+  "Summary\nTools         0 ran, 0 failed\nTime          1m",
+  part(block([at(60_000, turn(500, 20))], null, { launchedAt: 30_000, endedAt: 90_000 }), 0));
 // Without a session record there is no identifier, and a resume command naming
 // none would not reopen anything.
 check("which also leaves nothing to resume", 2,
-  String(block([at(60_000, turn(500, 20))], null, { launchedAt: 30_000, endedAt: 90_000 })).split("\n\n").length);
+  unframe(String(block([at(60_000, turn(500, 20))], null, { launchedAt: 30_000, endedAt: 90_000 })))
+    .replace(/^\n+|\n+$/g, "").split("\n\n").length);
 
 // Nothing was asked and nothing was answered, so there is nothing to report.
 check("a session that never reached the model prints nothing", null,
@@ -602,7 +673,7 @@ const defaultSessions = (quit: string) =>
   join(quit, "agent", "sessions", `--${ROOT.replace(/^\//, "").replace(/\//g, "-")}--`);
 
 const { printed, raw, session: away } = await quitAfterOpening((s, d) => `chat --session ${s} --session-dir ${d}`);
-const BLOCK = ["Session   01a04900-0000-7000-8000-00000000c0de", "Tools     3 ran, 1 failed",
+const BLOCK = ["Session       01a04900-0000-7000-8000-00000000c0de", "Tools         3 ran, 1 failed",
   "Model         Reqs   Input   Cache   Output", "qwen3.8:27b      3   37.0k    3.0k     1.2k"];
 check("quitting the chat prints the closing block on the restored terminal", true,
   BLOCK.every((l) => printed.includes(l)));
@@ -616,17 +687,17 @@ check("naming no identifier the chat could not have found it by", false,
 // colour is only visible in the one that was not. The theme is the harness's own
 // and its grey is whatever the operator's theme says, so what is pinned is that
 // the two lines were coloured and reset rather than which colour came out.
-check("and the two lines it prints wear a colour the theme chose", true,
-  /\x1b\[[0-9;]+mResume this session with:\x1b\[39m/.test(raw));
+check("and the command it prints wears a colour the theme chose", true,
+  /\x1b\[[0-9;]+mlm --resume [^\x1b]+\x1b\[39m/.test(raw));
 check("which the block above them does not", false, /\x1b\[[0-9;]+mTools /.test(raw));
 // The two figures differ only where a session outlived a launch, and this run is
 // that: the fixture's own record is dated before any run of this suite, while the
 // sitting is the seconds this case spends in the chat before ending it.
-const figure = (label: string) => (new RegExp(`^${label} +(.+)$`, "m").exec(printed)?.[1] ?? "");
+const figure = (label: string) => (new RegExp(`^│ +${label} +(.+?) +│$`, "m").exec(printed)?.[1] ?? "");
 check("the elapsed figure it prints is this sitting alone", true, /^\d+s$/.test(figure("Time")));
 check("and the conversation it reopened is the row under it", true, /^\d+h( \d+m)?$/.test(figure("History")));
 check("set off by a blank line from the frame the harness restored", true,
-  printed.includes("\n\nSession   01a04900"));
+  /\n\n┌─+┐\n/.test(printed));
 // The harness prints a resume line of its own under the name it was installed
 // as, saying what the block already said. It is swallowed as it is written, and
 // this case is what notices a harness that changes its wording, because the
@@ -653,7 +724,7 @@ check("a session reopens without naming the chat first", true,
 const atHome = await quitAfterOpening(() => "--session 01a04900-0000-7000-8000-00000000c0de", defaultSessions);
 check("a session held where the harness keeps its own is resumed by its identifier", true,
   BLOCK.every((l) => atHome.printed.includes(l))
-    && atHome.printed.includes("Resume this session with:\nlm --resume 01a04900-0000-7000-8000-00000000c0de"));
+    && resumeRows(atHome.printed) === "lm --resume 01a04900-0000-7000-8000-00000000c0de");
 check("and names no file, which is the longer line for nothing", false,
   atHome.printed.includes(`lm --resume ${atHome.session}`));
 
