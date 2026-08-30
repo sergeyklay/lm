@@ -152,35 +152,56 @@ not this one's.
 Quitting then prints a block of what the session did: the session's identifier, how many tools it
 ran and how many of those failed, how long the sitting lasted under `Time`, and a table of what each
 model was asked and what it spent, one row per model with a total row under them when more than one
-answered. `Time` is this sitting alone, from the moment the session opened in this launch to the
-moment you quit. A session whose own record was written before this launch started is one you
-reopened, and a second row, `History`, carries the whole conversation's span, from that record to
-the newest entry in it. The condition for that row is exact rather than a threshold and compares no
-durations, so a session opened fresh prints `Time` and nothing else. The launch is the process's own
-start rather than the first `session_start` event: the harness fires that again for a reload, and
-rebuilds this extension with it, while the chat carries on. A session the launch itself creates, at
-startup or through `/new`, has a record younger than the process, so its sitting opens at that
-record and no `History` row is printed for it. Every figure is a count, and none is divided by
-another, because a share below this project's stated minimum sample is withheld and one session is
-never that sample. A count of zero is printed rather than withheld, so a session that ran no tool
-says `0 ran, 0 failed`: a zero you cannot see cannot be told apart from a figure nothing computes.
-The block closes on two lines, `Resume this session with:` and the command itself, both in the grey
-the status row spends on the thinking level. The block is written once the harness has stopped the
-TUI, where the theme a header or footer callback is handed is out of scope, so the header callback
-keeps that one colour for then and the block goes out as plain text when no header was ever drawn.
-Which of the two forms the command takes depends on where the session is kept. An identifier resolves against the harness's
-default session directory and nowhere else, so a session held there is named by its identifier, which
-is short and is the same string the row at the top of the block already showed. A session held
-anywhere else, which is what `--session-dir` produces, is named by its file instead, because that path
-reopens the session from wherever it is while the identifier would not find it at all. A directory the
-harness declines to answer for takes the file too: the file is right in both cases and the identifier
-in only one. A path a shell would read as more than one word is quoted, and a long one is the single
-row of the block that can run past eighty columns, which is what the identifier buys where it works. A
-session that
-never reached the model prints nothing at all, since nothing was asked and nothing was answered. The
-block is written on `session_shutdown`, which also fires for a reload and for each of the three ways
-a session is replaced, so only the quit reason prints one. By then the harness has stopped the TUI,
-so the block lands on the restored terminal.
+answered. The block is as wide as the terminal says it is, read from `process.stdout.columns` at the
+moment it is written, so a two-hundred-column terminal gets two hundred. Where there is no terminal
+to ask, which is what a pipe, a redirect and CI are, and what a pseudo-terminal nobody gave a size
+to reports as a zero, the width falls back to eighty; under twenty it is floored at twenty, the
+floor the harness puts under its own width, because a command broken any finer comes out a character
+to the row. Every column of the table but the model's is already as wide as its own widest cell, so
+what the width decides is the room that column is left and how often the command that reopens the
+session has to break. In the table the four counted columns are as wide as the widest cell in them
+and the model column takes whatever they leave, so an identifier wider than that is elided in its
+middle rather than cut off at the end: names run out to
+a quantization suffix reach 54 characters, which `printf %s
+'hf.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M' | wc -c` returns, and the head is what
+tells one family of models apart while the tail is what tells two quantizations of one family apart,
+so a cut from either end would leave two rows reading the same. `Time` is this sitting alone, from
+the moment the session opened in this launch to the moment you quit. A session whose own record was
+written before this launch started is one you reopened, and a second row, `History`, carries the
+whole conversation's span, from that record to the newest entry in it. The condition for that row is
+exact rather than a threshold and compares no durations, so a session opened fresh prints `Time` and
+nothing else. The launch is the process's own start rather than the first `session_start` event: the
+harness fires that again for a reload, and rebuilds this extension with it, while the chat carries
+on. A session the launch itself creates, at startup or through `/new`, has a record younger than the
+process, so its sitting opens at that record and no `History` row is printed for it. Every figure is
+a count, and none is divided by another, because a share below this project's stated minimum sample
+is withheld and one session is never that sample. A count of zero is printed rather than withheld,
+so a session that ran no tool says `0 ran, 0 failed`: a zero you cannot see cannot be told apart
+from a figure nothing computes. The block closes on `Resume this session with:` and the command
+itself, all of it in the grey the status row spends on the thinking level. The block is written once
+the harness has stopped the TUI, where the theme a header or footer callback is handed is out of
+scope, so the header callback keeps that one colour for then and the block goes out as plain text
+when no header was ever drawn. Which of the two forms the command takes depends on where the session
+is kept. An identifier resolves against the harness's default session directory and nowhere else, so
+a session held there is named by its identifier, which is short and is the same string the row at
+the top of the block already showed. A session held anywhere else, which is what `--session-dir`
+produces, is named by its file instead, because that path reopens the session from wherever it is
+while the identifier would not find it at all. A directory the harness declines to answer for takes
+the file too: the file is right in both cases and the identifier in only one. A path a shell would
+read as more than one word is quoted. Nothing else about the command is shortened, because a path
+that no longer opens the session costs the operator more than a ragged screen does, and no
+shortening would bound the row anyway: the harness names every session file after a timestamp and a
+UUID, so the basename alone is 67 columns before any directory in front of it, which `printf %s
+'2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl' | wc -c` returns. A command
+wider than the terminal is broken across rows with the shell's own line continuation instead, and a
+paste rejoins exactly the word that was printed. It is the one row of the block that leaves the
+screen for a shell, so a terminal wide enough to hold it whole leaves nothing to rejoin at all. Each
+piece is quoted on its own rather than the whole command being quoted around the break, because a
+backslash inside single quotes is a backslash and not a break. A session that never reached the
+model prints nothing at all, since nothing was asked and nothing was answered. The block is written
+on `session_shutdown`, which also fires for a reload and for each of the three ways a session is
+replaced, so only the quit reason prints one. By then the harness has stopped the TUI, so the block
+lands on the restored terminal.
 
 The harness writes a resume line of its own straight after that, saying what the block already said
 under the name of whichever program it was installed as, and it offers no way to switch that off: no

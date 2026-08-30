@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The chat's closing summary now takes the width of the terminal it is written to, so a wide terminal gets a wide block and a pipe, a redirect or a terminal that reports no size falls back to eighty columns, floored at twenty.
+- A resume command wider than the block is now broken across rows with the shell's own line continuation, each piece quoted on its own, so a paste rejoins exactly the path that was printed rather than the command being shortened.
+- A model identifier wider than the spend table allows is now elided in its middle rather than cut off, so two quantizations of one model family stay told apart by their tails.
 - The registry is now the `tools/` of the repository you are standing in and nothing else: `lm` run in a project that ships no `tools/`, or outside a repository, has no verbs at all rather than falling back to the installation's own, and `LM_TOOLS` still names the whole registry when set.
 - With an empty registry `lm --list` prints nothing and exits 0, `lm --help` prints neither `Available verbs:` nor `Available workflows:` and no line pointing at a per-tool `--help`, and a name that is not there is refused as `lm: no such tool '<name>'.` with no list under it.
 - `lm --which` now refuses before it asks the model when the registry is empty, saying `lm: the registry is empty, so no verb can serve that request` and exiting 2, so a request the model never saw is not logged as a refusal.
