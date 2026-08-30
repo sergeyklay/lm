@@ -1,7 +1,7 @@
 // node tests/cli.mts
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -174,27 +174,48 @@ function runIn(cwd: string, args: string[], extra: Record<string, string> = {}, 
 }
 
 const rows = (out: string) => out.trim().split("\n").map((l) => l.split("\t"));
-const listed = (out: string) => rows(out).map((r) => r[0]);
-const fromProject = (out: string) => rows(out).filter((r) => r[2] === "project").map((r) => r[0]);
+const listed = (out: string) => (out.trim() === "" ? [] : rows(out).map((r) => r[0]));
 const SHIPPED = ["changelog", "commit", "issue", "pr", "ship"];
 
-const plain = runIn(project("plain"), ["--list"]);
-check("a project with no tools of its own lists the installation's", SHIPPED, listed(plain.out));
-check("and marks nothing as the project's", [], fromProject(plain.out));
+// The registry is the project's own tools/ and nothing else, so a project that
+// ships none has no verbs at all rather than the installation's.
+const plainDir = project("plain");
+const plain = runIn(plainDir, ["--list"]);
+check("a project with no tools of its own lists nothing", [], listed(plain.out));
+check("and says nothing at all while doing it", "", plain.out);
+check("and the listing still exits 0", 0, plain.code);
+// A heading with nothing under it is not printed, for either kind, and nothing
+// stands in for the section that is gone.
+const plainHelp = runIn(plainDir, ["--help"]);
+check("and --help names no verbs there", false, plainHelp.out.includes("Available verbs:"));
+check("and no workflows either", false, plainHelp.out.includes("Available workflows:"));
+check("and does not send the reader to a description that is not there",
+  false, plainHelp.out.includes("lm <name> --help"));
+check("while still printing the rest of the help", true, plainHelp.out.includes("Environment:"));
+// The refusal keeps its exit code and loses the list it has nothing to fill.
+const plainRun = runIn(plainDir, ["commit"]);
+check("a verb the registry does not hold exits 2 there", 2, plainRun.code);
+check("and the empty list is not printed under it",
+  "lm: no such tool 'commit'.\n", plainRun.err);
+const plainDirect = runIn(plainDir, ["commit"], {}, join(ROOT, "libexec/lm-verb"));
+check("and the shell runner answers the same way", "lm: no such tool 'commit'.\n", plainDirect.err);
+check("with the same exit code", 2, plainDirect.code);
+// Its own usage drops the section too: bare lm-verb prints usage and exits 2.
+const plainUsage = runIn(plainDir, [], {}, join(ROOT, "libexec/lm-verb"));
+check("and its usage names no commands", false, plainUsage.err.includes("Commands:"));
 
 const shadowDir = project("shadow", { "commit.sh": refuses("commit", "the project's own commit") });
 const shadow = runIn(shadowDir, ["--list"]);
-check("a name the project also ships appears once", SHIPPED, listed(shadow.out));
+check("the project's own tools are the whole registry", ["commit"], listed(shadow.out));
 check("and it is the project's description that is printed",
-  true, /^commit\tthe project's own commit\tproject$/m.test(shadow.out));
+  true, /^commit\tthe project's own commit$/m.test(shadow.out));
 check("and the installation's is gone", false, shadow.out.includes("Conventional Commits"));
-check("and only that name is marked", ["commit"], fromProject(shadow.out));
 
 const onlyDir = project("only", { "hello.sh": refuses("hello", "only the project ships this") });
 const only = runIn(onlyDir, ["--list"]);
-check("a name only the project ships is listed",
-  ["changelog", "commit", "hello", "issue", "pr", "ship"], listed(only.out));
-check("and marked as the project's", ["hello"], fromProject(only.out));
+check("a name only the project ships is listed", ["hello"], listed(only.out));
+check("and the installation ships nothing into it",
+  false, SHIPPED.some((n) => listed(only.out).includes(n)));
 // Listed is not reachable. `--list` is the shell runner's answer and dispatch is
 // the Node runner's, so a name that appears in one and runs from the other is
 // what says the two resolve the same registry.
@@ -207,41 +228,42 @@ check("and its help is generated from the project's declaration",
 // The shell runner resolves a verb for itself when it is invoked directly, which
 // is the one path bin/lm does not go through.
 const direct = runIn(onlyDir, ["hello"], {}, join(ROOT, "libexec/lm-verb"));
-check("the shell runner resolves a verb through the same precedence",
+check("the shell runner resolves a verb through the same registry",
   true, direct.err.includes("hello: the project's own file ran"));
 check("and hands back the tool's own refusal", 3, direct.code);
 // The listing comes from libexec/lm-verb and the help from bin/lm, each resolving
 // the registry for itself, so naming a different set is the drift this catches.
 const viaHelp = runIn(onlyDir, ["--help"]).out;
-const named = (label: string) => (new RegExp(`^Available ${label}:\\n  (.*)$`, "m").exec(viaHelp)?.[1] ?? "").split(", ");
+const named = (label: string) =>
+  (new RegExp(`^Available ${label}:\\n  (.*)$`, "m").exec(viaHelp)?.[1] ?? "").split(", ").filter(Boolean);
 check("and both runners name the same registry",
   listed(only.out), [...named("verbs"), ...named("workflows")].sort());
 
-// Outside a repository there is no project half, so there is nothing to prefer.
+// Outside a repository there is no `git rev-parse --show-toplevel` to read, so
+// there is no registry at all.
 const loose = mkdtempSync(join(tmpdir(), "lm-loose-"));
 const outside = runIn(loose, ["--list"]);
-check("outside a repository the registry is the installation's alone", SHIPPED, listed(outside.out));
-check("and nothing is marked there either", [], fromProject(outside.out));
+check("outside a repository the registry is empty", [], listed(outside.out));
 
-// The variable is the whole registry and not the first of two, which is what
-// every fixture that isolates the registry has always relied on.
+// The variable is the whole registry, which is what every fixture that isolates
+// the registry has always relied on.
 const pinned = runIn(shadowDir, ["--list"], { LM_TOOLS: join(onlyDir, "tools") });
 check("LM_TOOLS is the whole registry", ["hello"], listed(pinned.out));
-check("and its entries are not the project's", [], fromProject(pinned.out));
 // Dispatch reads the same whole registry: a name the project ships is not in it.
 const pinnedRun = runIn(shadowDir, ["commit"], { LM_TOOLS: join(onlyDir, "tools") });
 check("and dispatch sees only what the variable names", 2, pinnedRun.code);
 check("saying so of a name the project does ship",
   true, pinnedRun.err.includes("no such tool 'commit'"));
 
-// Inside the installation's own repository the project's tools/ is the
-// installation's, so the precedence is one directory and nothing shadows.
-check("the installation's own repository marks nothing as shadowing",
-  [], fromProject(runIn(ROOT, ["--list"]).out));
+// This repository is a project like any other, and its tools/ is what it gets.
+check("the installation's own repository is served by its own tools/",
+  SHIPPED, listed(runIn(ROOT, ["--list"]).out));
 
-// A workflow the installation ships names its verbs by name, and a name is
-// resolved through the same precedence the listing is.
-const workflow = runIn(shadowDir, ["ship", "--here", "--no-stage"]);
+// A workflow names its verbs by name, and a name is resolved through the same
+// registry the listing is.
+const flowDir = project("flow", { "commit.sh": refuses("commit", "the project's own commit") });
+copyFileSync(join(ROOT, "tools/ship.sh"), join(flowDir, "tools/ship.sh"));
+const workflow = runIn(flowDir, ["ship", "--here", "--no-stage"]);
 check("a workflow's verb resolves to the project's file",
   true, workflow.err.includes("commit: the project's own file ran"));
 check("and the installation's verb never ran", false, workflow.err.includes("nothing staged"));

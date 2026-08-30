@@ -225,6 +225,28 @@ lm --which "anything" >/dev/null 2>&1
 check "none is offered in the schema" "true" "$(jq -r '.format.properties.tool.enum|contains(["none"])' "$REPLIES/req.1")"
 teardown
 
+# An empty registry weighed nothing, so the refusal is the registry's and not the
+# model's, and it costs no call. The reply the model would have given is scripted
+# anyway: without it the case would go green on a runner that asked, because an
+# unanswered call exits 5 rather than 2.
+setup "$(say '{"tool":"none"}')"
+mkdir "$work/empty"
+err=$(LM_TOOLS="$work/empty" lm --which "write a commit message" 2>&1 >"$work/out.txt"); rc=$?
+check "an empty registry exits 2"            "2" "$rc"
+check "it says the registry is empty"        "1" "$(grep -c 'the registry is empty' <<<"$err")"
+check "it does not say the model refused"    "0" "$(grep -c 'no verb serves' <<<"$err")"
+check "and names no verb on stdout"          ""  "$(cat "$work/out.txt")"
+check "it makes no model call"               "0" "$(calls)"
+check "and writes no record"                 "0" "$(cat "$work/log.jsonl" 2>/dev/null | wc -l)"
+# The same state reached the other way: a repository of its own with no tools/ and
+# nothing in LM_TOOLS, which is what an operator running lm in their own project has.
+git init -q "$work/plain"
+err=$(cd "$work/plain" && unset LM_TOOLS && lm --which "write a commit message" 2>&1); rc=$?
+check "a project with no tools of its own too" "2" "$rc"
+check "with the same sentence"                 "1" "$(grep -c 'the registry is empty' <<<"$err")"
+check "and still no model call"                "0" "$(calls)"
+teardown
+
 # A --which run reaches the log whichever way it answers, because the signal is a
 # share: refusals alone are a numerator without a denominator. The record names
 # no verb, so lm-stats keeps it out of the verb table and counts it on its own.
@@ -237,8 +259,15 @@ check "a refusal is told from a match"  "none"   "$(jq -r '.which' "$work/log.js
 check "the record is not a verb"        "--which" "$(jq -r '.verb' "$work/log.jsonl" | head -1)"
 out=$("$ROOT/libexec/lm-stats" 2>&1)
 check "the verb table excludes it"  "0" "$(sed -n '2,/^$/p' <<<"$out" | grep -c -- --which)"
-check "lm-stats reports the share"  "1 of 2" \
-  "$(grep -A1 'found no verb for' <<<"$out" | tail -1 | tr -s ' ' | sed 's/^ //')"
+share() { "$ROOT/libexec/lm-stats" 2>&1 \
+  | grep -A1 'found no verb for' | tail -1 | tr -s ' ' | sed 's/^ //'; }
+check "lm-stats reports the share"  "1 of 2" "$(share)"
+# The refusal share is what the catalogue's behaviour is read from, and a request
+# no verb was weighed against is not a verdict on the catalogue. A record for it
+# would land in the denominator and never in the numerator.
+mkdir "$work/empty"
+LM_TOOLS="$work/empty" lm --which "brew me a coffee" >/dev/null 2>&1
+check "an empty registry leaves the share alone" "1 of 2" "$(share)"
 teardown
 
 # A verb run carries the field too, empty: one shape, so nothing has to know

@@ -64,8 +64,8 @@ lm --list                      # every tool with its description, tab-separated
 lm --which "text"              # name the verb that serves a request
 ```
 
-A tool the installation ships prints two tab-separated fields; one the repository you are standing
-in supplies prints `project` in a third.
+The registry is the `tools/` of the repository you are standing in, so `lm` in a project that
+ships none has no verbs and `--list` prints nothing.
 
 What each verb does to the repository is in [what this repository ships](instruments.md). What
 the exit codes mean, which environment variables are read and where the registry comes from is in

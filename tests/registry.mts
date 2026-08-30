@@ -26,7 +26,7 @@ function viaBash(file: string, script: string, cwd = ROOT): string {
   return r.stdout ?? "";
 }
 
-const files = list([TOOLS]);
+const files = list(TOOLS);
 const fromBash = spawnSync(join(ROOT, "libexec/lm-verb"), ["--list"], { encoding: "utf8", cwd: ROOT })
   .stdout.trim().split("\n").map((l) => l.split("\t")[0]).sort();
 check("the registry lists what lm-verb lists", fromBash, files.map((f) => basename(f, ".sh")).sort());
@@ -186,21 +186,18 @@ check("an empty answer is an answer", "0", String(blank.status));
 check("and reaches the tool as one", "answer|", readFileSync(join(work, "asked.txt"), "utf8"));
 rmSync(join(work, "asked.txt"));
 
-// The index over a precedence of directories. Which directories those are is
+// The index over the one directory the registry is. Which directory that is is
 // bin/lm's answer and tests/cli.mts pins it; this is what the listing does once
-// they are known.
+// it is known.
 const near = mkdtempSync(join(tmpdir(), "lm-near-"));
-writeFileSync(join(near, "commit.sh"), 'name="commit"\ndescription="the nearer one"\n');
+writeFileSync(join(near, "commit.sh"), 'name="commit"\ndescription="the only one"\n');
 writeFileSync(join(near, "hello.sh"), 'name="hello"\ndescription="only here"\n');
 writeFileSync(join(near, "notatool.txt"), "ignored");
-const precedence = list([near, TOOLS]);
-check("each name is listed once, in name order",
-  ["changelog.sh", "commit.sh", "hello.sh", "issue.sh", "pr.sh", "ship.sh"],
-  precedence.map((f) => basename(f)));
-check("and a shadowed name resolves to the nearer file",
-  join(near, "commit.sh"), precedence.find((f) => basename(f) === "commit.sh"));
-check("and the installation still supplies the rest",
-  join(TOOLS, "pr.sh"), precedence.find((f) => basename(f) === "pr.sh"));
+check("the listing is that directory and nothing else, in name order",
+  ["commit.sh", "hello.sh"], list(near).map((f) => basename(f)));
+// An empty registry is no directory at all rather than an empty one, which is
+// what the resolvers hand over when a project ships no tools/ of its own.
+check("and no registry lists nothing", [], list(undefined));
 rmSync(near, { recursive: true, force: true });
 
 rmSync(work, { recursive: true, force: true });
