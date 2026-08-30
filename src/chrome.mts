@@ -244,7 +244,9 @@ const NARROWEST = 20;
 const elide = (s: string, max: number): string =>
   s.length <= max ? s : `${s.slice(0, Math.ceil((max - 1) / 2))}…${s.slice(s.length - Math.floor((max - 1) / 2))}`;
 
-function spendTable(models: ModelSpend[], total: number): string[] {
+type SpendTable = { head: string; rows: string[]; label: number; span: number };
+
+function spendTable(models: ModelSpend[], total: number, floor: number): SpendTable {
   const cells = (m: ModelSpend) =>
     [m.model, String(m.requests), formatTokens(m.input), formatTokens(m.cache), formatTokens(m.output)];
   const rows = models.map(cells);
@@ -261,15 +263,22 @@ function spendTable(models: ModelSpend[], total: number): string[] {
   const width = COLUMNS.map((c, i) => Math.max(c.length, ...rows.map((r) => r[i].length)));
   const room = Math.max(
     COLUMNS[0].length,
+    floor,
     total - GUTTER.length * (COLUMNS.length - 1) - width.slice(1).reduce((n, w) => n + w, 0),
   );
   if (width[0] > room) {
     for (const r of rows) r[0] = elide(r[0], room);
     width[0] = Math.max(COLUMNS[0].length, ...rows.map((r) => r[0].length));
   }
+  width[0] = Math.max(width[0], floor);
   const row = (r: string[]) =>
     r.map((c, i) => (i === 0 ? c.padEnd(width[i]) : c.padStart(width[i]))).join(GUTTER).trimEnd();
-  return [row(COLUMNS), ...rows.map(row)];
+  return {
+    head: row(COLUMNS),
+    rows: rows.map(row),
+    label: width[0],
+    span: width.reduce((n, w) => n + w, 0) + GUTTER.length * (COLUMNS.length - 1),
+  };
 }
 
 // The resume line is a command the operator pastes, so a path a shell would read
@@ -294,25 +303,59 @@ function resumeCommand(value: string, width: number): string[] {
   return [...lines, head + shellWord(rest)];
 }
 
-export function summaryBlock(
-  s: Summary,
-  dim: (text: string) => string = (text) => text,
-  screenWidth?: number,
-): string[] {
-  const width = Math.max(NARROWEST, screenWidth || NO_TERMINAL);
+// The block is drawn after the harness has stopped the TUI, so it carries its
+// own ink rather than the theme a render callback is handed.
+export type Ink = {
+  bold: (text: string) => string;
+  accent: (text: string) => string;
+  border: (text: string) => string;
+};
+
+const PLAIN: Ink = { bold: (t) => t, accent: (t) => t, border: (t) => t };
+
+const PADDING = "  ";
+const FRAME = 2 + PADDING.length * 2;
+
+// The value column is one column across both sections, so the model names begin
+// where the figures beside `Session` do. It gives way when the room it would
+// take is room the identifier needs: a name elided to fit the table can be wider
+// than every label in the section above it.
+function sections(s: Summary, ink: Ink, width: number): string[] {
   const head: string[][] = [
     ...(s.id ? [["Session", s.id]] : []),
     ["Tools", `${s.tools} ran, ${s.failed} failed`],
     ["Time", formatDuration(s.sittingMs)],
     ...(s.historyMs === undefined ? [] : [["History", formatDuration(s.historyMs)]]),
   ];
-  const label = Math.max(...head.map(([name]) => name.length));
+  const name = Math.max(...head.map(([n]) => n.length));
+  const value = Math.max(...head.map(([, v]) => v.length));
+  const table = spendTable(s.models, width, name);
+  const label = Math.max(name, Math.min(table.label, width - GUTTER.length - value));
   return [
-    ...head.map(([name, value]) => `${name.padEnd(label)}${GUTTER}${value}`),
+    ink.bold("Summary"),
+    ...head.map(([n, v]) => `${n.padEnd(label)}${GUTTER}${v}`),
     "",
-    ...spendTable(s.models, width),
-    ...(s.resume ? ["", dim("Resume this session with:"), ...resumeCommand(s.resume, width).map(dim)] : []),
+    ink.bold("Spend"),
+    table.head,
+    ink.border("─".repeat(table.span)),
+    ...table.rows,
+    ...(s.resume ? ["", ink.bold("Resume"), ...resumeCommand(s.resume, width).map(ink.accent)] : []),
   ];
+}
+
+function framed(rows: string[], inner: number, ink: Ink): string[] {
+  const rule = "─".repeat(inner + PADDING.length * 2);
+  const side = ink.border("│");
+  const pad = (r: string) => `${side}${PADDING}${r}${" ".repeat(Math.max(0, inner - visibleWidth(r)))}${PADDING}${side}`;
+  return [ink.border(`┌${rule}┐`), ...["", ...rows, ""].map(pad), ink.border(`└${rule}┘`)];
+}
+
+export function summaryBlock(s: Summary, ink: Ink = PLAIN, screenWidth?: number): string[] {
+  const width = Math.max(NARROWEST, screenWidth || NO_TERMINAL);
+  const inner = width - FRAME;
+  if (inner < NARROWEST) return sections(s, ink, width);
+  const rows = sections(s, ink, inner);
+  return rows.every((r) => visibleWidth(r) <= inner) ? framed(rows, inner, ink) : sections(s, ink, width);
 }
 
 // The harness writes a resume line of its own once every shutdown handler has
@@ -338,9 +381,9 @@ export function dropHarnessResume(out: { write: (chunk: any, ...rest: any[]) => 
 export function installChrome(pi: any, updated?: string): void {
   // The closing block is written after the harness has stopped the TUI, where
   // the theme a header or footer callback is handed is out of scope. The header
-  // callback keeps it for then. A launch that draws nothing never sets one, and
-  // the block goes out in plain text.
-  let dim: ((text: string) => string) | undefined;
+  // callback keeps what the block draws with for then. A launch that draws
+  // nothing never sets one, and the block goes out in plain text.
+  let ink: Ink | undefined;
 
   // The same event fires for a reload and for each of the three ways a session
   // is replaced, where the chat carries on and a closing block would be a lie.
@@ -364,7 +407,7 @@ export function installChrome(pi: any, updated?: string): void {
       { file: manager.getSessionFile(), isDefaultDir },
     );
     if (!summary) return;
-    process.stdout.write(`\n${summaryBlock(summary, dim, process.stdout.columns).join("\n")}\n`);
+    process.stdout.write(`\n${summaryBlock(summary, ink, process.stdout.columns).join("\n")}\n`);
   });
 
   // The header is built before extensions initialise, and `setHeader` is a no-op
@@ -381,7 +424,11 @@ export function installChrome(pi: any, updated?: string): void {
     if (updated && event?.reason === "startup") ctx.ui.notify(`harness updated to ${updated}`, "info");
     const autoCompact = compactionEnabled(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
-      dim = (text: string) => theme.fg("dim", text);
+      ink = {
+        bold: (text: string) => theme.bold(theme.fg("text", text)),
+        accent: (text: string) => theme.fg("accent", text),
+        border: (text: string) => theme.fg("borderAccent", text),
+      };
       return { render: () => headerLines(theme) };
     });
     ctx.ui.setFooter((_tui: unknown, theme: any, footerData: any) => ({
