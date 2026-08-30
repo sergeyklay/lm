@@ -27,10 +27,12 @@ PORTFILE=$SRV/port
 
 cat > "$SRV/model.mjs" <<'EOF'
 import { createServer } from "node:http";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 
 // One tool call, streamed the way the harness reads it. The name is echoed back
-// out of the request, so the one server answers whichever verb is asking.
+// out of the request, so the one server answers whichever verb is asking. A case
+// that needs a shaped answer writes it to answers/<verb> first; the rest get the
+// one-field answer the stub tools declare.
 const sse = (name, args) => {
   const base = { id: "1", object: "chat.completion.chunk", created: 0, model: "m" };
   const mk = (d, fr = null) =>
@@ -40,7 +42,11 @@ const sse = (name, args) => {
     + mk({}, "tool_calls") + "data: [DONE]\n\n";
 };
 
-const [portFile, log] = process.argv.slice(2);
+const [portFile, log, answers] = process.argv.slice(2);
+const argsFor = (name) => {
+  try { return readFileSync(`${answers}/${name}`, "utf8").trim(); }
+  catch { return JSON.stringify({ a: `rendered by ${name}` }); }
+};
 const server = createServer((req, res) => {
   let raw = "";
   req.on("data", (c) => (raw += c));
@@ -50,13 +56,14 @@ const server = createServer((req, res) => {
     const name = body.tools?.[0]?.function?.name ?? "none";
     appendFileSync(log, JSON.stringify(body.messages ?? []) + "\n");
     res.writeHead(200, { "content-type": "text/event-stream" });
-    res.end(sse(name, JSON.stringify({ a: `rendered by ${name}` })));
+    res.end(sse(name, argsFor(name)));
   });
 });
 server.listen(0, "127.0.0.1", () => writeFileSync(portFile, String(server.address().port)));
 EOF
 
-node "$SRV/model.mjs" "$PORTFILE" "$SRVLOG" &
+ANSWERS=$SRV/answers; mkdir -p "$ANSWERS"
+node "$SRV/model.mjs" "$PORTFILE" "$SRVLOG" "$ANSWERS" &
 MODEL=$!
 trap 'kill "$MODEL" 2>/dev/null; rm -rf "$SRV"' EXIT
 for _ in $(seq 1 100); do [ -s "$PORTFILE" ] && break; sleep 0.05; done
@@ -66,6 +73,18 @@ PORT=$(cat "$PORTFILE")
 export LM_OLLAMA="http://127.0.0.1:$PORT"
 # One log spans every repository, so a fixture run has to opt out of it.
 export LM_LOG=
+
+stub_pr() {
+  cat > "$tools/pr.sh" <<'EOF'
+name="pr"
+description="stub"
+collect() { printf 'stub=pr flow=%s yes=%s args=[%s]\n' "${LM_WORKFLOW:-none}" "${LM_YES:-unset}" "$*"; }
+schema() { printf '%s\n' '{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}'; }
+validate() { cat >/dev/null; }
+render() { jq -r .a; }
+apply() { cat >/dev/null; echo "PR opened"; }
+EOF
+}
 
 # $1 becomes the stubbed commit's exit status, standing in for what `confirm`
 # returns: 0 is a yes, 7 the refusal a human makes.
@@ -77,8 +96,14 @@ setup() {
   cat > "$tools/commit.sh" <<'EOF'
 name="commit"
 description="stub"
+flags="--no-stage"
 collect() {
-  git diff --cached --quiet && { echo "lm: nothing staged" >&2; return 3; }
+  if [ -n "${LM_NO_STAGE:-}" ]; then
+    git diff --cached --quiet && { echo "lm: nothing staged" >&2; return 3; }
+  else
+    git diff HEAD --quiet && [ -z "$(git ls-files --others --exclude-standard)" ] &&
+      { echo "lm: nothing to commit" >&2; return 3; }
+  fi
   printf 'stub=commit flow=%s yes=%s args=[%s]\n' "${LM_WORKFLOW:-none}" "${LM_YES:-unset}" "$*"
 }
 schema() { printf '%s\n' '{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}'; }
@@ -87,20 +112,13 @@ render() { jq -r .a; }
 apply() {
   cat >/dev/null
   [ "${LM_STUB_RC:-0}" = 0 ] || exit "${LM_STUB_RC}"
+  [ -n "${LM_NO_STAGE:-}" ] || git add -A
   git commit -qm "feat: scope the widget to one repository"
 }
 EOF
-  cat > "$tools/pr.sh" <<'EOF'
-name="pr"
-description="stub"
-collect() { printf 'stub=pr flow=%s yes=%s args=[%s]\n' "${LM_WORKFLOW:-none}" "${LM_YES:-unset}" "$*"; }
-schema() { printf '%s\n' '{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}'; }
-validate() { cat >/dev/null; }
-render() { jq -r .a; }
-apply() { cat >/dev/null; echo "PR opened"; }
-EOF
+  stub_pr
   export LM_TOOLS=$tools LM_STUB_RC=${1:-0}
-  : > "$SRVLOG"
+  : > "$SRVLOG"; rm -f "$ANSWERS"/*
   cd "$work" || exit 1
   git init -q -b main .; git config user.email t@t; git config user.name t
   echo seed > f.txt; git add .; git commit -qm "chore: seed"
@@ -145,31 +163,35 @@ check "--here passes the refusal through" "7"    "$rc"
 check "--here made no commit"             "chore: seed" "$(git log -1 --format='%s')"
 teardown
 
-# An unstaged tree ships without a git add. g.txt is untracked on purpose: git diff
-# never reports one and git add takes it, which is the difference the workflow
-# rests on. Silence is the assertion too: staging is the expected case now.
+# An unstaged tree ships without a git add of the operator's. g.txt is untracked
+# on purpose: git diff never reports one and git add takes it, which is the
+# difference the verb rests on. The workflow no longer stages, so what this reads
+# is the staging that moved into apply().
 setup 0
 git reset -q
 echo more > g.txt
-out=$(ship 2>&1)
+ship >/dev/null 2>&1
 check "the unstaged change was shipped" "f.txt,g.txt" "$(git show --name-only --format= HEAD | paste -sd,)"
-check "and staging said nothing"        "0" "$(grep -c 'nothing to stage' <<<"$out")"
 teardown
 
-# --no-stage gets today's behaviour back: nothing is staged, and the verb refuses
-# an empty index the way it refuses one the operator left empty themselves.
+# --no-stage means the verb takes only what is already staged, so what the
+# operator left out of the index is still there afterwards.
 setup 0
 git reset -q
-ship --no-stage >/dev/null 2>&1; rc=$?
-check "--no-stage passes the refusal through" "3" "$rc"
-check "--no-stage staged nothing"             " M f.txt" "$(git status --porcelain)"
+echo more > g.txt
+git add f.txt
+ship --no-stage >/dev/null 2>&1
+check "--no-stage commits the index"      "f.txt" "$(git show --name-only --format= HEAD | paste -sd,)"
+check "and leaves the rest of the tree"   "?? g.txt" "$(git status --porcelain)"
 teardown
 
-# Nothing to stage is the surprising case, so that is the one that speaks.
+# Nothing to commit is the verb's own refusal, and no step of the workflow can
+# manufacture something for it to work on any more.
 setup 0
 git reset -q --hard
-out=$(ship 2>&1)
-check "a clean tree is named" "1" "$(grep -c 'nothing to stage' <<<"$out")"
+ship >/dev/null 2>&1; rc=$?
+check "a clean tree is refused"    "3" "$rc"
+check "and no branch is left over" "main" "$(git branch --format='%(refname:short)' | paste -sd,)"
 teardown
 
 # Both verbs of one workflow carry the same name, and it is not empty. The log
@@ -225,14 +247,153 @@ check "and what pr would do"                   "1" "$(grep -c 'rendered by pr' <
 check "and says its own steps did not run"     "1" "$(grep -c "ship's own steps do not run" <<<"$out")"
 teardown
 
-# The rehearsal is thinner than the run, and honestly so: staging is a side effect
-# and the tree is the operator's, so the verb refuses on its own account rather
-# than on a tree the rehearsal staged for it.
+# The rehearsal is thinner than the run, and honestly so. Staging is a side effect
+# inside apply() now, so this covers the verb as well as the workflow.
 setup 0
 git reset -q
 ship --dry-run >/dev/null 2>&1; rc=$?
-check "a rehearsal stages nothing"         ""  "$(git diff --cached --name-only)"
+check "a rehearsal stages nothing" "" "$(git diff --cached --name-only)"
+check "and a rehearsal exits 0"    "0" "$rc"
+teardown
+
+# A verb whose input an earlier step would have made refuses the way it would if
+# you ran it yourself now. No step makes one any more, so the tree has to be clean
+# for there to be nothing to work on.
+setup 0
+git reset -q --hard
+ship --dry-run >/dev/null 2>&1; rc=$?
 check "and the verb refuses on its own account" "3" "$rc"
+teardown
+
+# Everything below runs the real tools/commit.sh rather than the stub, because
+# what is being read is what the verb does to a repository: how many commits it
+# makes, which files each carries, and what it leaves when a hook stops it. pr
+# stays a stub; none of this is about pr. --yes is what stands in for the person
+# at the terminal, since confirm() reads a /dev/tty a suite has none of.
+setup_real() { # $1 how many of a b c d the tree changes
+  work=$(mktemp -d); tools=$(mktemp -d)
+  cp "$ROOT/tools/ship.sh" "$tools/ship.sh"
+  cp "$ROOT/tools/commit.sh" "$tools/commit.sh"
+  stub_pr
+  export LM_TOOLS=$tools
+  : > "$SRVLOG"; rm -f "$ANSWERS"/*
+  cd "$work" || exit 1
+  git init -q -b main .; git config user.email t@t; git config user.name t
+  local f k=0
+  for f in a b c d; do echo seed > "$f.txt"; done
+  git add .; git commit -qm "chore: seed"
+  for f in a b c d; do k=$((k + 1)); [ "$k" -le "$1" ] && echo "changed $f" > "$f.txt"; done
+  return 0
+}
+
+# One commit per argument, in the order given. The messages are the fixture's, so
+# nothing here depends on what a model would have said.
+groups() {
+  local f
+  for f in "$@"; do
+    jq -nc --arg f "$f" --arg t "${f%%.*}" '{files:[$f],type:"chore",scope:"",
+      subject:("touch " + $t),
+      body:"One file changed here and the reason is that this fixture needed it to."}'
+  done | jq -sc '{groups: .}'
+}
+
+# One group is the control the narrowing mutants need: with a single commit there
+# is nothing to narrow the index to, so a run that commits the whole index looks
+# exactly like a correct one here and only the cases below tell them apart.
+setup_real 1
+groups a.txt > "$ANSWERS/commit"
+ship --yes >/dev/null 2>&1; rc=$?
+check "one group exits 0"        "0" "$rc"
+check "and lands one commit"     "chore: touch a,chore: seed" "$(git log --format='%s' -2 | paste -sd,)"
+teardown
+
+# Two unrelated changes, one model call, two commits, and neither carries the
+# other file. This is the shape Q7 measured mixing at 4/50 on.
+setup_real 2
+groups a.txt b.txt > "$ANSWERS/commit"
+ship --yes >/dev/null 2>&1; rc=$?
+check "two unrelated changes exit 0"      "0" "$rc"
+check "and land two commits"              "chore: touch b,chore: touch a,chore: seed" "$(git log --format='%s' -3 | paste -sd,)"
+check "the second carries only its file"  "b.txt" "$(git show --name-only --format= HEAD | paste -sd,)"
+check "and the first only its own"        "a.txt" "$(git show --name-only --format= HEAD~1 | paste -sd,)"
+check "out of one model call"             "1" "$(grep -c 'Split these changes into commits' "$SRVLOG")"
+check "the tree is clean afterwards"      "" "$(git status --porcelain)"
+teardown
+
+# Four, which is where Q7 measured mixing at 24/50 and where the confirmation
+# stops being a formality.
+setup_real 4
+groups a.txt b.txt c.txt d.txt > "$ANSWERS/commit"
+ship --yes >/dev/null 2>&1
+check "four changes land four commits" "chore: touch d,chore: touch c,chore: touch b,chore: touch a" "$(git log --format='%s' -4 | paste -sd,)"
+check "each carrying one file"         "d.txt,c.txt,b.txt,a.txt" \
+  "$(for r in HEAD HEAD~1 HEAD~2 HEAD~3; do git show --name-only --format= "$r"; done | paste -sd,)"
+teardown
+
+# A hook that rewrites the group's files and then aborts is the formatter case:
+# the tree moved, so a retry can help, and every commit still lands. It fires
+# once, because a hook that failed for ever would be the other case.
+setup_real 3
+cat > .git/hooks/pre-commit <<'HOOK'
+#!/bin/sh
+git diff --cached --name-only | grep -qx c.txt || exit 0
+[ -f .git/rewrote ] && exit 0
+: > .git/rewrote
+echo reformatted >> c.txt
+exit 1
+HOOK
+chmod +x .git/hooks/pre-commit
+groups a.txt b.txt c.txt > "$ANSWERS/commit"
+ship --yes >/dev/null 2>&1; rc=$?
+check "a hook that rewrote the tree exits 0" "0" "$rc"
+check "and all three commits land"           "chore: touch c,chore: touch b,chore: touch a" "$(git log --format='%s' -3 | paste -sd,)"
+check "and the retry took what it wrote"     "1" "$(git show HEAD:c.txt | grep -c reformatted)"
+teardown
+
+# A hook that only rejected gets no retry, because with the tree unchanged a
+# retry is theatre. What landed stands, and 8 is what says so.
+setup_real 3
+cat > .git/hooks/pre-commit <<'HOOK'
+#!/bin/sh
+git diff --cached --name-only | grep -qx c.txt && exit 1
+exit 0
+HOOK
+chmod +x .git/hooks/pre-commit
+groups a.txt b.txt c.txt > "$ANSWERS/commit"
+out=$(ship --yes 2>&1); rc=$?
+br=$(git branch --format='%(refname:short)' | grep '^lm-ship-')
+check "a rejecting hook exits 8"          "8" "$rc"
+check "the earlier commits stand"         "chore: touch b,chore: touch a" "$(git log --format='%s' -2 "$br" 2>/dev/null | paste -sd,)"
+check "on a branch that survives 8"       "1" "$(git branch --list 'lm-ship-*' | wc -l)"
+check "main did not move"                 "chore: seed" "$(git log -1 --format='%s' main)"
+check "stderr names what landed"          "1" "$(grep -c 'landed: chore: touch a' <<<"$out")"
+check "and what is left"                  "1" "$(grep -c 'left uncommitted' <<<"$out")"
+check "and pr never ran"                  "0" "$(grep -c 'PR opened' <<<"$out")"
+teardown
+
+# The same rejection on a group that is not the last, which is the only shape that
+# tells the two hook probes apart. Every later group's files sit at HEAD in the
+# narrowed index and dirty in the tree, so a probe asked about the whole tree
+# answers 1 and retries a rejection no retry can help; asked about the group's own
+# files it answers 0. Measured 2026-08-30 in a throwaway repository: whole tree 1,
+# `git diff --quiet -- b.txt` 0. The exit code cannot say it either, because a
+# retried rejection lands nowhere and reports 8 just the same, so what the case
+# reads is how many times the hook ran.
+setup_real 3
+cat > .git/hooks/pre-commit <<'HOOK'
+#!/bin/sh
+git diff --cached --name-only | grep -qx b.txt || exit 0
+echo tried >> .git/rejected
+exit 1
+HOOK
+chmod +x .git/hooks/pre-commit
+groups a.txt b.txt c.txt > "$ANSWERS/commit"
+out=$(ship --yes 2>&1); rc=$?
+br=$(git branch --format='%(refname:short)' | grep '^lm-ship-')
+check "a rejection mid-series exits 8"     "8" "$rc"
+check "the commit before it stands"        "chore: touch a" "$(git log --format='%s' -1 "$br" 2>/dev/null)"
+check "and the rejection was not retried"  "1" "$(wc -l < .git/rejected)"
+check "and every uncommitted file is named" "2" "$(grep -cE '^  [bc]\.txt$' <<<"$out")"
 teardown
 
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
