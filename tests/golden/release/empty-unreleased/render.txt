@@ -1,0 +1,8 @@
+chore(release): cut 0.2.0
+
+  package.json       0.1.0 -> 0.2.0
+  package-lock.json  0.1.0 -> 0.2.0
+  CHANGELOG.md       0 entries -> ## [0.2.0] - 2026-01-02
+
+v0.2.0
+  lm 0.2.0 - a second thing the demo tool can do, and the first one repaired

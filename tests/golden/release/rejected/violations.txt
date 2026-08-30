@@ -1,0 +1,3 @@
+tag summary ends with a period
+tag summary names the version, which is written in front of it for you
+output contains non-ASCII characters

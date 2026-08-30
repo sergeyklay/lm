@@ -1,0 +1,21 @@
+{
+  "properties": {
+    "bump": {
+      "enum": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "type": "string"
+    },
+    "summary": {
+      "maxLength": 120,
+      "type": "string"
+    }
+  },
+  "required": [
+    "bump",
+    "summary"
+  ],
+  "type": "object"
+}

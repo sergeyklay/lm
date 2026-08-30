@@ -1,0 +1,22 @@
+This project is at version 0.1.0.
+
+The 2 entries standing under [Unreleased] in CHANGELOG.md, which is what this release carries:
+
+### Added
+
+- A second thing the demo tool can do
+
+### Fixed
+
+- The demo tool no longer forgets the first thing
+
+Choose the bump these entries call for, as Semantic Versioning defines it:
+  major when something that used to work no longer does.
+  minor when there is functionality that was not there before and nothing was broken.
+  patch when only defects were repaired.
+
+Write the summary the annotated tag carries.
+Say what the whole set of entries above gives the person who installs this release,
+not what any one of them changed.
+One unwrapped line, under 90 characters, lower case at the start, no trailing period.
+Do not name the version: it is written in front of your summary for you.

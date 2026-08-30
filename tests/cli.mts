@@ -35,7 +35,7 @@ for (const line of ["open a chat", "lm <verb>", "lm <workflow>", "lm stats", "--
 // one command away. A workflow is listed too, and never named in Usage beside
 // `lm stats`, which is `lm` itself rather than something this repository ships.
 check("the verbs are listed as names alone",
-  true, /^Available verbs:\n  changelog, commit, issue, pr$/m.test(help.out));
+  true, /^Available verbs:\n  changelog, commit, issue, pr, release$/m.test(help.out));
 check("the workflows have a listing of their own",
   true, /^Available workflows:\n  ship$/m.test(help.out));
 check("no description reaches the listing", false, help.out.includes("Conventional Commits"));
@@ -179,7 +179,7 @@ function runIn(cwd: string, args: string[], extra: Record<string, string> = {}, 
 
 const rows = (out: string) => out.trim().split("\n").map((l) => l.split("\t"));
 const listed = (out: string) => (out.trim() === "" ? [] : rows(out).map((r) => r[0]));
-const SHIPPED = ["changelog", "commit", "issue", "pr", "ship"];
+const SHIPPED = ["changelog", "commit", "issue", "pr", "release", "ship"];
 
 // The registry is the project's own tools/ and nothing else, so a project that
 // ships none has no verbs at all rather than the installation's.

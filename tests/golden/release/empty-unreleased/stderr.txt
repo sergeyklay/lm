@@ -1,0 +1,3 @@
+lm: nothing under '## [Unreleased]' in CHANGELOG.md
+    Draft the entries first: lm changelog
+[exit 3]

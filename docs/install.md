@@ -47,6 +47,7 @@ lm changelog       # CHANGELOG.md entries from the staged diff
 lm issue "topic"   # a GitHub issue, labels picked from the repository
 lm pr              # a pull request description
 lm ship            # branch, commit, pull request
+lm release         # bump the version, date the changelog section, commit and tag
 lm stats           # what the run log says about this repository
 ```
 

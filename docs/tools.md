@@ -59,6 +59,7 @@ node tests/cli.mts                # what `lm` dispatches, and its help
 bash tests/changelog-insert.sh    # the changelog insertion, byte for byte
 bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh` stubbed
 bash tests/golden.sh              # every verb except the model call
+bash tests/release.sh             # what `lm release` does to a repository, on a throwaway one
 bash tests/ship.sh                # the `lm ship` workflow, on the driver `lm` runs it on
 bash tests/stats.sh               # the clean share split at a date and the chat's share of the log
 bash tests/consent.sh             # what an answer may say, and the bounded wait, under a pty
@@ -825,13 +826,85 @@ a rehearsal exits 0, stages nothing and still prints what `commit` would do; tha
 and that the whole series came out of one model call. Each holds an absence or a completion that no
 mutation of the workflow can manufacture on its own.
 
+The release has a group of its own, and it is split the way a verb's always is here. The six cases
+under `tests/golden/release`, which `ls tests/golden/release | wc -l` counts, pin the four
+read-only functions; `tests/release.sh` drives `apply()`, which no fixture can reach because
+`confirm` reads `/dev/tty`. That suite runs the shell runner with `curl` stubbed against a
+repository under `mktemp -d` that has a bare remote of its own, so the two pushes are real and
+land nowhere anybody owns, and `npm install --package-lock-only` runs inside that repository with
+`npm_config_registry` pointed at a refused port. Counted 2026-08-30 with
+`bash tests/release.sh | grep -c '^ok'` at 44 and `bash tests/golden.sh | grep -c '^ok   release/'`
+at 30.
+
+Twenty mutations, each predicted by case name before it was planted, each gated on the anchor
+occurring exactly once under `grep -oF ... | wc -l` and on `bash -n`, and each confirmed by the
+value the mutated line produced.
+
+The answer's own shape. Widening the bump enum to free text reddens eight: all six `schema`
+expectations and the two cases that read the enum and the enumerated fields off the stubbed
+request. Dropping the `validate()` rule against a summary that names the version reddens exactly
+`release/rejected/violations`.
+
+The two versions of the same sentence are pinned apart, which is the point of having both. The tag
+message losing its `lm <version> - ` prefix in `apply()` reddens one, `and reads lm <version> -
+<summary>`; making the tag lightweight rather than annotated reddens that one and `the tag is
+annotated`. Rewording the commit subject `apply()` writes reddens one, `whose subject names the
+version`, while rewording the subject `render()` prints reddens eight: the two that read the
+rendered commit, from a run and from a rehearsal, and all six `render` expectations. Stripping the
+prefix from `render()`'s tag line reddens eight the same way.
+
+What `apply()` does to the repository, one property each. Not repairing the foot links reddens the
+two that read them; opening no dated heading reddens `the [Unreleased] section is emptied` and `the
+entries stand under a dated heading`; dropping `npm install --package-lock-only` reddens `and so
+does package-lock.json` and `and which carries the three together`, because a lock file that did
+not change is not in a commit made with a pathspec; not rewriting `package.json`'s version reddens
+those two and `package.json says the new version`; and removing both pushes reddens `the branch
+reached the remote` and `and so did the tag`.
+
+What `collect()` refuses, and where. Dropping the guard on a version that is not three numbers
+reddens three; no longer refusing a version the arithmetic cannot reach reddens five; and the
+operator's version no longer pinning the bump reddens `release/pinned/prompt` and `a named version
+pins the bump`.
+
+Four findings, and they are what the record is for. The first attempt at moving the `[Unreleased]`
+guard out of `collect()` and into `apply()` deleted the `local n; n=$(_entries)` line above it,
+which `collect()` reads three lines later, so under `set -u` every case died and 36 went red at
+once: a mutant that parses, crashes where it is planted, and reads as thorough coverage. Replanted
+so that only the `if` moves, it reddens three where five were predicted, and the two survivors are
+the finding: `an empty [Unreleased] exits 3` and `and says there is nothing under it` both stay
+green, because the guard in `apply()` exits 3 and says the same words. Only `before any model
+call`, which counts what the stubbed `curl` was asked, can tell the two placements apart. The same
+shape appears twice more and each time the survivor is named here rather than repaired: `no
+package.json exits 3` survives the removal of its own guard, because the version-shape guard below
+it exits 3 too, and `release/no-unreleased/prompt` survives the removal of the missing-section
+guard, because the empty-section guard below it refuses first; in both, the case reading the words
+is what dies.
+
+The third is the runner's. Moving `libexec/lm-verb`'s `--dry-run` guard to after `apply` was
+predicted to redden the four rehearsal cases that read the repository, and reddened five: `a cut
+exits 0` goes with them, because `(( DRY ))` moved to the end of the file becomes the last command
+the runner executes and a false arithmetic test exits 1. `a rehearsal exits 0` and `and says it did
+nothing` stay green under it, and that green is what says the moved line ran. The fourth is two
+under-predictions of the same kind: collect no longer saying which version the project is at was
+predicted at three and reddened four, and no longer refusing an unreachable version was predicted
+at three and reddened five, both times because the prediction was written from `tests/release.sh`
+alone and forgot the fixture case that covers the same line.
+
+Sixteen cases no mutation in the series reddens, and they are controls rather than assertions. Six
+hold what a refusal or a rehearsal leaves behind, which rests on the runner's own `confirm` and is
+covered where that lives. Eight are the `violations` and `stderr` expectations that are empty
+because the answer is clean or the verb said nothing, an absence no mutation of this verb can
+manufacture. The other two are `and lands exactly one commit`, which one `git commit` cannot fail
+to satisfy, and `one model call paid for all of it`, which is what makes every count beside it
+readable.
+
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
 defect to fix. Every tool reports `SC2148` because it carries no shebang, which is honest
 (`libexec/lm-verb` sources it and never executes it), and one `SC2034` per declaration the runner
 reads after sourcing and the file itself never uses: `name` and `description` everywhere, plus
-`flags` where a tool declares one. Measured 2026-08-30 across the four verbs with
+`flags` where a tool declares one. Measured 2026-08-30 across the five verbs with
 `for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: `changelog` four, `commit` four,
-`issue` three, `pr` three. A tool reporting one more than its declarations account for carries
+`issue` three, `pr` three, `release` three. A tool reporting one more than its declarations account for carries
 something the others do not, and that is what to look at.
 
 `changelog` is the one, and its extra is a false positive worth leaving. Its validator matches
