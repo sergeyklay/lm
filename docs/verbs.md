@@ -42,7 +42,8 @@ picks the verb for a request by reading the same one-line descriptions `lm --lis
 no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
 exits 2, so a workflow that pipes it into `lm` stops rather than running the nearest match.
 Either answer is logged, so how often the registry has no verb for what you asked is a share
-`lm stats` prints rather than something you have to remember.
+`lm stats` prints rather than something you have to remember. Both are answers the model gave,
+and a request it never saw is in neither.
 
 ## lm stats
 
@@ -144,7 +145,7 @@ Environment only:
 | `LM_CTX` | `65536` |
 | `LM_MAX_TOKENS` | `3000` |
 | `LM_THINK` | `none` |
-| `LM_TOOLS` | unset, and the registry is a precedence |
+| `LM_TOOLS` | unset, and the registry is the repository's own `tools/` |
 | `LM_LOG` | `$HOME/.lm/runs.jsonl` |
 | `LM_YES` | unset |
 
@@ -159,14 +160,19 @@ seconds is thirty times what the read costs when it works, measured on 2026-08-2
 one `/api/show` per model the read is made of.
 
 `LM_TOOLS`, when set, is the whole registry: exactly the one directory it names, and nothing
-beside it. When it is unset the registry is a precedence of two directories, nearest first: the
-`tools/` of the repository you are standing in, then the `tools/` of the installation. The
-repository is what `git rev-parse --show-toplevel` reports in the working directory, so outside a
-repository, and in one with no `tools/` of its own, the installation's is the whole registry. A
-name present in both resolves to the nearer file and is listed once. `lm --list` prints
-`project` in a third tab-separated field for every entry the repository supplied, so a verb
-shadowing one the installation ships is visible rather than silent; an entry from the
-installation prints the two fields it always printed.
+beside it. When it is unset the registry is the `tools/` of the repository you are standing in,
+and nothing beside that either. The repository is what `git rev-parse --show-toplevel` reports in
+the working directory, so outside a repository, and in one with no `tools/` of its own, the
+registry is empty. The installation's own `tools/` is never a fallback: `lm` run in another
+project answers with that project's verbs or with none, and every entry `lm --list` prints
+carries the same two tab-separated fields.
+
+An empty registry prints no listing rather than an empty one. `lm --list` says nothing and exits
+0, `lm --help` prints neither `Available verbs:` nor `Available workflows:`, and a name goes
+unresolved: `lm: no such tool 'commit'.` on stderr and exit 2, with no list under it. `lm --which`
+refuses there before it asks the model, saying `lm: the registry is empty, so no verb can serve
+that request` on stderr and exiting 2: no verb was weighed, so the model's own refusal would
+report a judgement nobody made, and the run reaches neither the model nor the log.
 
 `LM_CTX` is what the service serves, not what a model can hold. Ollama bounds every model it loads,
 and a card's own length is read per model by `card()` in `src/catalogue.mts`, so a new `LM_MODEL`

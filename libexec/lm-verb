@@ -11,34 +11,24 @@ set -euo pipefail
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null || true)
 
-# LM_TOOLS names the whole registry. Otherwise the project's tools/ shadows the
-# installation's. bin/lm resolves this for itself, and tests/cli.mts is what
+# LM_TOOLS names the whole registry. Otherwise it is the tools/ of the repository
+# you are standing in, and nothing at all outside one or in a repository with no
+# tools/ of its own. bin/lm resolves this for itself, and tests/cli.mts is what
 # requires the two to answer alike.
-INSTALL=$(dirname "$(readlink -f "$0")")/../tools
 if [ -n "${LM_TOOLS:-}" ]; then
-  DIRS=("$LM_TOOLS")
-elif [ -n "$TOP" ] && [ -d "$TOP/tools" ] \
-  && [ "$(readlink -f "$TOP/tools")" != "$(readlink -f "$INSTALL")" ]; then
-  DIRS=("$TOP/tools" "$INSTALL")
+  DIR=$LM_TOOLS
+elif [ -n "$TOP" ] && [ -d "$TOP/tools" ]; then
+  DIR="$TOP/tools"
 else
-  DIRS=("$INSTALL")
+  DIR=
 fi
 
-# The nearer directory wins a name outright, and a third field says so, because a
-# shadowed verb the operator cannot see is one they cannot account for. An entry
-# from the installation prints the two fields it always printed. The file name is
-# carried through the sort and cut back off, so the order is the one the glob gave
-# when there was a single directory to glob.
-list() { local d f n seen=" " src
-  { for d in "${DIRS[@]}"; do
-      src=""
-      if [ "$d" = "${DIRS[0]}" ] && [ "${#DIRS[@]}" -gt 1 ]; then src=$'\tproject'; fi
-      for f in "$d"/*.sh; do [ -f "$f" ] || continue
-        n=${f##*/}
-        case "$seen" in *" $n "*) continue ;; esac
-        seen="$seen$n "
-        ( . "$f"; printf '%s\t%s\t%s%s\n' "$n" "$name" "$description" "$src" )
-      done
+# The file name is carried through the sort and cut back off, so the order is the
+# one a C-locale glob would have given rather than the caller's locale.
+list() { local f
+  [ -n "$DIR" ] || return 0
+  { for f in "$DIR"/*.sh; do [ -f "$f" ] || continue
+      ( . "$f"; printf '%s\t%s\t%s\n' "${f##*/}" "$name" "$description" )
     done; } | LC_ALL=C sort -t$'\t' -k1,1 | cut -f2-; }
 
 # Assigns rather than echoing: a command substitution is a subshell, and the six
@@ -90,7 +80,8 @@ sha() { [ -n "${1:-}" ] || return 0; printf '%s' "$1" | sha256sum | cut -d' ' -f
 usage() { echo "usage: lm <verb> [--dry-run] [text] | lm --list | lm --which <text>"
   list | awk -F'\t' '
     { n[NR] = $1; d[NR] = $2; if (length($1) > w) w = length($1) }
-    END { printf "\nCommands:\n\n"
+    END { if (NR == 0) exit
+          printf "\nCommands:\n\n"
           f = "  %-" (w + 4) "s%s\n"
           for (i = 1; i <= NR; i++) printf f, n[i], d[i]
           print "" }'; }
@@ -153,8 +144,14 @@ case "${1:-}" in
       # refusal: counting only refusals gives a numerator and no denominator.
       # --which is not a verb, and the record says so rather than borrowing one,
       # because a refusal exits 2 and would read as a failure in the verb table.
-      VERB="--which"; CALLS=1; trap 'log_run $?' EXIT
       CAT=$(list | awk -F'\t' '{printf "- %s: %s\n",$1,$2}')
+      # An empty registry is the registry's refusal and not the model's: nothing
+      # was weighed, so saying no verb served the request reports a judgement
+      # nobody made and pays for a foregone conclusion. Nothing reached the model,
+      # so like --list this leaves no record: a record with no call in it sits in
+      # the denominator lm-stats reads the refusal share from.
+      [ -n "$CAT" ] || { echo "lm: the registry is empty, so no verb can serve that request" >&2; exit 2; }
+      VERB="--which"; CALLS=1; trap 'log_run $?' EXIT
       NAMES=$(list | cut -f1 | jq -R . | jq -sc '. + ["none"]')
       SCH=$(jq -n --argjson n "$NAMES" '{type:"object",properties:{tool:{type:"string",enum:$n}},required:["tool"]}')
       PROMPT="Available tools:
@@ -183,10 +180,15 @@ done
 
 VERB=$1; shift
 TOOL=
-for d in "${DIRS[@]}"; do
-  if [ -f "$d/$VERB.sh" ]; then TOOL="$d/$VERB.sh"; break; fi
-done
-[ -n "$TOOL" ] || { echo "lm: no such tool '$VERB'. Available:" >&2; list | cut -f1 | sed 's/^/  /' >&2; exit 2; }
+if [ -n "$DIR" ] && [ -f "$DIR/$VERB.sh" ]; then TOOL="$DIR/$VERB.sh"; fi
+if [ -z "$TOOL" ]; then
+  # A list with nothing in it is not printed, so the sentence stops where it has
+  # nothing left to name.
+  AVAIL=$(list | cut -f1 | sed 's/^/  /')
+  { printf "lm: no such tool '%s'.%s\n" "$VERB" "${AVAIL:+ Available:}"
+    [ -z "$AVAIL" ] || printf '%s\n' "$AVAIL"; } >&2
+  exit 2
+fi
 . "$TOOL"
 
 # Flags are found by scanning, so a flag and free text coexist in either order.

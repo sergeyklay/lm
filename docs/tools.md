@@ -1,10 +1,10 @@
 # Adding a tool
 
 Drop one file into a `tools/` directory. Nothing else changes: the index is the directory
-listing. Which directories are listed is the registry, and
-[running a verb](verbs.md) fixes that: the repository you are standing in supplies verbs of its
-own and the installation supplies the rest, unless `LM_TOOLS` names one directory as the whole of
-it. A name the repository also ships resolves to the repository's file.
+listing. Which directory is listed is the registry, and [running a verb](verbs.md) fixes that:
+the `tools/` of the repository you are standing in, unless `LM_TOOLS` names another directory
+instead. A project with neither has no verbs, and `lm` says so rather than answering out of some
+other project's.
 
 ```bash
 name="verb"
@@ -79,8 +79,9 @@ diff before committing them.
 
 Every group of checks below has been made to go red, and that record is what makes a green run of
 them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
-kills a different subset of the six cases in `tests/runner.sh`: dropping the trap kills five,
-blanking the `which` argument kills three, and dropping the table's exclusion kills one. The
+kills a different subset of the group's seven cases in `tests/runner.sh`: dropping the trap kills
+six, blanking the `which` argument kills four, and dropping the table's exclusion kills one — the
+trap also kills `a --which run hashes its prompt`, which belongs to the hash group beside it. The
 `changelog` internal-symbol check reports nothing over every bullet the changelog has published:
 45 when it landed, 47 on 2026-08-26 by
 `awk '/^## \[Unreleased\]/{u=1;next} /^## \[/{u=0} !u&&/^- /' CHANGELOG.md | wc -l`, and it names
@@ -462,8 +463,8 @@ the three suites that hold the record's shape: `tests/runner.sh` for the shell w
 `tests/chat.mts` for the Node one, and `tests/stats.sh` for a log holding records written on both
 sides of the field's arrival. `tests/chat.mts` enters each caller the way it is entered in earnest,
 `bin/lm` as a process of its own against the registration the chat itself uses, over a fixture that
-refuses in `collect` so neither side reaches a model. Counted 2026-08-29 with `grep -c '^ok'` over
-each suite's output: `tests/runner.sh` at 79, `tests/chat.mts` at 31 and `tests/stats.sh` at 26.
+refuses in `collect` so neither side reaches a model. Counted 2026-08-30 with `grep -c '^ok'` over
+each suite's output: `tests/runner.sh` at 89, `tests/chat.mts` at 31 and `tests/stats.sh` at 26.
 
 Eight mutations, each predicted by case name before it was planted, each gated, and each confirmed
 by the value the mutated line put in the record. On the Node side: the chat declaring no caller
@@ -559,67 +560,68 @@ wall clock left a mutant in the working tree twice, the second time with `trap .
 installed, which did not fire: what proves a restore is `cmp` against the pre-series copy in the
 same command, never a trap and never the intention to restore.
 
-The registry is a precedence of directories rather than one directory, and the group that pins it
-is split across the two runners because the resolution is: `libexec/lm-verb` answers `--list` and
-`bin/lm` dispatches, and each resolves for itself. `tests/cli.mts` stands `lm` in five kinds of
-directory - a repository with no `tools/` of its own, one shadowing a name the installation ships,
-one adding a name it does not, a directory that is no repository at all, and a run with `LM_TOOLS`
-set - and `tests/registry.mts` drives `list()` over two directories on its own. Counted 2026-08-30
-with `node tests/cli.mts | grep -c '^ok'` at 64 and `node tests/registry.mts | grep -c '^ok'` at 53.
+The registry is one directory, and the group that pins it is split across the two runners because
+the resolution is: `libexec/lm-verb` answers `--list` and `bin/lm` dispatches, and each resolves for
+itself. `tests/cli.mts` stands `lm` in five kinds of directory - a repository with no `tools/` of
+its own, one shipping a name the installation also ships, one shipping a name it does not, a
+directory that is no repository at all, and a run with `LM_TOOLS` set - and `tests/registry.mts`
+drives `list()` over one directory and over none. The group is 33 cases: the 30 at the end of
+`tests/cli.mts` from `a project with no tools of its own lists nothing` onwards, and 3 in
+`tests/registry.mts`. Counted 2026-08-30 with `node tests/cli.mts | grep -c '^ok'` at 71
+and `node tests/registry.mts | grep -c '^ok'` at 52.
 
 Twelve mutations, each predicted by case name before it was planted and each compared as a name
-set. Dropping the project directory from `bin/lm` reddens the six cases that dispatch a verb, run a
-workflow or take help from a project file, and none of the listing cases; dropping it from
-`libexec/lm-verb` reddens the eight that read the listing or reach a verb through the shell runner,
-and none that dispatch. The two sets share exactly one case, the one that asks both runners for the
-registry and requires the same answer, which must die whenever either resolver breaks and is the
-only case that can say the two agree; every other case belongs to one runner alone, which is what
-says the two are pinned apart rather than once. Removing the shell runner's dedup reddens 2,
-removing the Node one reddens
-3, two of them the workflow's, because `runWorkflow` builds a `Map` from the listing and a repeated
-name resolves to the last entry rather than the first. Never marking an entry `project` reddens 3;
-never collapsing two identical directories in the shell runner reddens the one case that runs
-inside this repository; taking the sort off the shell listing reddens 3; pointing the shell
-runner's verb lookup at the installation reddens 2; and letting `LM_TOOLS` be the first of two
-rather than the whole registry reddens 2 in each runner.
+set. The two that carry the change restore the fallback the registry no longer has. Making
+`registry()` in `bin/lm` answer with the installation's `tools/` when the project has none reddens
+5, every one of them a case that reaches the Node runner: the three that read `lm --help` in a
+project with no `tools/`, and the two that read what `lm commit` says and returns there. Making
+the shell runner's `DIR` fall back the same way reddens 6, and the two sets are disjoint: the three
+that read `--list`, the two that read the shell runner's own refusal, and the one that reads its
+usage. That each set belongs to one runner alone is what says the two are pinned apart rather than
+once, and it is also what the change cost: the case that asks both runners for the registry and
+requires the same answer now dies under neither, because it stands in a project that has a `tools/`
+and no resolver falls back there.
 
-Three attempts are the warnings worth keeping. `node --check` is not a parse gate for these files:
+Letting the project's `tools/` win over `LM_TOOLS` reddens 2 in `bin/lm`, both of them dispatch
+cases, and 1 in the shell runner, the case that reads the listing. Printing the verb heading
+whether or not there are verbs reddens 2, the case reading that the heading is absent and the case
+reading that nothing points at a description which is not there; printing the `Available:`
+announcement over an empty list reddens 1 in each runner; and printing the shell runner's own
+`Commands:` heading over an empty listing reddens 1. `list()` indexing every file rather than the
+`.sh` ones reddens the one case whose fixture carries a `notatool.txt`.
+
+Two are equivalent, and both sit on machinery a one-directory registry cannot exercise. Dropping
+the shell listing's `[ -n "$DIR" ] || return 0` kills nothing: with `DIR` empty the glob is
+`/*.sh`, which matches nothing, so the loop runs and prints the same nothing. The site is confirmed
+to have executed rather than assumed, by `bash -x` showing `for f in "$DIR"/*.sh` reached under
+the mutant where the intact file returns before it. Taking the sort off that listing kills nothing
+either: one directory's glob is already in order, so the sort guards against a locale rather than
+against an interleave, and the listing under the mutant is byte-identical.
+
+The warning worth keeping is the twelfth, a crashing mutant that reads as coverage from one side
+and as nothing from the other. Dropping `if (!dir) return [];` from `list()` makes
+`readdirSync(undefined)` throw. In `tests/registry.mts` that ends the suite at the case written for
+it: the run exits 1 after 51 `ok` lines with no `FAIL` line at all, so a harness reading case names
+sees an empty kill set while the exit status sees the kill. And in `tests/cli.mts` the two cases
+asserting `--help` names no verbs and no workflows both pass under it, because a `bin/lm` that
+throws prints nothing and an assertion of absence is satisfied by nothing. What catches it there is
+the one positive case beside them, that the rest of the help still prints. A section asserted
+absent needs a case asserting what is still present, or a crash reads as the feature working.
+
+Two harness faults cost more than several of the kills. The first series wrote each mutant's backup
+beside the file it was mutating, and `bin/lm.pre` reddened `bin holds one command`, a case about
+`ls bin/` that no mutant in the series could reach: a kill set carrying a name from outside the
+group is the harness reporting on itself. And `node --check` is not a parse gate for these files:
 it accepts a duplicate `const` in any `.mts` carrying an `import`, which is the error that stopped
 `tests/cli.mts` loading while it was being written, so what gated every Node mutant here is the
-suite printing at least one `ok` line. Reversing the sort in `list()` was predicted to redden one
-case and reddened two, the second an older case pinning the order `--help` names tools in - new code
-killed by a case nobody wrote for it, and the reason a prediction is worth writing down. And the
-mutant that never collapses two identical directories on the Node side kills nothing at all, with
-the site confirmed to have executed and to have returned the same directory twice: `list()`
-deduplicates by name whatever it is handed, so that collapse is a saved directory read and a shape
-shared with the shell runner, not a behaviour. The anchor rule earned its place here too - `DIRS=(`
-occurs three times and the first is the `LM_TOOLS` branch, so a patch taken at the first hit would
-have measured a branch nobody meant to touch and reported its kill set as the other one's.
+suite printing at least one `ok` line, and the shell mutants were gated on `bash -n`.
 
-The twelve leave part of the group unreddened, and a second series on 2026-08-28 measured which
-part. Their kill sets, unioned by case name, cover 20 of the 26 cases the group holds - counted by
-differencing the case names the two suites print at `4d345ea` against those they print at
-`b069603`. Two of the remaining six were reddened by mutations of `list()` that the twelve never
-made: iterating `dirs` in reverse reddens 3 across both suites, one of them the case pinning that a
-shadowed name resolves to the nearer file, and reading only the first directory reddens 4,
-one of them the case pinning that the installation still supplies the rest. Each set was predicted
-by name first and matched. Neither mutant is reachable from the runners, which is why a series
-aimed at the resolvers missed both.
-
-The last four are covered by no mutant that is not equivalent, and the guard behind them by no case
-at all. Dropping either `[ -n "$TOP" ]` or `[ -d "$TOP/tools" ]` from the `elif` in
-`libexec/lm-verb` changes no output anywhere: the mutant lands and the branch flips - `bash -x`
-prints a two-element `DIRS` where the intact file prints one - but a directory that is not there
-supplies no rows to glob and the `project` marker is a field on a row, so stdout and stderr are
-byte-identical, including in the one fixture that isolates the `-d` test, a repository where
-`tools` exists as a regular file. An empty kill set under an equivalent mutant indicts neither the
-mutant nor the cases. The Node runner's own guard is a different matter: dropping
-`!existsSync(project)` from `registry()` in `bin/lm` leaves both suites green at 64 and 53 while
-`node bin/lm --help` run inside a repository that has no `tools/` throws `ENOENT` at `lstat` with
-`registry` on the stack, because `--list` leaves `bin/lm` for the shell runner before `registry()`
-is reached and no case stands the Node runner in such a repository. That is the ordinary case for
-anyone who installs `lm` and runs a verb in a project of their own, and it is the group's one real
-hole rather than a coarse assertion.
+The twelve leave part of the group unreddened. Their kill sets, unioned by case name, cover 17 of
+the 33, counting the one killed as a crash. The 16 that stand are the ones a mutation of the
+resolvers cannot reach: that a project's own file is what runs, what its refusal returns, what its
+generated help says, and that a workflow resolves its verbs through the same registry. Each is
+pinned by a fixture rather than by a resolver, which is why a series aimed at the resolvers misses
+them.
 
 The delivery has a group of its own, and it sits on the driver the operator uses rather than
 beside it. `tests/ship.sh` runs `bin/lm ship` into `runWorkflow` over `tools/ship.sh`, with

@@ -13,18 +13,15 @@ process.env.PI_SKIP_VERSION_CHECK = "1";
 const libexec = join(dirname(realpathSync(process.argv[1])), "..", "libexec");
 const argv = process.argv.slice(2);
 
-// LM_TOOLS names the whole registry. Otherwise the project's tools/ shadows the
-// installation's. libexec/lm-verb resolves this for itself, and tests/cli.mts is
-// what requires the two to answer alike.
+// LM_TOOLS names the whole registry. Otherwise it is the tools/ of the repository
+// you are standing in, and nothing at all outside one or in a repository with no
+// tools/ of its own. libexec/lm-verb resolves this for itself, and tests/cli.mts
+// is what requires the two to answer alike.
 function registry() {
-  if (process.env.LM_TOOLS) return [process.env.LM_TOOLS];
-  const install = join(libexec, "..", "tools");
+  if (process.env.LM_TOOLS) return process.env.LM_TOOLS;
   const top = (spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout ?? "").trim();
   const project = top && join(top, "tools");
-  // The installation's own repository is its own project, so the same directory
-  // must not enter the precedence twice.
-  if (!project || !existsSync(project) || realpathSync(project) === realpathSync(install)) return [install];
-  return [project, install];
+  return project && existsSync(project) ? project : undefined;
 }
 
 function hand(program, args) {
@@ -86,8 +83,12 @@ if (wantsHelp) {
   const verbs = names(false);
   const workflows = names(true);
   const workflowUsage = workflows.length > 0 ? "\n  lm <workflow> [options] [text]  run one workflow" : "";
-  const verbRows = `  ${verbs.join(", ")}`;
+  // A heading with nothing under it is not printed, for either kind: an empty
+  // registry names no verbs, and the line saying where a description is read
+  // belongs to the listing rather than standing in for it.
+  const verbRows = verbs.length === 0 ? "" : `\n\nAvailable verbs:\n  ${verbs.join(", ")}`;
   const workflowRows = workflows.length === 0 ? "" : `\n\nAvailable workflows:\n  ${workflows.join(", ")}`;
+  const detail = verbRows || workflowRows ? "\n\nRun 'lm <name> --help' for what one does and how to call it." : "";
   process.stdout.write(`lm - local developer verbs and a chat, against a model on your own machine
 
 Usage:
@@ -96,12 +97,7 @@ Usage:
   lm --continue                   reopen the last chat where it left off
   lm --resume [id]                reopen a past chat, or pick one from a list
   lm stats [--all]                what the run log says about this repository
-  lm stats --since <date>         the same, split into before and since that date
-
-Available verbs:
-${verbRows}${workflowRows}
-
-Run 'lm <name> --help' for what one does and how to call it.
+  lm stats --since <date>         the same, split into before and since that date${verbRows}${workflowRows}${detail}
 
 Options:
   --dry-run                     print the result and stop before the side effect
@@ -118,7 +114,7 @@ Environment:
   LM_CTX                        what ollama serves per model, not what a model can hold (65536)
   LM_MAX_TOKENS                 how many tokens a verb's answer may cost; the chat asks for no budget (3000)
   LM_THINK                      the effort a verb asks the model for; the chat has /thinking (none)
-  LM_TOOLS                      the whole registry; unset, the project's tools/ then the installation's
+  LM_TOOLS                      the whole registry; unset, the tools/ of the repository you are in
   LM_LOG                        the run log, empty to disable ($HOME/.lm/runs.jsonl)
 `);
   process.exit(0);
@@ -163,7 +159,7 @@ if (argv.length > 0 && argv[0] !== "chat" && !argv[0].startsWith("-")) {
   const files = list(registry());
   const file = files.find((f) => basename(f, ".sh") === argv[0]);
   if (!file) {
-    process.stderr.write(`lm: no such tool '${argv[0]}'. Available:\n`);
+    process.stderr.write(`lm: no such tool '${argv[0]}'.${files.length === 0 ? "" : " Available:"}\n`);
     for (const f of files) process.stderr.write(`  ${meta(f).name}\n`);
     process.exit(2);
   }
