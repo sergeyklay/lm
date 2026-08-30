@@ -64,7 +64,7 @@ bash tests/consent.sh             # the bounded wait for an answer, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
-node tests/chrome.mts             # what the chat's header, its update row, status rows and closing block say, and at what width
+node tests/chrome.mts             # what the chat's header, its update notice, status rows and closing block say, and at what width
 node tests/request.mts            # what the Node runner asks the model for, off the wire
 node tests/chat-request.mts       # what the chat asks the model for, off the wire
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
@@ -187,14 +187,44 @@ admits `0.84.4`. Dropping the comparison against the installed version reddens t
 require a launch already on the newest in range to report nothing, and both come back naming the
 version they are already on. Rethrowing rather than swallowing reddens exactly the one case that
 hands the registry an error, and reddens it as `threw Error: no route to host` rather than by
-crashing the suite, because that case awaits a rejection it expects not to get. Of the row itself:
-drawing it whatever the launch did reddens three rather than the two predicted, the third an older
-case requiring every header row to carry the mark, which a row of text does not - new code killed by
-a case nobody wrote for it, and the second entry in this file's record of why a prediction is
-written down first. Dropping the version from the row reddens the case that reads it, and drawing
-the row in the harness's own warning colour reddens the case that requires the theme's grey, each
-leaving the other green, which is what says the text and its colour are pinned apart rather than
-twice. Counted 2026-08-30 with `node tests/chrome.mts | grep -c '^ok'` at 100.
+crashing the suite, because that case awaits a rejection it expects not to get. Of the line itself, six more, driven
+by handing `installChrome` a stand-in for the harness that records what it was notified of and what
+header it was given. Putting the line back into the header reddens four: the two holding the header
+to its two rows, the one requiring it to say nothing about the harness, and an older case requiring
+every header row to carry the mark, which a row of text does not - new code killed by a case nobody
+wrote for it, and the second entry in this file's record of why a prediction is written down first.
+Deleting the notify call reddens the three that read the notice, the version it names and the level
+it goes out at, each coming back undefined. Moving the level from `info` to `warning` reddens only
+the case that reads the level; adding a restart instruction to the message reddens the case that
+reads the message and the one that forbids the word, each leaving the other green, which is what
+says the text and its level are pinned apart rather than twice. Dropping the guard on the version
+reddens the case requiring a launch that moved nothing to say nothing, which comes back notifying
+`harness updated to undefined`, and dropping the guard on the `startup` reason reddens the case
+requiring a reload not to repeat it.
+
+The version the harness compares its own release notes against is a settings write rather than a
+screen, and its cases carry five mutants of their own. Deleting the write reddens the two that read
+what was written, one through a stand-in and one through the harness's own settings file. Dropping
+the gate on having installed something reddens the case requiring a launch that installed nothing to
+leave the recorded version alone, which comes back writing `null`. Dropping the equality guard
+reddens the case refusing a second write and the one reading the file's timestamp back. Replacing
+the whole condition with `true` reddens both of those, the case for a machine with nothing recorded,
+and the one for a launch that installed nothing. The last two also redden the case that hands the
+settings a reader which throws, predicted for neither: removing either guard removes the read, so
+the throw never happens and the write goes through. That case pins two properties rather than one,
+that the throw is swallowed and that the recorded version is read before anything is written, and
+the correction is the third entry in this file's record of why a prediction is written down first.
+Making the catch write rather than swallow reddens that case alone. One case here is killed by no
+mutant and cannot be: the one requiring the neighbouring setting to survive the write guards the
+harness's settings manager rather than any line in this repository, as the case beside it does for
+`quietStartup`.
+
+The trap in that series is the anchor for the last of them. `// The chat opens either way.` occurs
+twice in `src/chrome.mts`, the second in `silenceStartup`, so a patch taking the first match lands
+in code no case in this group reads and reports an empty kill set, which reads as a hole in the
+suite. Gating on the occurrence count rather than on the patch's exit status refuses it, and
+`grep -c '// The chat opens either way.' src/chrome.mts` returns 2. Counted 2026-08-30 with
+`node tests/chrome.mts | grep -c '^ok'` at 110.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by

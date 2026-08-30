@@ -189,13 +189,14 @@ const { providerConfig } = await import("../src/provider.mts");
 const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts");
 const { initialSelection, seedThinkingLevel } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
-const { installChrome, silenceStartup } = await import("../src/chrome.mts");
+const { installChrome, silenceStartup, silenceChangelog } = await import("../src/chrome.mts");
 const { list } = await import("../src/registry.mts");
 
 silenceStartup();
 
 const settings = SettingsManager.create(process.cwd());
 seedThinkingLevel(settings);
+silenceChangelog(settings, updated);
 const selection = initialSelection(settings);
 const files = list(registry());
 

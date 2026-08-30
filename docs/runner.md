@@ -94,8 +94,11 @@ nothing is installed and nothing is said. Otherwise npm installs it into this cl
 `--no-save`, which leaves `package.json` and `package-lock.json` byte for byte as they were, so the
 operator's working tree stays clean and the range still says what the operator wrote. Because it
 lands before the harness is imported, the session opens on the new version and no restart is asked
-for: the header carries one dim row naming the version it moved to, and a launch that moved nothing
-carries no row.
+for. The launch says so through the harness's own notice rather than through this project's header,
+at the `info` level, which prints the line dim and bare where the other two prefix it with a word
+claiming something is wrong. The header is what the screen says on every frame and an update
+happened once, so the line is a system message and not a row of chrome. A launch that moved nothing
+says nothing, and a reload, which installs nothing, does not repeat it.
 
 Only the chat pays for any of this. A verb makes no registry request and no version check, so
 `lm commit` costs what it always did. The one request the launch does make is bounded at two
@@ -115,11 +118,18 @@ The one thing this leaves for the operator is `npm ci`, which reinstalls from th
 the harness back to the version the lock names. The next launch installs the newest in range again.
 
 The chat keeps its settings, its credentials and its session history in the harness's own
-directory under the home directory, outside this repository, and writes there as you use it. Two
+directory under the home directory, outside this repository, and writes there as you use it. Three
 of those settings it writes itself, once each and silently, because a message about a setting you
 did not ask for is the noise it removes: the harness lists every resource it loaded on each launch
-unless `quietStartup` is set and there is no flag for it, and the thinking level above is the other.
-A value already there is left alone in both cases. A past session is reopened from `lm` itself rather than from a
+unless `quietStartup` is set and there is no flag for it, the thinking level above is the second,
+and the version the harness compares its own release notes against is the third. A value already
+there is left alone in all three. The last is written only on the launch that installed a new
+harness, because that launch is what would otherwise earn the greeting: the harness shows the notes
+lying between the version it finds recorded and the one it is running, and an update nobody asked
+for should not cost a screen of them on the way in. `/changelog` still shows them on request, a
+harness that moved some other way keeps the greeting it earned, and a machine with nothing recorded
+is left to the harness, which records its own version there, shows nothing, and reports the install
+while it does. A past session is reopened from `lm` itself rather than from a
 subcommand: `lm --continue` takes the most recent one, and `lm --resume`, or `-r`, takes the
 identifier or the file the closing block printed, or offers the list to choose from when nothing
 follows it. The harness spells those two apart, taking a name on `--session` and nothing at all on
@@ -129,8 +139,7 @@ text, dashes and all. Untranslated, a name there is a word the harness has no fl
 would reach the reopened chat as the first thing it was asked.
 
 It wears this project's own header and status rows rather than the harness's. The header is the
-mark, the name and the version `package.json` declares, one dim row naming what to type, and the
-update row above when a launch installed one; the
+mark, the name and the version `package.json` declares, and one dim row naming what to type; the
 status rows carry the working directory, the branch when there is one and the model, then the
 context against its window, what the session has spent beside it, and the thinking level the
 session is at. Both are installed on `session_start`,

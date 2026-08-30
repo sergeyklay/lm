@@ -68,17 +68,13 @@ export type Chrome = {
   thinking: string | undefined;
 };
 
-export function headerLines(theme: any, updated?: string): string[] {
+export function headerLines(theme: any): string[] {
   const v = version();
   const name = theme.bold(theme.fg("text", v ? `lm v${v}` : "lm"));
   const hint = theme.fg("dim", "/ for commands · @ for a file path · ! to run bash");
-  // The session is already on the version this names, so it says what happened
-  // rather than what to do about it. A launch that moved nothing adds no row.
-  const gutter = " ".repeat(visibleWidth(MARK[0]) + 2);
   return [
     `${theme.fg("accent", MARK[0])}  ${name}`,
     `${theme.fg("borderAccent", MARK[1])}  ${hint}`,
-    ...(updated ? [`${gutter}${theme.fg("dim", `harness updated to ${updated}`)}`] : []),
   ];
 }
 
@@ -124,6 +120,28 @@ export function silenceStartup(): void {
   try {
     const settings = SettingsManager.create(process.cwd());
     if (settings.getQuietStartup() !== true) settings.setQuietStartup(true);
+  } catch {
+    // The chat opens either way.
+  }
+}
+
+// The harness greets the operator with its own release notes whenever the
+// version it finds recorded is older than the one it is running, and this
+// project is what moved that version: an update nobody asked for should not cost
+// a screen of notes on the next launch, and `/changelog` still shows them on
+// request. So the version is recorded exactly when this launch is what installed
+// it, and written once, as `silenceStartup` writes its own. A harness that moved
+// some other way keeps its greeting, and a machine with nothing recorded is left
+// alone: the harness records its own version there, shows nothing, and reports
+// the install while it does.
+export function silenceChangelog(
+  settings: { getLastChangelogVersion(): unknown; setLastChangelogVersion(version: string): void },
+  updated: string | undefined,
+): void {
+  try {
+    if (updated !== undefined && settings.getLastChangelogVersion() !== updated) {
+      settings.setLastChangelogVersion(updated);
+    }
   } catch {
     // The chat opens either way.
   }
@@ -317,12 +335,19 @@ export function installChrome(pi: any, updated?: string): void {
   // The header is built before extensions initialise, and `setHeader` is a no-op
   // until it exists, so this waits for session_start rather than running in the
   // factory.
-  pi.on("session_start", (_event: unknown, ctx: any) => {
+  pi.on("session_start", (event: any, ctx: any) => {
     if (!ctx.hasUI) return;
+    // The session is already on the version this names, so it reports rather
+    // than instructs, and it is a system message rather than a row of chrome:
+    // the header is what the screen always says, and this happened once. `info`
+    // is the level that prints it dim and bare, where the other two prefix it
+    // with a word claiming something is wrong. Only the launch is announced,
+    // because the same event fires again for a reload that installed nothing.
+    if (updated && event?.reason === "startup") ctx.ui.notify(`harness updated to ${updated}`, "info");
     const autoCompact = compactionEnabled(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
       dim = (text: string) => theme.fg("dim", text);
-      return { render: () => headerLines(theme, updated) };
+      return { render: () => headerLines(theme) };
     });
     ctx.ui.setFooter((_tui: unknown, theme: any, footerData: any) => ({
       render: (width: number) => {

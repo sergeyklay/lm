@@ -8,7 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, installChrome, silenceChangelog, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -52,16 +52,67 @@ check("the second row tells the operator what to type", true,
 check("and it is dim rather than loud", true, styled(header[1], "dim"));
 check("both rows carry the mark", true, header.every((l) => l.includes("█")));
 
-// What a launch that updated the harness says, and what one that did not says
-// instead. The session is already on the version named, so the row reports
-// rather than instructs, and a launch that moved nothing adds no row at all.
-const moved = headerLines(theme, "0.84.4");
-check("a launch that updated the harness adds a third row", 3, moved.length);
-check("naming the version it moved to", true, plain(moved[2]).includes("harness updated to 0.84.4"));
-check("without telling the operator to restart", false, /restart|Run |update the/.test(plain(moved[2])));
-check("dim rather than loud", true, styled(moved[2], "dim"));
-check("and aligned under the name above it", true, plain(moved[2]).startsWith(`${" ".repeat(visibleWidth("█ █▀█") + 2)}harness`));
-check("a launch that moved nothing adds no row", 2, headerLines(theme, undefined).length);
+// What a launch that updated the harness says, and where it says it. The header
+// is what the screen says on every frame; an update happened once, so it goes
+// out as the harness's own system notice instead. `session_start` fires again
+// for a reload, which installed nothing and must not be told it did.
+function openChat(updated: string | undefined, reason: string = "startup") {
+  const notices: Array<[string, unknown]> = [];
+  let rows: string[] = [];
+  const handlers: Record<string, (event: any, ctx: any) => void> = {};
+  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } }, updated);
+  handlers.session_start({ type: "session_start", reason }, {
+    hasUI: true,
+    cwd: ROOT,
+    model: undefined,
+    getContextUsage: () => undefined,
+    sessionManager: { getCwd: () => ROOT, getEntries: () => [] },
+    ui: {
+      notify: (message: string, type: unknown) => notices.push([message, type]),
+      setHeader: (factory: any) => { rows = factory(undefined, theme).render(); },
+      setFooter: () => {},
+    },
+  });
+  return { notices, rows };
+}
+
+const opened = openChat("0.84.4");
+check("a launch that updated the harness says so through the harness's own notice", 1, opened.notices.length);
+check("naming the version it moved to", "harness updated to 0.84.4", String(opened.notices[0]?.[0]));
+check("without telling the operator to restart", false, /restart|Run |update the/.test(String(opened.notices[0]?.[0])));
+check("at the level that prints it bare, claiming nothing is wrong", "info", String(opened.notices[0]?.[1]));
+check("and the header stays the two rows it always was", 2, opened.rows.length);
+check("saying nothing about the harness itself", false, /harness/.test(plain(opened.rows.join("\n"))));
+check("a launch that moved nothing says nothing", 0, openChat(undefined).notices.length);
+check("and a reload, which installed nothing, does not repeat the notice", 0, openChat("0.84.4", "reload").notices.length);
+
+// The harness greets the operator with its own release notes when the version it
+// finds recorded is older than the one it runs, and this project is what moved
+// it. So the version is recorded when this launch installed it, and only then: a
+// harness that moved some other way keeps the greeting it earned.
+function recordChangelog(stored: string | undefined, updated: string | undefined): string[] {
+  const writes: string[] = [];
+  silenceChangelog(
+    { getLastChangelogVersion: () => stored, setLastChangelogVersion: (v: string) => writes.push(v) },
+    updated,
+  );
+  return writes;
+}
+check("a launch that installed a version records it, so its notes never greet the operator",
+  ["0.84.4"], recordChangelog("0.84.3", "0.84.4"));
+check("a version already recorded is not written a second time", [], recordChangelog("0.84.4", "0.84.4"));
+check("a launch that installed nothing never writes over the version already there", [],
+  recordChangelog("0.84.3", undefined));
+check("nor over a machine that has none, which the harness records for itself", [],
+  recordChangelog(undefined, undefined));
+check("and a settings file that cannot be read leaves the chat opening", [], (() => {
+  const writes: string[] = [];
+  silenceChangelog(
+    { getLastChangelogVersion: () => { throw new Error("unreadable"); }, setLastChangelogVersion: (v: string) => writes.push(v) },
+    "0.84.4",
+  );
+  return writes;
+})());
 
 // Which version a launch installs, off the registry. The range `package.json`
 // declares is the whole of the policy, so the arithmetic is pinned against a
@@ -168,6 +219,29 @@ silence();
 check("a setting already made is left alone", before, statSync(settingsFile).mtimeMs);
 check("and nothing else in the file is disturbed", "light",
   JSON.parse(readFileSync(settingsFile, "utf8")).theme);
+
+// The same, for the version the harness compares its own release notes against,
+// and against the harness's own settings file rather than a stand-in: the two
+// accessors are its API, and a fake agreeing with itself would not notice them
+// moving.
+const changelog = (updated: string) =>
+  spawnSync(process.execPath, ["-e",
+    'Promise.all([import("./src/chrome.mts"), import("@earendil-works/pi-coding-agent")])' +
+    `.then(([m, pi]) => m.silenceChangelog(pi.SettingsManager.create(process.cwd()), ${JSON.stringify(updated)}))`], {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
+  });
+
+changelog("0.84.4");
+check("the version a launch installed is recorded where the harness reads it", "0.84.4",
+  JSON.parse(readFileSync(settingsFile, "utf8")).lastChangelogVersion);
+check("and the setting beside it is left as it was", "light",
+  JSON.parse(readFileSync(settingsFile, "utf8")).theme);
+const recorded = statSync(settingsFile).mtimeMs;
+changelog("0.84.4");
+check("recording the same version again does not touch the file", recorded, statSync(settingsFile).mtimeMs);
+
 rmSync(work, { recursive: true, force: true });
 
 // What the chat says on the way out. The figures are counts of what this session
