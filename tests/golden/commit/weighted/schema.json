@@ -1,0 +1,46 @@
+{
+  "properties": {
+    "body": {
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "chrome",
+        "libexec",
+        "tools",
+        "alpha",
+        "beta",
+        "gamma",
+        "CHANGELOG",
+        ""
+      ],
+      "type": "string"
+    },
+    "subject": {
+      "maxLength": 60,
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "feat",
+        "fix",
+        "docs",
+        "style",
+        "refactor",
+        "perf",
+        "test",
+        "chore",
+        "ci",
+        "build",
+        "revert"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "subject",
+    "body"
+  ],
+  "type": "object"
+}

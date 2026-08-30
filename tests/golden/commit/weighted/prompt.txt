@@ -1,0 +1,103 @@
+Recent commit subjects in this repository. Match their vocabulary and level of detail:
+feat: seed the fixture
+
+Files changed:
+CHANGELOG.md
+libexec/lm-stats
+src/chrome.mts
+tools/alpha.sh
+tools/beta.sh
+tools/gamma.sh
+
+Staged diff:
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e69de29..d00491f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -0,0 +1 @@
++1
+diff --git a/libexec/lm-stats b/libexec/lm-stats
+index e69de29..f00c965 100644
+--- a/libexec/lm-stats
++++ b/libexec/lm-stats
+@@ -0,0 +1,10 @@
++1
++2
++3
++4
++5
++6
++7
++8
++9
++10
+diff --git a/src/chrome.mts b/src/chrome.mts
+index e69de29..1c99002 100644
+--- a/src/chrome.mts
++++ b/src/chrome.mts
+@@ -0,0 +1,40 @@
++1
++2
++3
++4
++5
++6
++7
++8
++9
++10
++11
++12
++13
++14
++15
++16
++17
++18
++19
++20
++21
++22
++23
++24
++25
++26
++27
++28
++29
++30
++31
++32
++33
++34
++35
++36
++37
++38
++39
++40
+diff --git a/tools/alpha.sh b/tools/alpha.sh
+index e69de29..1191247 100644
+--- a/tools/alpha.sh
++++ b/tools/alpha.sh
+@@ -0,0 +1,2 @@
++1
++2
+diff --git a/tools/beta.sh b/tools/beta.sh
+index e69de29..1191247 100644
+--- a/tools/beta.sh
++++ b/tools/beta.sh
+@@ -0,0 +1,2 @@
++1
++2
+diff --git a/tools/gamma.sh b/tools/gamma.sh
+index e69de29..1191247 100644
+--- a/tools/gamma.sh
++++ b/tools/gamma.sh
+@@ -0,0 +1,2 @@
++1
++2
+
+Write the commit message for this change.
+Subject: imperative mood, lower case after the colon, no trailing period, under 60 characters, no issue number.
+Body: two or three sentences saying what changed and why. No bullet lists, no file names, no phrases like 'This commit'.

@@ -33,10 +33,14 @@ collect() {
 
 schema() {   # the scope enum is built from the repository at call time
   local scopes
-  scopes=$(git diff --cached --name-only | awk -F/ '{
-      for (i=1;i<NF;i++){print $i; if(i+1<NF) print $i"/"$(i+1)}
-      n=split($NF,a,"."); if(n>1) print a[1] }' \
-    | sort -u | grep -vE '^(src|internal|pkg|cmd|lib|app|test|tests|docs?)$' | head -25)
+  scopes=$(git diff --cached --numstat --no-renames | awk -F'\t' '{
+      w=($1=="-"?0:$1)+($2=="-"?0:$2); split("",c); n=split($3,p,"/")
+      for (i=1;i<n;i++){ c[p[i]]=1; if(i+1<n) c[p[i]"/"p[i+1]]=1 }
+      m=split(p[n],b,"."); if(m>1) c[b[1]]=1
+      for (k in c) weight[k]+=w }
+      END{ for (k in weight) printf "%d\t%s\n", weight[k], k }' \
+    | sort -k1,1nr -k2,2 | cut -f2 \
+    | grep -vE '^(src|internal|pkg|cmd|lib|app|test|tests|docs?)$' | head -25)
   printf '%s\n' "$scopes" "" | jq -R . | jq -sc . | jq -c '{
     type:"object",
     properties:{
