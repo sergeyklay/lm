@@ -263,11 +263,30 @@ const OPENED: Sitting = { launchedAt: RECORD - 1000, endedAt: Date.parse("2026-0
 const FILE = "/home/ubuntu/.pi/sessions/--home-ubuntu-lm--/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl";
 const HOME: SessionLocation = { file: FILE, isDefaultDir: true };
 const AWAY: SessionLocation = { file: "/srv/sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl", isDefaultDir: false };
-const block = (es: any[], h: any = head, sitting: Sitting = OPENED, where: SessionLocation = HOME) => {
+// The width is the terminal's, so every case here hands the block one rather
+// than reading the terminal the suite happens to be running on.
+const block = (es: any[], h: any = head, sitting: Sitting = OPENED, where: SessionLocation = HOME,
+  screenWidth: number | undefined = 80) => {
   const s = summarize(h, es, sitting, where);
-  return s === null ? null : summaryBlock(s).join("\n");
+  return s === null ? null : summaryBlock(s, undefined, screenWidth).join("\n");
 };
 const part = (text: string | null, n: number) => String(text).split("\n\n")[n];
+// What the operator would select: the row under the label and every row a
+// continuation carries on to.
+function resumeRows(text: string): string {
+  const rest = text.split("Resume this session with:\n")[1]?.split("\n") ?? [];
+  const rows: string[] = [];
+  for (const line of rest) {
+    rows.push(line);
+    if (!line.endsWith("\\")) break;
+  }
+  return rows.join("\n");
+}
+// Those rows are a command, so what they carry is read by running them rather
+// than by rejoining them here: a shell reading its own continuations back is the
+// only witness that a path broken across rows still names the session.
+const pasted = (text: string) =>
+  spawnSync("bash", ["-c", resumeRows(text).replace(/^lm --resume /, "printf %s ")], { encoding: "utf8" }).stdout;
 
 check("the block opens on the session, what it ran and how long it took",
   "Session   01a04900-0000-7000-8000-00000000c0de\nTools     3 ran, 1 failed\nTime      12m 30s",
@@ -280,12 +299,21 @@ check("and it closes on the command that reopens the session, over two lines",
 // The identifier is the shorter line and the one the operator reads on the row
 // above, but it resolves in one directory. A session kept anywhere else is named
 // by its file, which reopens it wherever it is.
+// The file form is wider than the row by construction, since the basename the
+// harness builds is 67 of the 80 on its own, and it is a command to paste rather
+// than a figure to read: it is broken with the shell's own continuation instead
+// of being shortened, because a path that no longer opens the session costs more
+// than a ragged screen.
+const AWAY_COMMAND = "lm --resume /srv/sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-0000\\\n"
+  + "0000c0de.jsonl";
 check("a session outside that directory is named by its file instead",
-  `Resume this session with:\nlm --resume ${AWAY.file}`, part(block(entries, head, OPENED, AWAY), 2));
+  `Resume this session with:\n${AWAY_COMMAND}`, part(block(entries, head, OPENED, AWAY), 2));
+check("and a shell reading that back names the file the session is held in",
+  AWAY.file, pasted(String(block(entries, head, OPENED, AWAY))));
 // The harness declares no method that answers this, so a build that stops
 // shipping one leaves the question open, and an open question takes the file.
 check("and a directory the harness will not answer for takes the file too",
-  `Resume this session with:\nlm --resume ${AWAY.file}`,
+  `Resume this session with:\n${AWAY_COMMAND}`,
   part(block(entries, head, OPENED, { file: AWAY.file, isDefaultDir: undefined }), 2));
 check("but with no file to name it falls back to the identifier",
   "Resume this session with:\nlm --resume 01a04900-0000-7000-8000-00000000c0de",
@@ -295,8 +323,97 @@ check("but with no file to name it falls back to the identifier",
 check("a path a shell would split is quoted",
   "Resume this session with:\nlm --resume '/srv/my sessions/a.jsonl'",
   part(block(entries, head, OPENED, { file: "/srv/my sessions/a.jsonl", isDefaultDir: false }), 2));
+// A backslash inside single quotes is a backslash rather than a break, so a
+// quoted path is broken into one quoted piece per row, which the shell joins
+// into the single word it was.
+const SPACED = "/srv/my sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000-00000000c0de.jsonl";
+const spacedBlock = String(block(entries, head, OPENED, { file: SPACED, isDefaultDir: false }));
+check("a quoted path too wide for the row is broken into quoted pieces",
+  "Resume this session with:\n"
+  + "lm --resume '/srv/my sessions/2026-08-28T20-00-00-000Z_01a04900-0000-7000-8000'\\\n"
+  + "-00000000c0de.jsonl",
+  part(spacedBlock, 2));
+check("and a shell reading that back names the file with its space intact", SPACED, pasted(spacedBlock));
+
+// The two rows that can outgrow the block are the resume command and the model
+// column, so the width is read over a block carrying both at once.
+const WIDE = "hf.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M";
+const retag = (es: any[], model: string) =>
+  es.map((e) => (e.message?.model ? { ...e, message: { ...e.message, model } } : e));
 check("every row of it reads on an eighty-column terminal", true,
   String(block(entries)).split("\n").every((l) => l.length <= 80));
+check("and so does one naming the session by its file and the model by a 54-character identifier",
+  true, String(block(retag(entries, WIDE), head, OPENED, AWAY)).split("\n").every((l) => visibleWidth(l) <= 80));
+
+// Eighty is what there is to fall back on rather than a bound: the block takes
+// the width the terminal reports, so the one row the operator pastes is a single
+// row again wherever the terminal is wide enough to hold it.
+const WIDE_TERMINAL = 100;
+check("a terminal wider than the command leaves it on one row",
+  `Resume this session with:\nlm --resume ${AWAY.file}`,
+  part(block(entries, head, OPENED, AWAY, WIDE_TERMINAL), 2));
+// Every other column is already as wide as its own widest cell, so the model
+// column is the only one a wider terminal changes.
+check("and the model column is given the room that terminal leaves it", true,
+  part(block(retag(entries, WIDE), head, OPENED, AWAY, WIDE_TERMINAL), 1).includes(WIDE));
+
+// There is nothing to ask when stdout is not a terminal, which is what a pipe, a
+// redirect and CI are. A pty nobody gave a size to reports zero, and zero is the
+// same answer as none. The block is reached without the helper above, because a
+// default argument stands in for the width that was never reported and the case
+// would be asking about the helper rather than about the block.
+const bounded = (screenWidth?: number) => {
+  const s = summarize(head, entries, OPENED, AWAY);
+  return s === null ? "" : summaryBlock(s, undefined, screenWidth).join("\n");
+};
+const EIGHTY = bounded(80);
+check("with no terminal to report a width the block is the eighty-column one", EIGHTY, bounded());
+check("and a terminal reporting no size at all is read the same way", EIGHTY, bounded(0));
+
+// Narrower than the shell's own continuation can work in, the command comes out
+// a character of the path to the row, which no paste rejoins. Twenty is where
+// that stops, the floor the harness puts under its own width.
+const narrow = bounded(5);
+check("a width under twenty is floored there", bounded(20), narrow);
+const carried = (row: string) => row.replace(/^lm --resume /, "").replace(/\\$/, "");
+check("and every row of the command it breaks carries more than one character of the path", true,
+  resumeRows(narrow).split("\n").every((l) => carried(l).length > 1));
+check("and the table's model column is its own heading wide rather than a negative width",
+  "Model   Reqs   Input   Cache   Output\nqw\u20267b      3   37.0k    3.0k     1.2k", part(narrow, 1));
+check("and a shell reading it back still names the file", AWAY.file, pasted(narrow));
+
+// Which width the block is handed is the shutdown handler's answer, and only the
+// handler says so: the block itself takes whatever it is given. The read happens
+// where the block is written, after the harness has stopped the TUI, because the
+// width a render callback is handed is out of scope by then.
+function quitWithColumns(columns: number | undefined): string {
+  const handlers: Record<string, (event: any, ctx: any) => void> = {};
+  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } });
+  const out = process.stdout as any;
+  const [reported, wrote] = [out.columns, out.write];
+  const written: string[] = [];
+  out.columns = columns;
+  out.write = (chunk: unknown) => { written.push(String(chunk)); return true; };
+  try {
+    handlers.session_shutdown({ type: "session_shutdown", reason: "quit" }, {
+      hasUI: true,
+      sessionManager: {
+        getHeader: () => head,
+        getEntries: () => entries,
+        getSessionFile: () => AWAY.file,
+        usesDefaultSessionDir: () => false,
+      },
+    });
+  } finally {
+    out.write = wrote;
+    out.columns = reported;
+  }
+  return written.join("");
+}
+check("the handler bounds the block by the width the terminal it writes to reports",
+  `lm --resume ${AWAY.file}`, resumeRows(quitWithColumns(WIDE_TERMINAL)));
+check("and by eighty when that terminal reports nothing",
+  resumeRows(EIGHTY), resumeRows(quitWithColumns(undefined)));
 
 // The two lines are a command to paste rather than a figure to read, so they
 // wear the grey the status row spends on `think`. The block is written once the
@@ -304,7 +421,7 @@ check("every row of it reads on an eighty-column terminal", true,
 // gone, so the colour arrives as an argument instead of being read in here.
 const rowsOf = (dim?: (text: string) => string) => {
   const s = summarize(head, entries, OPENED, HOME);
-  return s === null ? [] : summaryBlock(s, dim);
+  return s === null ? [] : summaryBlock(s, dim, 80);
 };
 const coloured = rowsOf((text) => theme.fg("dim", text));
 check("the two lines that reopen the session are dim", true,
@@ -338,6 +455,22 @@ check("a second model gets a row of its own and a total under both",
   part(block(two.entries, two.head), 1));
 check("and the columns are still as wide as the widest cell in them", true,
   part(block(two.entries, two.head), 1).split("\n").every((l) => l.length === 43));
+
+// Until one cell outgrows what the four fixed columns leave it. The identifier
+// is elided in the middle rather than cut, because the tail is what tells one
+// quantization of a model from another and a cut would drop it.
+check("a model identifier wider than the table allows is elided in the middle",
+  "Model                                              Reqs   Input   Cache   Output\n"
+  + "hf.co/unsloth/Qwen3-Code…3B-Instruct-GGUF:Q4_K_M      3   37.0k    3.0k     1.2k",
+  part(block(retag(entries, WIDE)), 1));
+const quantized = two.entries.map((e) => (e.message?.model
+  ? { ...e, message: { ...e.message, model: e.message.model === "qwen3.8:27b" ? WIDE : `${WIDE.slice(0, -6)}Q8_0` } }
+  : e));
+const quantTable = part(block(quantized, two.head), 1).split("\n");
+check("two identifiers sharing a prefix are still told apart",
+  2, new Set(quantTable.slice(1, 3).map((l) => l.slice(0, quantTable[0].indexOf("Reqs")))).size);
+check("and the total row still lines up under both", true,
+  quantTable.every((l) => l.length === 80));
 
 const at = (ms: number, message: any) => ({ type: "message", timestamp: new Date(ms).toISOString(), message });
 const turn = (input: number, output: number) =>
@@ -475,8 +608,8 @@ check("quitting the chat prints the closing block on the restored terminal", tru
   BLOCK.every((l) => printed.includes(l)));
 // The session is not in the directory an identifier resolves in, so the line
 // names the file, which reopens it from wherever it is.
-check("and a session held outside the default directory is resumed by its file", true,
-  printed.includes(`Resume this session with:\nlm --resume ${away}`));
+check("and a session held outside the default directory is resumed by its file", away,
+  pasted(printed));
 check("naming no identifier the chat could not have found it by", false,
   printed.includes("lm --resume 01a04900-0000-7000-8000-00000000c0de"));
 // Every case here reads a capture the escapes have been stripped out of, so the
@@ -500,8 +633,9 @@ check("set off by a blank line from the frame the harness restored", true,
 // operator would otherwise be the one to notice.
 check("and the harness's own resume line never reaches the screen", false,
   printed.includes("To resume this session"));
-// This project's own are two lines and the harness's would be a third.
-check("leaving the two resume lines on it, this project's own", 2,
+// This project's own label and the first row of its command; the harness's
+// would be a third.
+check("leaving the two lines that say resume on it, this project's own", 2,
   printed.split("\n").filter((l) => /[Rr]esume/.test(l)).length);
 
 // A session flag is the chat's and `lm` claims none of them, so the same session

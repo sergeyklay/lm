@@ -225,7 +225,7 @@ twice in `src/chrome.mts`, the second in `silenceStartup`, so a patch taking the
 in code no case in this group reads and reports an empty kill set, which reads as a hole in the
 suite. Gating on the occurrence count rather than on the patch's exit status refuses it, and
 `grep -c '// The chat opens either way.' src/chrome.mts` returns 2. Counted 2026-08-30 with
-`node tests/chrome.mts | grep -c '^ok'` at 110.
+`node tests/chrome.mts | grep -c '^ok'` at 124.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
@@ -259,7 +259,8 @@ Ten mutations of the block in `src/chrome.mts` each redden the set predicted for
 were planted. Restoring the withheld failure clause reddens four, among them the two cases that
 exist because that clause used to be withheld. Dropping the cached half of a model's input reddens
 four, left-aligning the numeric columns reddens seven, and widening every column heading fourfold
-reddens those seven and the case that holds the block to eighty columns. Blanking the session
+reddens those seven and the case that hands the block eighty columns and reads every row back inside
+them. Blanking the session
 identifier reddens five, printing the resume paragraph for a session with no record to name reddens
 only the case that counts the block's paragraphs, and collapsing the sitting to zero reddens four. Three narrow the attribution of a model's
 spend: ignoring usage an entry carries rather than a message reddens the two compaction cases,
@@ -302,10 +303,10 @@ directory says reddens five: the three unit cases holding a session outside the 
 session directory, the one that quotes a path a shell would split, and the pair driven through the
 pseudo-terminal on a session `--session-dir` put elsewhere. Printing the file whatever the directory
 says was predicted to redden four and reddened five, and the surplus is the finding: a file path is
-longer than an identifier, so the case holding the block to eighty columns goes red beside them,
-which is the whole reason the identifier is the line where it resolves. Dropping the quoting reddens
-only the case with a space in the path, and reading a directory the harness will not answer for as
-the default one reddens only the case written for it. The last two are aimed at the method that
+longer than an identifier, so the case reading every row of an eighty-column block back inside it
+goes red beside them, which is the whole reason the identifier is the line where it resolves.
+Dropping the quoting reddens only the case with a space in the path, and reading a directory the
+harness will not answer for as the default one reddens only the case written for it. The last two are aimed at the method that
 decides, which the harness ships on the session manager and leaves out of the type it hands an
 extension: never calling it reddens exactly the two cases that reopen a session from the harness's
 own directory and no unit case at all, which is why that pair is driven through a pseudo-terminal
@@ -314,6 +315,42 @@ cases at once, the two locations swapping lines, which is what says the method i
 than merely being present. The series was itself perturbed before it was believed: replanted on an
 anchor occurring seven times, the driver refused the mutation rather than patching the first hit,
 which is the zero this record would otherwise have had to explain.
+
+How wide the block is drawn is the terminal's answer rather than a constant of the source, and eight
+mutations of `src/chrome.mts` separate the reading from the fallback, the fallback from the floor,
+and both from what each consumer is handed. Moving the fallback from 80 to 100 reddens three: the
+two unit cases that hand `summaryBlock` no width and a width of zero, and the one that reads the
+handler's own block back when the terminal reports nothing. Moving the floor from 20 to 1 reddens
+two, the case pinning where the narrowing stops and the one requiring every row of the broken
+command to carry more than one character of the path. Reading the width with `??` in place of `||`
+reddens six, five of them the cases driven through a pseudo-terminal: under `script -qc`, which is
+how those cases run, `process.stdout.columns` reports `0` rather than `undefined`, so `??` takes the
+zero, floors every live case to twenty, and the rows those cases match on come out too narrow to
+hold what they match. `script -qc 'node -e "console.log(process.stdout.columns)"' /dev/null` prints
+`0` where the same program on a plain pipe prints `undefined`, which is the whole reason that
+resolution is written with `||`. The sixth is the unit case written for that zero. Dropping
+`process.stdout.columns` from the call site reddens one, the case reading which width the handler
+bounded the block by. Two say which consumer gets the width rather than the fallback: handing the
+spend table the fallback reddens two, the case reading the model column on a terminal wider than
+eighty and the one reading it on a terminal narrower than twenty, and handing the resume command the
+fallback reddens two, the case keeping the command on one row where the terminal is wide enough for
+it and the handler case again. Dropping the `Math.max` that keeps the model column at least its own
+heading wide reddens one, the narrow case that would otherwise be given a negative width. Dropping
+the `\` from the rows the command is broken across reddens seven: the six unit cases that read a
+broken command back, three of them through a shell that rejoins the rows, and the pseudo-terminal
+case that pastes what the screen printed.
+
+The model column is the only cell that can outgrow what the four fixed columns leave it, and three
+further mutations cover the elision that keeps it inside. Refusing to elide reddens four: the case
+reading the elided identifier, the one requiring the total row to line up beneath two of them, the
+one reading every row of an eighty-column block that names a 54-character model, and the narrow
+case. Dropping the re-measure of the column after the elision reddens exactly the same four, so
+nothing here separates a table that never elides from one that elides and then pads the column to
+the width it had before. Refusing to elide was predicted to redden five and reddened four, and the
+case it left green is the finding: two identifiers sharing a prefix are told apart by an un-elided
+table anyway, since they differ in their tails. Only eliding from the end rather than the middle
+reddens that one, beside the elided-identifier case and the narrow one, three in all. It is the case
+for the middle rather than the case for the elision.
 
 The command names `--resume` and prints over two lines in the theme's own grey, and nine further
 mutations across `src/chrome.mts` and `bin/lm` separate the three claims in that sentence. Writing

@@ -238,8 +238,13 @@ export function summarize(header: any, entries: any[], sitting: Sitting, where: 
 
 const COLUMNS = ["Model", "Reqs", "Input", "Cache", "Output"];
 const GUTTER = "   ";
+const NO_TERMINAL = 80;
+const NARROWEST = 20;
 
-function spendTable(models: ModelSpend[]): string[] {
+const elide = (s: string, max: number): string =>
+  s.length <= max ? s : `${s.slice(0, Math.ceil((max - 1) / 2))}…${s.slice(s.length - Math.floor((max - 1) / 2))}`;
+
+function spendTable(models: ModelSpend[], total: number): string[] {
   const cells = (m: ModelSpend) =>
     [m.model, String(m.requests), formatTokens(m.input), formatTokens(m.cache), formatTokens(m.output)];
   const rows = models.map(cells);
@@ -254,6 +259,14 @@ function spendTable(models: ModelSpend[]): string[] {
     }));
   }
   const width = COLUMNS.map((c, i) => Math.max(c.length, ...rows.map((r) => r[i].length)));
+  const room = Math.max(
+    COLUMNS[0].length,
+    total - GUTTER.length * (COLUMNS.length - 1) - width.slice(1).reduce((n, w) => n + w, 0),
+  );
+  if (width[0] > room) {
+    for (const r of rows) r[0] = elide(r[0], room);
+    width[0] = Math.max(COLUMNS[0].length, ...rows.map((r) => r[0].length));
+  }
   const row = (r: string[]) =>
     r.map((c, i) => (i === 0 ? c.padEnd(width[i]) : c.padStart(width[i]))).join(GUTTER).trimEnd();
   return [row(COLUMNS), ...rows.map(row)];
@@ -264,7 +277,29 @@ function spendTable(models: ModelSpend[]): string[] {
 const shellWord = (s: string) =>
   /^[A-Za-z0-9_\-./~:@]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`;
 
-export function summaryBlock(s: Summary, dim: (text: string) => string = (text) => text): string[] {
+// Nothing here is shortened or cut, so a command too wide for the block is
+// broken with the shell's own continuation and each piece quoted on its own,
+// which a paste rejoins into the one word that was printed.
+function resumeCommand(value: string, width: number): string[] {
+  const lines: string[] = [];
+  let head = "lm --resume ";
+  let rest = value;
+  while (head.length + shellWord(rest).length > width) {
+    let take = rest.length;
+    while (take > 1 && head.length + shellWord(rest.slice(0, take)).length + 1 > width) take -= 1;
+    lines.push(`${head}${shellWord(rest.slice(0, take))}\\`);
+    rest = rest.slice(take);
+    head = "";
+  }
+  return [...lines, head + shellWord(rest)];
+}
+
+export function summaryBlock(
+  s: Summary,
+  dim: (text: string) => string = (text) => text,
+  screenWidth?: number,
+): string[] {
+  const width = Math.max(NARROWEST, screenWidth || NO_TERMINAL);
   const head: string[][] = [
     ...(s.id ? [["Session", s.id]] : []),
     ["Tools", `${s.tools} ran, ${s.failed} failed`],
@@ -275,8 +310,8 @@ export function summaryBlock(s: Summary, dim: (text: string) => string = (text) 
   return [
     ...head.map(([name, value]) => `${name.padEnd(label)}${GUTTER}${value}`),
     "",
-    ...spendTable(s.models),
-    ...(s.resume ? ["", dim("Resume this session with:"), dim(`lm --resume ${shellWord(s.resume)}`)] : []),
+    ...spendTable(s.models, width),
+    ...(s.resume ? ["", dim("Resume this session with:"), ...resumeCommand(s.resume, width).map(dim)] : []),
   ];
 }
 
@@ -329,7 +364,7 @@ export function installChrome(pi: any, updated?: string): void {
       { file: manager.getSessionFile(), isDefaultDir },
     );
     if (!summary) return;
-    process.stdout.write(`\n${summaryBlock(summary, dim).join("\n")}\n`);
+    process.stdout.write(`\n${summaryBlock(summary, dim, process.stdout.columns).join("\n")}\n`);
   });
 
   // The header is built before extensions initialise, and `setHeader` is a no-op
