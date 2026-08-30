@@ -39,7 +39,7 @@ call before it ships.
 
 `validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry.
 
-`apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses. `ask "text"` prints one line of answer, so `labels=$(ask "Labels (bug, ci):")` works; an empty line is an answer and the tool decides what it means, while no answer at all exits 7 like a refused confirmation. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. A tool file that calls one anyway is stopped there and the run exits 1 naming the function, because that is a defect in the tool file and not an answer the human withheld. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
+`apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses, and [`verbs.md`](verbs.md) fixes what a refusal is: `n`, `no` or an empty line, against `y` or `yes` for consent, in either case, with anything else put back to them for as long as they keep giving it, since a confirmation runs after the model call and a typo is not a decision to throw a finished answer away. `ask "text"` prints one line of answer, so `labels=$(ask "Labels (bug, ci):")` works; an empty line is an answer and the tool decides what it means, while no answer at all exits 7 like a refused confirmation. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. A tool file that calls one anyway is stopped there and the run exits 1 naming the function, because that is a defect in the tool file and not an answer the human withheld. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
 
 A tool refuses with `return 3` when there is nothing to work on, and `apply()` returns 8 when part
 of its work landed and the rest did not. Those two are the tool file's; the other codes are the
@@ -61,7 +61,7 @@ bash tests/issue-labels.sh        # the label list `issue` hands `gh`, with `gh`
 bash tests/golden.sh              # every verb except the model call
 bash tests/ship.sh                # the `lm ship` workflow, on the driver `lm` runs it on
 bash tests/stats.sh               # the clean share split at a date and the chat's share of the log
-bash tests/consent.sh             # the bounded wait for an answer, under a pty
+bash tests/consent.sh             # what an answer may say, and the bounded wait, under a pty
 bash tests/runner.sh              # libexec/lm-verb around the model call, with curl stubbed
 node tests/registry.mts           # the Node runner's bridge to a bash tool, and how apply asks
 node tests/chat.mts               # which verbs the chat is offered, and the dialog a person answers
@@ -616,22 +616,65 @@ driver at all. The case asserting the flag was not forwarded went for that reaso
 free text is forwarded took its place.
 
 The bounded wait is the other half, and `tests/consent.sh` cannot afford to wait for it: the bound
-is 120 seconds, so its cases take the shipped text of the reading function out of the shell runner
+is 120 seconds, so its cases take the shipped text of the reading functions out of the shell runner
 and substitute only the number, which leaves the number itself to cases that grep for it in both
-runners. `grep -c '^check ' tests/consent.sh` counts them, at 16 as this is written. The split is
-deliberate and it is also a limit worth stating: the shell runner's line is driven under a pty and
-the Node runner's is read rather than driven, because the two are built from the same shape and only
-one of them is cheap to put a terminal in front of. Five mutations: taking the bound off the shell
-read reddens 3, moving the Node constant reddens the 1 that names it, deleting the shell line that
-says why the wait ended reddens 1, deleting the Node line that says it reddens 1, and hardcoding a
-different bound into the shell read reddens the 2 behaviour cases while the case that greps for the
-text survives - which is what shows the text and the behaviour are checked separately rather than
-twice. Two harness faults cost more than the five kills. The feeder holding the pty open ended
-before the harness did, so the blocked read hit end of input and exited 7 by that route, and a case
-reading only the status reported a bound that was not there. And a series killed by the tool's own
-wall clock left a mutant in the working tree twice, the second time with `trap ... EXIT INT TERM`
+runners. `bash tests/consent.sh | grep -c '^ok'` counts them, at 67 on 2026-08-30. The number they
+substitute is five seconds and not one, because the bound is a deadline for the whole confirmation
+rather than for each reading: a case that answers three times and reads the re-ask between each has
+to fit every answer and every wait inside the one number, and at one second the later answers
+arrived after it had already passed. That reads as a broken loop rather than as a bound too small
+for the case, so the substituted number is itself part of what the cases assert. The extraction is
+one `sed` range from `_read` to `ask`, so a function added between them is carried along rather than
+left out of every driven case without saying so - which is what a two-range extraction did, and
+which is why `_deadline` sits between `_read` and `_verdict` rather than beside the constant it
+reads. The split is deliberate and it is also a limit worth stating: the shell runner's lines are
+driven under a pty and the Node runner's are read rather than driven, because the two are built from
+the same shape and only one of them is cheap to put a terminal in front of.
+
+Eleven mutations for the bound, each predicted by case name before it was planted. Computing the
+deadline inside `_read` instead of once per confirmation reddens 3, and it is the whole case for the
+deadline being total: the run that keeps typing past it stops returning 7 and returns the harness's
+124 instead, because a reading answered before its own bound expires never times out and the loop
+never ends. Taking the bound off the shell read reddens 3; deleting the shell line that says why the
+wait ended reddens 2; spelling the bound into the Node timeout line by hand reddens the 1 that names
+it; and taking the spaces out of the Node deadline's arithmetic reddens 2 while the same edit to the
+shell one reddens 1. Spelling a different bound into the shell deadline reddens the 5 behaviour
+cases while both text cases that grep for the number survive - which is what shows the text and the
+behaviour are checked separately rather than twice, and the same separation shows again in the two
+mutations that rewrite the remaining-time arithmetic without changing what it computes and redden
+exactly one text case each. One prediction was wrong and is the useful one. An expired deadline that
+forces a yes instead of exiting was predicted at 6 and reddened 4: `nobody typing reaches a
+decision` survived, because a first reading with the whole bound still in front of it times out
+inside `read -t` and never reaches the branch that runs when nothing is left, and `and without it
+the same run still refuses` died unpredicted, because the unattended script carries the reading
+functions without the constant, so its deadline is the epoch and every reading takes that branch.
+
+Two harness faults cost more than the kills. The feeder holding the pty open ended before the
+harness did, so the blocked read hit end of input and exited 7 by that route, and a case reading
+only the status reported a bound that was not there. And a series killed by the tool's own wall
+clock left a mutant in the working tree twice, the second time with `trap ... EXIT INT TERM`
 installed, which did not fire: what proves a restore is `cmp` against the pre-series copy in the
 same command, never a trap and never the intention to restore.
+
+What the answer may say is the third half, and it is what the driven cases mostly are. Fourteen
+mutations of `_verdict`, `confirm` and the words the re-ask uses, each predicted by case name first.
+Narrowing the yes set to a bare lowercase `y` reddens 7; dropping the bare `y` from it reddens 16;
+widening the no set's verdict to a yes reddens 8. The pair that pays for the prompt counts is the
+narrowed no set, which reddens exactly 3: the text case and the two that count how often the
+question was put, while `the word no is a refusal` and `a bare empty line is a refusal` both
+survive, because a value that falls through to the re-ask still exits 7 when nobody answers the next
+one. A case reading only that status cannot say which line answered.
+
+The message and the loop are pinned apart, which is why the wording could change without the loop
+moving. Dropping the period from the shell message reddens 4; putting the `lm: ` prefix back on it
+reddens 5, one of them the case that reads that line whole and finds a program name on it that the
+program is standing at its own prompt to say; echoing the answer back beside the message reddens 4,
+because the terminal has already printed it; and wording the re-ask as a timeout reddens 8,
+including the three that a re-ask is not reported as one. Capping the loop at two readings reddens
+6 and breaking after the first reddens 12, and what separates the two sets is only what a third
+answer is allowed to do. Writing `[ "$v" = 2 ] || break` as an `if` reddens exactly one text case in
+each runner and nothing else, the loop being unchanged. The Node mutations in this group redden
+exactly their own text case each, which is the limit above restated.
 
 The registry is one directory, and the group that pins it is split across the two runners because
 the resolution is: `libexec/lm-verb` answers `--list` and `bin/lm` dispatches, and each resolves for
