@@ -42,11 +42,11 @@ names, and the launch after it moves forward again.
 
 ```bash
 lm                 # chat with the local model, verbs available inside it
-lm commit          # Conventional Commits message from the staged diff
+lm commit          # group the uncommitted changes and commit each group
 lm changelog       # CHANGELOG.md entries from the staged diff
 lm issue "topic"   # a GitHub issue, labels picked from the repository
 lm pr              # a pull request description
-lm ship            # stage, branch, commit, pull request
+lm ship            # branch, commit, pull request
 lm stats           # what the run log says about this repository
 ```
 

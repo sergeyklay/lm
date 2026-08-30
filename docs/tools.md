@@ -41,8 +41,9 @@ call before it ships.
 
 `apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses. `ask "text"` prints one line of answer, so `labels=$(ask "Labels (bug, ci):")` works; an empty line is an answer and the tool decides what it means, while no answer at all exits 7 like a refused confirmation. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. A tool file that calls one anyway is stopped there and the run exits 1 naming the function, because that is a defect in the tool file and not an answer the human withheld. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
 
-A tool refuses with `return 3` when there is nothing to work on. The other codes are the
-runner's; [`verbs.md`](verbs.md) lists them.
+A tool refuses with `return 3` when there is nothing to work on, and `apply()` returns 8 when part
+of its work landed and the rest did not. Those two are the tool file's; the other codes are the
+runner's, and [`verbs.md`](verbs.md) lists them all.
 
 When `collect()` needs something the machine running the tests may not have, put the call
 behind a function so a fixture can replace it. `tools/issue.sh` reads the repository's labels
@@ -536,7 +537,7 @@ the three suites that hold the record's shape: `tests/runner.sh` for the shell w
 sides of the field's arrival. `tests/chat.mts` enters each caller the way it is entered in earnest,
 `bin/lm` as a process of its own against the registration the chat itself uses, over a fixture that
 refuses in `collect` so neither side reaches a model. Counted 2026-08-30 with `grep -c '^ok'` over
-each suite's output: `tests/runner.sh` at 89, `tests/chat.mts` at 31 and `tests/stats.sh` at 26.
+each suite's output: `tests/runner.sh` at 91, `tests/chat.mts` at 31 and `tests/stats.sh` at 26.
 
 Eight mutations, each predicted by case name before it was planted, each gated, and each confirmed
 by the value the mutated line put in the record. On the Node side: the chat declaring no caller
@@ -639,7 +640,7 @@ its own, one shipping a name the installation also ships, one shipping a name it
 directory that is no repository at all, and a run with `LM_TOOLS` set - and `tests/registry.mts`
 drives `list()` over one directory and over none. The group is 33 cases: the 30 at the end of
 `tests/cli.mts` from `a project with no tools of its own lists nothing` onwards, and 3 in
-`tests/registry.mts`. Counted 2026-08-30 with `node tests/cli.mts | grep -c '^ok'` at 71
+`tests/registry.mts`. Counted 2026-08-30 with `node tests/cli.mts | grep -c '^ok'` at 72
 and `node tests/registry.mts | grep -c '^ok'` at 52.
 
 Twelve mutations, each predicted by case name before it was planted and each compared as a name
@@ -699,60 +700,98 @@ The delivery has a group of its own, and it sits on the driver the operator uses
 beside it. `tests/ship.sh` runs `bin/lm ship` into `runWorkflow` over `tools/ship.sh`, with
 `commit` and `pr` written as tool files of the suite's own and a recording server answering the one
 model call each makes, so every line a delivery runs is run here and none of it needs a GPU.
-`grep -c '^check ' tests/ship.sh` counts the cases, at 36 as this is written.
+`grep -c '^check ' tests/ship.sh` counts the cases, at 61 as this is written.
 
-Seventeen mutations beside the two on `--yes` above, each predicted by case name before it was
-planted and each compared as a name set. Taking the `git switch -q -c` out of `prepare()` reddens exactly one, the case reading that
-`main` is untouched, and not the case reading the branch name: `after_commit` renames whatever
-branch is current, so a commit made on `main` still ends up on a branch called after its subject,
-and the prediction that the branch cases would die was wrong for that reason. Dropping
-`LM_WORKFLOW` from the environment `runWorkflow` builds reddens the two cases that read the
-tag and leaves the branch names alone, which is the `:-ship` fallback in `_branch()` working.
-Dropping the `--dry-run` guard from the workflow's own `step()` reddens six: the four that read
-the repository back after a rehearsal, the one that says a rehearsal stages nothing, and the one
-that reads the refusal a rehearsed verb makes on its own account. Its evidence is what the mutant
-left behind - a branch renamed to `chore/seed`, after a commit the run never made. Removing the
-line that says the workflow's own steps did not run reddens only the case that reads it.
+Twenty-six mutations beside the two on `--yes` above, each predicted by case name before it was
+planted, each gated on the anchor occurring exactly once under `grep -oF ... | wc -l`, and each
+compared as a name set rather than a count. Re-derived in full 2026-08-30, because the cases the
+verb's own group added moved most of the earlier kill sets.
 
-Then one property each: `_name()` returning a constant reddens the case reading the branch name;
-cutting the placeholder whether or not `--here` was given reddens the two `--here` cases that read
-a branch; never calling `failed_<verb>` reddens the two that read what a refusal left behind;
-deleting `git branch -q -D` from `failed_commit` reddens the one that reads the branch list;
-removing the `nothing to stage` diagnostic reddens the one that reads it; dropping `git add -A`
-reddens the one that reads what an unstaged tree shipped; staging whether or not `--no-stage` was
-given reddens both `--no-stage` cases; always taking the staging branch that says nothing reddens
-the two that read what got staged; dropping the free text from the arguments each verb is handed
-reddens the one that reads it; and dropping the runner's own `--dry-run` guard, in `src/verb.mts`,
-reddens the three rehearsal cases that read the commit and the tree.
+The workflow's own lines, one property each. Taking the `git switch -q -c` out of `prepare()`
+reddens five: the two that read `main` after a run and the three that read the branch an exit-8 run
+left, and not the case reading the branch name, because `after_commit` renames whatever branch is
+current, so a commit made on `main` still ends up on a branch called after its subject. Dropping
+`LM_WORKFLOW` from the environment `runWorkflow` builds reddens five, the two that read the tag and
+the three that look the placeholder up by name. Dropping the `--dry-run` guard from the workflow's
+own `step()` reddens the three rehearsal cases that read the branch and the reflog; the tree cases
+survive it now, because `prepare()` no longer writes to the tree. Removing the line that says the
+workflow's own steps did not run reddens only the case that reads it. `_name()` returning a
+constant reddens the case reading the branch name. Cutting the placeholder whether or not `--here`
+was given reddens the two `--here` cases that read a branch. Never calling `failed_<verb>` reddens
+the three that read what a refusal left behind. Deleting `git branch -q -D` from `failed_commit`
+reddens the two that read the branch list after a refusal. Dropping the free text from the
+arguments each verb is handed reddens the one that reads it. Dropping the runner's own `--dry-run`
+guard, in `src/verb.mts`, reddens the three rehearsal cases that read the commit and the tree.
 
-Three are broad and worth knowing as such: running only the first verb reddens five, the two that
-read `pr` and the three that count both verbs; swallowing a verb's non-zero status reddens six,
-across the refusal, the `--no-stage` and the rehearsal groups, because every refusal in the suite
-travels the same line; and handing every verb `--dry-run` reddens ten, which is what covers the
-cases saying the commit landed and `pr` ran.
+Three of those are broad and worth knowing as such: running only the first verb reddens six, the
+three that read `pr` and the three that count both verbs; swallowing a verb's non-zero status
+reddens thirteen, across the refusal, the clean-tree and both hook groups, because every non-zero
+in the suite travels the same line; and handing every verb `--dry-run` reddens twenty-nine, which
+is what covers every case saying a commit landed.
 
-Two first attempts are the warnings worth keeping, and both are cases too coarse for the mutant
-written for them. The rehearsal case reading `git status --porcelain` first ran on a fixture whose
-tree was already staged, so the mutation that lets `prepare()` stage changed nothing it could see
-and the kill set came back one name short; the fixture now carries a file staged and modified again
-on top of that, and an untracked one beside it. And the `--no-stage` case first read the index
-alone, which is empty both when nothing was staged and when what was staged has just been
-committed, so the mutation that always stages left it green; it reads the working tree now.
+Then the verb's own, which is where the cases that read a repository are. Committing the whole
+index instead of the group - dropping the `git reset -q --` narrowing in `apply()` - reddens
+fifteen, every case that reads how many commits landed or what one carried, and leaves the
+one-group case green: that control exists for this mutant, because with a single commit there is
+nothing to narrow and a wrong `apply()` looks exactly like a right one. Restoring `git add -A` to
+`prepare()` *behind its `--no-stage` guard* reddens **nothing**, which is the finding: the verb
+stages the same tree in `apply()`, so what the deletion buys is not the grouping but the flag's
+meaning. Staging in `prepare()` regardless of the flag reddens the two `--no-stage` cases.
+Dropping the moved-HEAD guard from `failed_commit()` reddens the three that read what an exit-8 run
+left on its branch, and leaves the two refusal cases green, because nothing landed in those.
 
-Five cases no mutation reddens, and they are controls rather than assertions: that a refusal leaves
-no commit, with and without `--here`; that the work is still staged after one; that a rehearsal
-exits 0; and that it still prints what `commit` would do. Each holds an absence or a completion
-that no mutation of the workflow can manufacture on its own.
+Two mutants aim at the hook contract and both redden exactly one case, `and the rejection was not
+retried`: retrying whichever way the probe answered, and probing the whole tree rather than the
+failing group. The second is `git diff --quiet` with no pathspec, which is the form measured
+2026-08-27 and wrong under an index `apply()` narrows per group. It needs saying how that case had
+to be built, because two earlier shapes of it reported a clean kill for nothing. The exit code
+cannot discriminate: a retried rejection lands nowhere either and reports 8 just the same, so the
+case counts the hook's own runs instead of reading a status. And the rejection has to fall on a
+group that is **not the last**, because only then is a later group's file dirty relative to the
+narrowed index; with the rejection on the last group the unscoped probe answers 0 like the scoped
+one and the mutant killed nothing at all. Measured 2026-08-30 in a throwaway repository: rejection
+on the last of three, whole tree 0 and `git diff --quiet -- c.txt` 0; rejection on the second of
+three, whole tree 1 and `git diff --quiet -- b.txt` 0.
+
+The deterministic half of the same verb is the nine `commit` cases under `tests/golden/commit`,
+which `ls tests/golden/commit | wc -l` counts, and six mutations cover them. Reading the index
+instead of the whole tree reddens fifteen expectations across five cases and leaves every
+`no-stage` one green, which is the subset that makes it a kill rather than a crash: under the flag
+the index is the input either way. Dropping the untracked half of the input alone reddens four, the
+prompt and the schema of the two cases that carry an untracked file. Dropping `files` from the
+schema item reddens all nine `schema` expectations and nothing else. Reading only the first group
+in `validate()` reddens the one case whose planted violation sits in the second, and leaves the one
+whose violation sits in the first green. Changing the `description` reddens the `tests/cli.mts`
+case that pins it. Rendering only the first group reddens six, and the sixth is a warning rather
+than a kill: on the zero-group case the mutant iterates once over a group that is not there and
+prints `null: null`, so it crashed where it was planted rather than truncating anything. Five of
+those six are the truncation the mutant was for; the prediction had named five and the sixth is why
+a kill set is compared by name.
+
+Two fixtures are shaped by mutants that had been too coarse to see, and both are worth reading
+before either is simplified. The rehearsal case reads `git status --porcelain` over a tree carrying
+a file staged and modified again on top of it and an untracked one beside it, because on a tree
+that is merely staged a mutation that stages changes nothing the case can see. And the
+`--no-stage` case reads the working tree rather than the index, because the index is empty both
+when nothing was staged and when what was staged has just been committed, so a mutation that
+stages everything leaves an index-reading case green.
+
+Nine cases no mutation in the series reddens, and they are controls rather than assertions: that a
+refusal leaves no commit, with and without `--here`; that the work is still staged after one; that
+a rehearsal exits 0, stages nothing and still prints what `commit` would do; that one group exits 0;
+and that the whole series came out of one model call. Each holds an absence or a completion that no
+mutation of the workflow can manufacture on its own.
 
 `shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
-defect to fix. Every tool reports exactly three: `SC2148` because it carries no shebang, which
-is honest (`libexec/lm-verb` sources it and never executes it), and `SC2034` twice, for `name` and
-`description`, which the runner reads after sourcing and the file itself never uses. Measured
-2026-08-26 across the four tools with
-`for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: four, three, three, three. A
-tool reporting a fourth carries something the others do not, and that is what to look at.
+defect to fix. Every tool reports `SC2148` because it carries no shebang, which is honest
+(`libexec/lm-verb` sources it and never executes it), and one `SC2034` per declaration the runner
+reads after sourcing and the file itself never uses: `name` and `description` everywhere, plus
+`flags` where a tool declares one. Measured 2026-08-30 across the four verbs with
+`for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: `changelog` four, `commit` four,
+`issue` three, `pr` three. A tool reporting one more than its declarations account for carries
+something the others do not, and that is what to look at.
 
-`changelog` is the one, and its fourth is a false positive worth leaving. Its validator matches
+`changelog` is the one, and its extra is a false positive worth leaving. Its validator matches
 the backticked spans in a drafted bullet, so the regex contains literal backticks inside single
 quotes, and `SC2016` reads those as a command substitution that will not expand. Quoting it any
 other way changes what the pattern matches. `shellcheck -f gcc tools/changelog.sh` names the

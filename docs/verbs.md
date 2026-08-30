@@ -22,13 +22,12 @@ whole delivery goes through with nobody at the terminal. What neither reaches is
 chat has a person in it by construction, and its dialog is still asked.
 
 On a workflow `--dry-run` covers the whole delivery and not only the verbs inside it. `lm ship`
-opens a branch and stages the tree around the verbs it runs, and those are side effects like any
-other, so a rehearsal runs none of them: after `lm ship --dry-run` the working tree, the branch you
-are on, the branches that exist, `HEAD` and the reflog all read exactly as they did before it. What
-you see is each verb rehearsed against the repository as it stands, which is thinner than the run,
-and the workflow says so on stderr. A verb whose input an earlier step would have made refuses
-the way it would if you ran it yourself now: on a tree nothing was staged in, `lm ship --dry-run`
-reaches `commit` and `commit` exits 3.
+opens a branch around the verbs it runs, and that is a side effect like any other, so a rehearsal
+runs none of them: after `lm ship --dry-run` the working tree, the branch you are on, the branches
+that exist, `HEAD` and the reflog all read exactly as they did before it. What you see is each verb
+rehearsed against the repository as it stands, which is thinner than the run, and the workflow says
+so on stderr. A verb with nothing to work on refuses the way it would if you ran it yourself now:
+on a clean tree, `lm ship --dry-run` reaches `commit` and `commit` exits 3.
 
 Exit 7 is what a declined confirmation reports, so a run under `--yes` stops producing it rather
 than producing it for a different reason.
@@ -235,10 +234,22 @@ A workflow stops on any of these. 7 is the one that is not a failure: it is you 
 | 4 | the validator rejected two answers |
 | 5 | the model returned nothing usable: empty content, or an answer cut off by the token budget |
 | 7 | you declined the confirmation |
+| 8 | part of the work landed and the rest did not; what landed stands, and re-running takes the rest |
 
-From `lm commit` this most often means a hook rejected the commit, and the hook's own code is not
+From `lm commit` 1 most often means a hook rejected the commit, and the hook's own code is not
 recoverable: `git commit` reports 1 whatever the hook exited with, so what the hook printed is the
 only thing that says why.
+
+`lm commit` makes one commit per group it found, so a failure part-way through has two shapes and
+they are not the same news. 1 is the first commit failing, which leaves the repository as it was.
+8 is a later one failing, which leaves the commits before it in place: nothing is reverted, `lm
+commit` names on stderr which subjects landed and which files are still uncommitted, and running it
+again re-groups what is left. `lm ship` stops on either, and on 8 it leaves the branch it opened
+alone rather than deleting work that landed on it.
+
+Under `--yes` the confirmation is not asked, so a whole series of commits lands without anyone
+seeing the grouping first. That is what an unattended run asks for, and it is a larger unseen act
+than one commit was.
 
 Inside the chat a verb has no exit status to hand anyone, so the tool result says the same
 thing in words: a refused confirmation reads `Declined. Nothing was applied.` and any other
@@ -256,9 +267,10 @@ In the other two it took the refusal at its word, said so, and offered you the `
 run yourself - which is the same capability used the other way and not a guarantee of anything. This is why
 `lm stats` counts the work that went through a verb rather than the work that was done.
 
-Taking the shell away is one flag, and the same request then stops at the verb: nothing is staged,
-`commit` exits 3, and the model says it cannot run git itself. Both halves are reproducible in a
-repository with one modified file and a scratch log, which is what `tests/verb-live.mts` drives.
+Taking the shell away is one flag, and the same request then stops at the verb: `commit` reaches the
+confirmation, a session run with `-p` has nobody to answer it, and it exits 7 having applied
+nothing. Both halves are reproducible in a repository with one modified file and a scratch log,
+which is what `tests/verb-live.mts` drives.
 
 ```bash
 LM_LOG=/tmp/runs.jsonl lm chat -p 'commit the change'
