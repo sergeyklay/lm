@@ -33,12 +33,29 @@ export const CONFIRM_TIMEOUT_SECONDS = 120;
 // the operator who walked away from an open terminal apart from a run that never had
 // one and has already been told so by the shell.
 const timedRead = (after: string) =>
-  `local a rc=0; read -r -t ${CONFIRM_TIMEOUT_SECONDS} -p "$1 " a </dev/tty || rc=$?; `
+  `local a rc=0 left=$(( DEADLINE - $(date +%s) )); `
+  + `if [ "$left" -gt 0 ]; then read -r -t "$left" -p "$1 " a </dev/tty || rc=$?; else rc=129; fi; `
   + `[ "$rc" -le 128 ] || printf "\nlm: no answer in ${CONFIRM_TIMEOUT_SECONDS}s, nothing was applied\n" >&2; `
   + `[ "$rc" = 0 ] || exit 7; ${after}`;
+// The bound is a deadline for the whole confirmation rather than for each reading.
+// A re-ask that started the clock again would leave confirm's loop unbounded: a
+// stuck key or a device emitting bytes satisfies every reading and never times out.
+const DEADLINE =
+  `_deadline() { DEADLINE=$(( $(date +%s) + ${CONFIRM_TIMEOUT_SECONDS} )); }; `;
+// A line that is neither a yes nor a no is a typo, not a decision, and confirm runs
+// after the model call, so reading one as a refusal throws a finished answer away.
+const VERDICT =
+  '_verdict() { case "$1" in [yY]|[yY][eE][sS]) return 0;; [nN]|[nN][oO]|"") return 1;; '
+  + '*) return 2;; esac; }; ';
+const REASK = 'echo "Please answer y or n." >&2; ';
 const ASK =
-  `confirm() { ${timedRead('[ "$a" = y ] || exit 7; ')}}; `
-  + `ask() { ${timedRead('printf "%s" "$a"; ')}}; `;
+  VERDICT
+  + DEADLINE
+  + `confirm() { local v DEADLINE; _deadline; `
+  + `while :; do v=0; ${timedRead('')}_verdict "$a" || v=$?; `
+  + `[ "$v" = 2 ] || break; ${REASK}done; `
+  + `[ "$v" = 0 ] || exit 7; }; `
+  + `ask() { local DEADLINE; _deadline; ${timedRead('printf "%s" "$a"; ')}}; `;
 
 // The run that declares itself unattended, through --yes or LM_YES. confirm answers
 // yes and ask answers an empty line, which is not a new design but the answer

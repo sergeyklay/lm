@@ -32,11 +32,20 @@ on a clean tree, `lm ship --dry-run` reaches `commit` and `commit` exits 3.
 Exit 7 is what a declined confirmation reports, so a run under `--yes` stops producing it rather
 than producing it for a different reason.
 
+A confirmation takes `y` or `yes` for a yes, and `n`, `no` or an empty line for a no, in either
+case. Anything else is neither, and a confirmation runs after the model has been called and waited
+for, so reading a mistyped letter as a refusal throws a finished answer away and sends you through
+the verb again from the top. `lm` says `Please answer y or n.` and puts the question again instead,
+for as many neither answers as arrive. Only a yes or a no ends it, so a typo can never cost you a
+finished answer.
+
 A confirmation nobody answers is not a run that waits for ever. `lm` waits 120 seconds for the
 answer and then stops, exits 7 and says so, applying nothing - the case it exists for is the
-terminal left open on a desk somebody walked away from, where the wait had no bound at all. A run
-with no terminal at all does not reach that wait: it exits 7 at once, because there is no
-`/dev/tty` to read. `lm --which`
+terminal left open on a desk somebody walked away from, where the wait had no bound at all. Those
+120 seconds are the budget for the whole confirmation rather than for each reading: a re-ask does
+not start the clock again, so answers that are neither, however fast they arrive, cannot hold the
+run open past the bound. A run with no terminal at all does not reach that wait: it exits 7 at
+once, because there is no `/dev/tty` to read. `lm --which`
 picks the verb for a request by reading the same one-line descriptions `lm --list` prints. When
 no verb serves the request it prints nothing, says `no verb serves that request` on stderr and
 exits 2, so a workflow that pipes it into `lm` stops rather than running the nearest match.

@@ -65,15 +65,29 @@ CONFIRM_TIMEOUT_SECONDS=120
 # bash returns above 128 when a read times out and 1 at end of input, which tells
 # the operator who walked away from an open terminal apart from a run that never
 # had one and has already been told so by the shell.
-_read() { local rc=0
-  read -r -t "$CONFIRM_TIMEOUT_SECONDS" -p "$2 " "$1" </dev/tty || rc=$?
+_read() { local rc=0 left=$(( DEADLINE - $(date +%s) ))
+  if [ "$left" -gt 0 ]; then read -r -t "$left" -p "$2 " "$1" </dev/tty || rc=$?; else rc=129; fi
   [ "$rc" -le 128 ] || printf '\nlm: no answer in %ss, nothing was applied\n' "$CONFIRM_TIMEOUT_SECONDS" >&2
   [ "$rc" = 0 ] || exit 7; }
+# The bound is a deadline for the whole confirmation rather than for each reading.
+# A re-ask that started the clock again would leave the loop below unbounded: a
+# stuck key or a device emitting bytes satisfies every reading and never times out.
+_deadline() { DEADLINE=$(( $(date +%s) + CONFIRM_TIMEOUT_SECONDS )); }
+# A line that is neither a yes nor a no is a typo, not a decision, and confirm runs
+# after the model call, so reading one as a refusal throws a finished answer away.
+_verdict() { case "$1" in [yY]|[yY][eE][sS]) return 0;; [nN]|[nN][oO]|'') return 1;; *) return 2;; esac; }
 # LM_YES is the transport half of --yes: the flag is the Node runner's to parse, and
 # a workflow reaches this runner through the variable instead. Without this the
 # published sentence that the variable works on every verb is false for lm ship.
-confirm() { [ "${LM_YES:-}" = 1 ] && return 0; local a; _read a "$1"; [ "$a" = y ] || exit 7; }
-ask() { [ "${LM_YES:-}" = 1 ] && return 0; local a; _read a "$1"; printf '%s' "$a"; }
+confirm() { [ "${LM_YES:-}" = 1 ] && return 0
+  local a v DEADLINE; _deadline
+  while :; do
+    v=0; _read a "$1"; _verdict "$a" || v=$?
+    [ "$v" = 2 ] || break
+    echo 'Please answer y or n.' >&2
+  done
+  [ "$v" = 0 ] || exit 7; }
+ask() { [ "${LM_YES:-}" = 1 ] && return 0; local a DEADLINE; _deadline; _read a "$1"; printf '%s' "$a"; }
 
 sha() { [ -n "${1:-}" ] || return 0; printf '%s' "$1" | sha256sum | cut -d' ' -f1; }
 
