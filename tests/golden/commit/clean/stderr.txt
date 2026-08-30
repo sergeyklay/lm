@@ -1,0 +1,2 @@
+lm: nothing to commit
+[exit 3]

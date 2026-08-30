@@ -36,13 +36,13 @@ runner calls them in order:
 
 ```bash
 name="commit"
-description="Write a Conventional Commits message for the staged changes"
+description="Split the uncommitted changes into logical commits, each with a Conventional Commits message"
 
-collect()  { git diff --staged; }    # build the prompt from the repository
+collect()  { git diff HEAD; }        # build the prompt from the repository
 schema()   { ... }                   # the answer's shape, an enum on every closed set
 validate() { ... }                   # print one line per violation, nothing when clean
 render()   { ... }                   # show the result to the human
-apply()    { confirm "commit? [y/N]"; ... }  # the side effect, once the human agrees
+apply()    { confirm "3 commit(s)? [y/N]"; ... }  # the side effect, once the human agrees
 ```
 
 The model never picks a value that can be enumerated: scopes, labels and template sections are

@@ -1,0 +1,24 @@
+tools/demo.sh
+feat(demo): give the demo tool a description
+
+The router shortlist reads the description field, and the demo tool did
+not have one. Adding it makes the tool selectable by lm --which.
+
+docs/guide.md
+docs(guide): say how the demo tool is installed
+
+The guide named the tool and stopped there. It now carries the install
+step a reader needs before anything else works.
+
+libexec/lm-stats
+feat(lm-stats): report the clean share beside the totals
+
+A run that went through a verb and one that did not were counted
+together. The share is now its own column, so the two are told apart at
+a glance.
+
+CHANGELOG.md
+chore(CHANGELOG): open the changelog
+
+There was nowhere to record a release. The file exists now and the next
+entry has somewhere to go.

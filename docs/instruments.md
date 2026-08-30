@@ -13,8 +13,21 @@ the contents.
 
 `lm changelog` reads the index when something is staged and the working
 tree otherwise, so an entry can be drafted before anything is staged, or from the text alone
-when nothing has changed at all. `lm commit` reads the index and only the index, because
-that is what it commits.
+when nothing has changed at all.
+
+`lm commit` reads everything uncommitted, splits it into one commit per independent change and
+makes them all, so a dirty tree becomes a history without a `git add` of your own: modified files
+and untracked ones both go in, and `.gitignore` is honoured. It shows the whole grouping and asks
+once before any commit is made, because a wrong commit boundary is the one thing the validator
+cannot see. Each commit takes the tree exactly as it stood when the run began, so an edit
+made while the run is thinking is not swept into it. `--no-stage` narrows it to what you have
+already staged, which is what you want when you staged a subset yourself. If a hook stops a commit part-way through the series, the ones before
+it stand: the verb says which landed and which files are left, and exits 8.
+
+```bash
+lm commit                      # group the dirty tree and commit each group
+lm commit --no-stage           # only what you staged yourself
+```
 
 A drafted bullet is refused when it names something only the source knows: the functions
 `docs/tools.md` publishes as the tool contract are fair game, the project's other functions are
@@ -22,17 +35,15 @@ not. Name what a user of the verb can see instead.
 
 ## lm ship
 
-`lm ship` runs `commit` then `pr` over the same text. It stages the working tree first, so a
-dirty tree ships without a `git add` of your own: modified files and untracked ones both go
-in, and `.gitignore` is honoured. It then opens a thematic branch named
+`lm ship` runs `commit` then `pr` over the same text. It opens a thematic branch named
 `<type>/<kebab-description>` after the subject the model writes, so the branch you end up on
-follows the work rather than the other way round. `--here` commits where you already are.
-`--no-stage` leaves the index alone, which is what you want when you have staged a subset
-yourself. Declining the commit leaves neither a branch nor a commit, and leaves the staging in
-place.
+follows the work rather than the other way round, and `commit` makes its commits on that branch.
+`--here` commits where you already are. `--no-stage` is `commit`'s flag and is typeable here too,
+where it means the same thing. Declining the commit leaves neither a branch nor a commit, and
+leaves the index as you left it.
 
 ```bash
-lm ship                        # stage, branch, commit, pull request
+lm ship                        # branch, commit, pull request
 lm ship --here "what changed"  # same, on the branch you are on
 lm ship --no-stage             # ship only what you staged yourself
 ```

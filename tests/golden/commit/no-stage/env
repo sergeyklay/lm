@@ -1,0 +1,3 @@
+# The runner turns the declared flag into this before the tool is sourced; a
+# fixture has no runner, so it sets what the flag would have set.
+LM_NO_STAGE=1

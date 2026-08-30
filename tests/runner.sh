@@ -76,6 +76,27 @@ check "an undeclared flag exits 2"     "2" "$rc"
 check "a typo makes no model call"     "0" "$(calls)"
 teardown
 
+# The other arm of the same scan, which nothing drove until a verb declared a flag
+# of its own: a declared flag becomes LM_<NAME> and never reaches "$@". The case
+# reads the variable out of the prompt rather than off the exit status, because
+# the refusing arm exits 2 and everything else here exits 0.
+setup "$(say ok)"
+cat > "$work/tools/stub.sh" <<'EOF'
+name="stub"
+description="exercises the runner and nothing else"
+flags="--force"
+collect() { echo "PROMPT force=${LM_FORCE:-unset} args=[$*]"; }
+schema() { echo '{"type":"object"}'; }
+validate() { local j; j=$(cat); [ "$j" = ok ] || echo "answer must be ok"; }
+render() { cat; echo; }
+apply() { confirm "Apply? [y/N]"; echo APPLIED; }
+EOF
+lm stub --force --dry-run go >/dev/null 2>&1; rc=$?
+check "a declared flag is taken"       "0" "$rc"
+check "and reaches collect as LM_FORCE" "PROMPT force=1 args=[go]" \
+  "$(grep -o 'PROMPT force=[^\\"]*' "$REPLIES/req.1")"
+teardown
+
 # collect refuses: the status is the tool's, and the model is never asked.
 setup
 lm stub refuse >/dev/null 2>&1; rc=$?

@@ -1,10 +1,10 @@
 Recent commit subjects in this repository. Match their vocabulary and level of detail:
 feat: add the demo tool
 
-Files changed:
+Changed files:
 tools/demo.sh
 
-Staged diff:
+Diff:
 diff --git a/tools/demo.sh b/tools/demo.sh
 index 5da2ae8..5c1ebf5 100644
 --- a/tools/demo.sh
@@ -13,10 +13,13 @@ index 5da2ae8..5c1ebf5 100644
  name="demo"
 +description="one line"
 
-The person running this described the change as follows. Treat it as what they meant,
+The person running this described the work as follows. Treat it as what they meant,
 not as wording to copy, and still take the facts from the diff above:
 the router shortlist reads description, and this tool had none
 
-Write the commit message for this change.
+Split these changes into commits. One commit per independent change: a change is
+independent when it could be reverted on its own without breaking the others.
+Every file listed above must appear in exactly one commit, and no other file may
+appear. Write the Conventional Commits message for each commit.
 Subject: imperative mood, lower case after the colon, no trailing period, under 60 characters, no issue number.
 Body: two or three sentences saying what changed and why. No bullet lists, no file names, no phrases like 'This commit'.

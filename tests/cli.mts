@@ -50,11 +50,15 @@ check("--resume is named as taking an identifier and not needing one",
 // generated from what the file declares: no tool file answers --help itself.
 const own = run(LM, ["commit", "--help"]);
 check("what it does is the first line, not a label",
-  true, own.out.startsWith("Write a Conventional Commits message"));
+  true, own.out.startsWith("Split the uncommitted changes into logical commits"));
 check("and the usage names it once", true, /^  lm commit \[options\] \[text\]$/m.test(own.out));
 check("and exits 0", 0, own.code);
 // Which kind it is shows in whether there is a sequence to name.
 check("a verb names no sequence", false, own.out.includes("Runs in order:"));
+// A verb declaring a flag of its own is what `commit` made possible, and the
+// help is generated from the declaration rather than written beside it.
+check("a verb names the flag it declared, under its own name",
+  true, /^Declared by commit:\n  --no-stage$/m.test(own.out));
 const flow = run(LM, ["ship", "--help"]);
 check("a workflow names the verbs it runs, in order",
   true, /^Runs in order:\n  commit, pr$/m.test(flow.out));

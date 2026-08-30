@@ -1,0 +1,60 @@
+{
+  "properties": {
+    "groups": {
+      "items": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "enum": [],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "enum": [
+              ""
+            ],
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 60,
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "feat",
+              "fix",
+              "docs",
+              "style",
+              "refactor",
+              "perf",
+              "test",
+              "chore",
+              "ci",
+              "build",
+              "revert"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "files",
+          "type",
+          "scope",
+          "subject",
+          "body"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "groups"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,11 @@
+tools/demo.sh
+feat(demo): give the demo tool a description
+
+The router shortlist reads the description field, and the demo tool did
+not have one. Adding it makes the tool selectable by lm --which.
+
+docs/guide.md
+docs(guide): say how the demo tool is installed
+
+The guide named the tool and stopped there. It now carries the install
+step a reader needs before anything else works.

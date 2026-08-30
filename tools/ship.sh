@@ -9,8 +9,8 @@ flags="--here --no-stage"
 # Reading the subject back out of the commit looks like the long way round, and
 # the short way is worse: naming the branch before committing means a --dry-run
 # of `lm commit` first, which costs a second model call for a prompt identical to
-# the first, because collect() in tools/commit.sh reads the index, the working
-# tree and `git log` and never the branch. Two calls, one answer.
+# the first, because collect() in tools/commit.sh reads the working tree and
+# `git log` and never the branch. Two calls, one answer.
 _name() {
   local s t d
   s=$(git log -1 --format='%s')
@@ -28,35 +28,27 @@ _branch() { printf 'lm-%s' "${LM_WORKFLOW:-ship}"; }
 # The operator should not have to decide which branch they are on, so a thematic
 # one is what happens when nothing is said. Its name is unknown until the commit
 # exists, so it opens under a placeholder and is renamed once the subject is there.
-#
-# The operator should not have to stage what they are already shipping either. The
-# verb cannot do it for them: collect() in tools/commit.sh reads the index and
-# refuses an empty one, which is right, because it cannot describe a change it is
-# not committing. So the opinion lives here and --no-stage takes it back off.
-# git add sees more of the tree than reading it does: a modified file shows in git
-# diff and in git add, an untracked one only in git add, and .gitignore is honoured
-# either way. Staging survives a refusal, the way it already did when the operator
-# typed it.
 prepare() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "lm: not a git repository" >&2; return 2; }
   if [ -z "${LM_HERE:-}" ]; then git switch -q -c "$(_branch)"; fi
-  if [ -z "${LM_NO_STAGE:-}" ]; then
-    if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-      # Having staged nothing is the surprising case, so it is the one that speaks.
-      echo "lm: nothing to stage; shipping the index as it stands" >&2
-    else
-      git add -A
-    fi
-  fi
 }
 
 # A refusal leaves neither a branch nor a commit. Nothing was committed, so HEAD
 # has moved exactly once — into the placeholder — and the branch the operator
 # started on is what the previous reflog entry names.
+#
+# `commit` exits 8 having landed part of the work, and those commits are on the
+# placeholder. Deleting it then destroys exactly what 8 exists to say survived,
+# so the branch goes only when it still points where the operator left it.
 failed_commit() {
   if [ -z "${LM_HERE:-}" ]; then
+    local b; b=$(_branch)
     git switch -q -
-    git branch -q -D "$(_branch)"
+    if [ "$(git rev-parse -q --verify "$b")" = "$(git rev-parse HEAD)" ]; then
+      git branch -q -D "$b"
+    else
+      echo "lm: commits landed on $b; leaving the branch in place" >&2
+    fi
   fi
 }
 
