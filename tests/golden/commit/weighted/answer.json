@@ -1,6 +1,1 @@
-{
-  "type": "feat",
-  "scope": "chrome",
-  "subject": "size the closing block to the terminal it lands on",
-  "body": "The closing block measured its own width and ignored the terminal it was printed into, so a narrow window wrapped it mid-sentence. It now reads the terminal's columns and sizes itself to what it lands on."
-}
+{"groups":[{"files":["src/chrome.mts","libexec/lm-stats"],"type":"feat","scope":"chrome","subject":"size the closing block to the terminal it lands on","body":"The closing block measured its own width and ignored the terminal it was printed into, so a narrow window wrapped it mid-sentence. It now reads the terminal's columns and sizes itself to what it lands on."},{"files":["CHANGELOG.md","tools/alpha.sh","tools/beta.sh","tools/gamma.sh"],"type":"chore","scope":"tools","subject":"seed the three placeholder tools","body":"The registry had nothing to list, so no case could read a listing back. Three placeholder files give it one, and the changelog records that they arrived."}]}

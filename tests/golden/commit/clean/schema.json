@@ -8,17 +8,13 @@
           },
           "files": {
             "items": {
-              "enum": [
-                "tools/demo.sh"
-              ],
+              "enum": [],
               "type": "string"
             },
             "type": "array"
           },
           "scope": {
             "enum": [
-              "demo",
-              "tools",
               ""
             ],
             "type": "string"

@@ -9,6 +9,9 @@
           "files": {
             "items": {
               "enum": [
+                "CHANGELOG.md",
+                "docs/guide.md",
+                "libexec/lm-stats",
                 "tools/demo.sh"
               ],
               "type": "string"
@@ -17,7 +20,10 @@
           },
           "scope": {
             "enum": [
+              "guide",
+              "CHANGELOG",
               "demo",
+              "libexec",
               "tools",
               ""
             ],

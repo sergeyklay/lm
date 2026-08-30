@@ -1,46 +1,74 @@
 {
   "properties": {
-    "body": {
-      "type": "string"
-    },
-    "scope": {
-      "enum": [
-        "chrome",
-        "libexec",
-        "tools",
-        "alpha",
-        "beta",
-        "gamma",
-        "CHANGELOG",
-        ""
-      ],
-      "type": "string"
-    },
-    "subject": {
-      "maxLength": 60,
-      "type": "string"
-    },
-    "type": {
-      "enum": [
-        "feat",
-        "fix",
-        "docs",
-        "style",
-        "refactor",
-        "perf",
-        "test",
-        "chore",
-        "ci",
-        "build",
-        "revert"
-      ],
-      "type": "string"
+    "groups": {
+      "items": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "enum": [
+                "CHANGELOG.md",
+                "libexec/lm-stats",
+                "src/chrome.mts",
+                "tools/alpha.sh",
+                "tools/beta.sh",
+                "tools/gamma.sh"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "enum": [
+              "chrome",
+              "libexec",
+              "tools",
+              "alpha",
+              "beta",
+              "gamma",
+              "CHANGELOG",
+              ""
+            ],
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 60,
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "feat",
+              "fix",
+              "docs",
+              "style",
+              "refactor",
+              "perf",
+              "test",
+              "chore",
+              "ci",
+              "build",
+              "revert"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "files",
+          "type",
+          "scope",
+          "subject",
+          "body"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
     }
   },
   "required": [
-    "type",
-    "subject",
-    "body"
+    "groups"
   ],
   "type": "object"
 }

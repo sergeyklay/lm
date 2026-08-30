@@ -1,7 +1,7 @@
 Recent commit subjects in this repository. Match their vocabulary and level of detail:
 feat: seed the fixture
 
-Files changed:
+Changed files:
 CHANGELOG.md
 libexec/lm-stats
 src/chrome.mts
@@ -9,7 +9,7 @@ tools/alpha.sh
 tools/beta.sh
 tools/gamma.sh
 
-Staged diff:
+Diff:
 diff --git a/CHANGELOG.md b/CHANGELOG.md
 index e69de29..d00491f 100644
 --- a/CHANGELOG.md
@@ -98,6 +98,9 @@ index e69de29..1191247 100644
 +1
 +2
 
-Write the commit message for this change.
+Split these changes into commits. One commit per independent change: a change is
+independent when it could be reverted on its own without breaking the others.
+Every file listed above must appear in exactly one commit, and no other file may
+appear. Write the Conventional Commits message for each commit.
 Subject: imperative mood, lower case after the colon, no trailing period, under 60 characters, no issue number.
 Body: two or three sentences saying what changed and why. No bullet lists, no file names, no phrases like 'This commit'.

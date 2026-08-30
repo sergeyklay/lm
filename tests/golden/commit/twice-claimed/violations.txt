@@ -1,0 +1,4 @@
+docs/guide.md is in more than one commit
+commit 2: subject ends with a period
+commit 2: subject starts with a capital letter
+commit 2: body opens with a banned phrase

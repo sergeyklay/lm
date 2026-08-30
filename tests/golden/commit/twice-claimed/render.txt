@@ -1,0 +1,11 @@
+tools/demo.sh
+docs/guide.md
+feat(demo): give the demo tool a description
+
+The router shortlist reads the description field, and the demo tool did
+not have one.
+
+docs/guide.md
+docs(guide): Say how the demo tool is installed.
+
+Added the install step the guide was missing.

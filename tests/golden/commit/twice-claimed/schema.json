@@ -9,6 +9,7 @@
           "files": {
             "items": {
               "enum": [
+                "docs/guide.md",
                 "tools/demo.sh"
               ],
               "type": "string"
@@ -17,6 +18,7 @@
           },
           "scope": {
             "enum": [
+              "guide",
               "demo",
               "tools",
               ""
