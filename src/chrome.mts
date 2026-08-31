@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { SettingsManager } from "@earendil-works/pi-coding-agent";
+import { CustomEditor, SettingsManager } from "@earendil-works/pi-coding-agent";
 
 // The mark is block glyphs coloured from the theme rather than from RGB: a
 // terminal without truecolor gets the theme's own approximation instead of a
@@ -411,6 +411,34 @@ export function dropHarnessResume(out: { write: (chunk: any, ...rest: any[]) => 
   };
 }
 
+const DOUBLE_ESCAPE_MS = 500;
+
+// A press is not always a chunk of its own — tmux writes a double tap as one —
+// and every other escape sequence opens with the same byte, so the presses in a
+// chunk are counted and a chunk carrying anything after them is not a press.
+const ESCAPES = /^\x1b+$/;
+
+export class DoubleEscapeEditor extends CustomEditor {
+  private lastEscape = 0;
+
+  // Declaring `onEscape` here would sever the abort: the harness assigns one
+  // that forwards to whichever handler its interrupt chain holds at the time,
+  // and only while the subclass has left the property undefined.
+  handleInput(data: string): void {
+    const presses = ESCAPES.test(data) ? data.length : 0;
+    if (presses > 0 && this.getText().length > 0 && !this.isShowingAutocomplete()) {
+      const now = Date.now();
+      if (presses > 1 || now - this.lastEscape < DOUBLE_ESCAPE_MS) {
+        this.setText("");
+        this.lastEscape = 0;
+        return;
+      }
+      this.lastEscape = now;
+    }
+    super.handleInput(data);
+  }
+}
+
 // Everything this project draws on the chat's screen. Without a terminal there
 // is nothing to draw on.
 export function installChrome(pi: any, updated?: string): void {
@@ -494,5 +522,7 @@ export function installChrome(pi: any, updated?: string): void {
         });
       },
     }));
+    ctx.ui.setEditorComponent((tui: any, editorTheme: any, keybindings: any) =>
+      new DoubleEscapeEditor(tui, editorTheme, keybindings));
   });
 }

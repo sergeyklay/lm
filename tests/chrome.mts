@@ -9,7 +9,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, DoubleEscapeEditor, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -60,6 +60,7 @@ check("both rows carry the mark", true, header.every((l) => l.includes("█")));
 function openChat(updated: string | undefined, reason: string = "startup") {
   const notices: Array<[string, unknown]> = [];
   let rows: string[] = [];
+  let editorFactory: ((tui: any, editorTheme: any, keybindings: any) => any) | undefined;
   const handlers: Record<string, (event: any, ctx: any) => void> = {};
   installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } }, updated);
   handlers.session_start({ type: "session_start", reason }, {
@@ -72,9 +73,10 @@ function openChat(updated: string | undefined, reason: string = "startup") {
       notify: (message: string, type: unknown) => notices.push([message, type]),
       setHeader: (factory: any) => { rows = factory(undefined, theme).render(); },
       setFooter: () => {},
+      setEditorComponent: (factory: any) => { editorFactory = factory; },
     },
   });
-  return { notices, rows };
+  return { notices, rows, editorFactory };
 }
 
 const opened = openChat("0.84.4");
@@ -86,6 +88,93 @@ check("and the header stays the two rows it always was", 2, opened.rows.length);
 check("saying nothing about the harness itself", false, /harness/.test(plain(opened.rows.join("\n"))));
 check("a launch that moved nothing says nothing", 0, openChat(undefined).notices.length);
 check("and a reload, which installed nothing, does not repeat the notice", 0, openChat("0.84.4", "reload").notices.length);
+
+// The press the harness spends on nothing. With text in the editor and no answer
+// in flight every branch of its own escape chain declines, so the second press
+// inside the window is free and takes the editor's text. The decision is the
+// chunk, the editor's own state and the clock, so these drive the real subclass
+// against a stub terminal and a clock they hold still, rather than through a pty.
+// `onEscape` stands in for the handler the harness assigns: the production class
+// leaves the property undefined, which is what keeps the abort wired.
+// `app.interrupt` is the one action the parent asks about on every chunk it is
+// handed, so the stub's answers double as the record of which presses got there.
+function chatEditor(text: string = "") {
+  const parent: string[] = [];
+  const editor = openChat(undefined).editorFactory!(
+    { requestRender: () => {}, invalidate: () => {}, terminal: { setTitle: () => {} } },
+    { borderColor: undefined },
+    {
+      matches: (data: string, action: string) => {
+        if (action === "app.interrupt") parent.push(data);
+        return action === "app.interrupt" && data === "\x1b";
+      },
+    },
+  );
+  const aborts: string[] = [];
+  editor.onEscape = () => aborts.push("abort");
+  editor.setText(text);
+  let clock = 1_700_000_000_000;
+  const press = (chunk: string, elapsed: number = 0) => {
+    clock += elapsed;
+    const real = Date.now;
+    Date.now = () => clock;
+    try { editor.handleInput(chunk); } finally { Date.now = real; }
+  };
+  return { editor, aborts, parent, press };
+}
+
+check("the chat installs an editor of its own", true, chatEditor().editor instanceof DoubleEscapeEditor);
+
+const onePress = chatEditor("hello escape probe");
+onePress.press("\x1b");
+check("a single Esc leaves the text where it is", "hello escape probe", onePress.editor.getText());
+check("and reaches the handler that aborts an answer in flight", 1, onePress.aborts.length);
+
+const doublePress = chatEditor("hello escape probe");
+doublePress.press("\x1b");
+doublePress.press("\x1b", 250);
+check("a second Esc inside the window clears the editor", "", doublePress.editor.getText());
+check("and only the first press was spent on the abort", 1, doublePress.aborts.length);
+
+const slowPress = chatEditor("hello escape probe");
+slowPress.press("\x1b");
+slowPress.press("\x1b", 1000);
+check("two presses a second apart are two aborts, not a clear", "hello escape probe", slowPress.editor.getText());
+check("and both reached the abort", 2, slowPress.aborts.length);
+
+const popup = chatEditor("/co");
+(popup.editor as any).autocompleteState = "auto";
+popup.press("\x1b");
+popup.press("\x1b", 250);
+check("an open autocomplete owns the key, so the text survives", "/co", popup.editor.getText());
+check("and both presses went on to the popup rather than being swallowed", 2, popup.parent.length);
+
+// tmux writes a double tap as one chunk, which the harness's own double-escape
+// misses; a whole-chunk comparison against one escape would inherit that.
+const merged = chatEditor("hello escape probe");
+merged.press("\x1b\x1b");
+check("two escapes in one chunk clear the editor", "", merged.editor.getText());
+
+const sequence = chatEditor("hello escape probe");
+sequence.press("\x1b[A");
+sequence.press("\x1b", 10);
+check("an escape that opens a longer sequence is not a press", "hello escape probe", sequence.editor.getText());
+
+const empty = chatEditor("");
+empty.press("\x1b");
+check("an Esc on an empty editor is handed to the parent rather than swallowed", 1, empty.aborts.length);
+empty.editor.setText("a draft the abort put back");
+empty.press("\x1b", 10);
+check("and armed nothing, so a draft the abort restored survives the next press",
+  "a draft the abort put back", empty.editor.getText());
+
+const rearm = chatEditor("hello escape probe");
+rearm.press("\x1b");
+rearm.press("\x1b", 250);
+rearm.editor.setText("typed again");
+rearm.press("\x1b", 10);
+check("a clear disarms the window, so the next single press is an abort again",
+  "typed again", rearm.editor.getText());
 
 // The harness greets the operator with its own release notes when the version it
 // finds recorded is older than the one it runs, and this project is what moved
@@ -275,6 +364,7 @@ function chatOn(saved: Record<string, unknown>, model: { provider: string; id: s
       notify: () => {},
       setHeader: () => {},
       setFooter: (factory: any) => { render = factory(undefined, theme, { getGitBranch: () => null }).render; },
+      setEditorComponent: () => {},
     },
   };
   handlers.session_start({ type: "session_start", reason: "startup" }, ctx);

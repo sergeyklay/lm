@@ -99,9 +99,10 @@ above the prompt naming a command to run, and `bin/lm` sets `PI_SKIP_VERSION_CHE
 variable the program sets travels with the clone, where a settings key would have to be put on every
 machine by hand. In its place the launch reads the range `package.json` declares for the harness,
 asks npm's own configured registry which versions exist, so an operator on a private one is asked
-the same registry npm will install from, and takes the newest that range admits. `^0.84.3`
-carries every `0.84.x` by itself; the move to `0.85` is a commit, because that is the move that can
-break the extension this project registers. When the version it picks is the one already installed,
+the same registry npm will install from, and takes the newest that range admits. The range is a
+caret on a `0.x` version, so it carries every patch of the minor it names by itself, and moving it
+to the next minor is a commit, because that is the move that can break the extension this project
+registers. `grep -n 'pi-coding-agent' package.json` prints the range in force. When the version it picks is the one already installed,
 nothing is installed and nothing is said. Otherwise npm installs it into this clone alone, under
 `--no-save`, which leaves `package.json` and `package-lock.json` byte for byte as they were, so the
 operator's working tree stays clean and the range still says what the operator wrote. Because it

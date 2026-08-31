@@ -225,11 +225,23 @@ moves nowhere under any range. The two mutants above were re-derived against the
 unchanged by it: satisfying `*` in `pickTarget` still reddens five, and dropping the comparison
 against the installed version still reddens two, which come back `0.84.4` and `0.84.3`.
 
-The fifth is a zero this record can explain. `declaredRange` reading the repository rather than the
-clone reddens nothing at all, because this repository declares the same `^0.84.3` the fixture does,
-so no case can tell the two apart. What says it ran rather than missed is the pair: planted on top of
-the widened fixture, which alone reddens two, it reddens nothing, because the fixture's range is no
-longer what is read. The anchor rule earned its place here on the fixture rather than on the source -
+The fifth is a zero this record can explain, and the explanation is arithmetic rather than textual.
+`declaredRange` reading the repository rather than the clone reddens nothing at all even though the
+two disagree: this repository declares `^0.84.4` and the fixture `^0.84.3`, ranges that differ over
+exactly one version, `0.84.3` itself, and no case is placed to see that. The one that comes closest,
+`a launch already on the newest in range reports nothing`, publishes `0.84.3` alone and expects
+nothing under either range - under the fixture's because that version is already installed, under the
+repository's because it sits below the floor - so it survives by the other route rather than by the
+same one. The zero rests on the two ranges agreeing on every list the cases publish rather than on
+the declarations matching, and `package.json` is versioned, so what it rests on moves with a commit
+rather than with the machine. What says the mutant ran rather than missed is a read and a pair.
+Handed a clone carrying no `package.json` at all it still returns a range, and stepping the published
+list one version at a time pins that range to `>=0.84.4 <0.85.0`, which is the repository's
+declaration and nothing the clone could have supplied, where the unmutated line returns undefined for
+every one of those. Planted on top of the widened fixture, which alone reddens `a launch installs the
+target and reports the version it moved to` and `naming that version to npm and no other` as `0.85.0`
+and `["0.85.0"]`, it turns both green again, because the fixture's range is no longer what is read.
+The anchor rule earned its place here on the fixture rather than on the source -
 `grep -oF '"^0.84.3"' tests/chrome.mts | wc -l` returns 4, so the widening is planted on the whole
 declaration and not on the bare range three `pickTarget` cases pass as well.
 
