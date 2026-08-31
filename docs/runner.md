@@ -29,10 +29,21 @@ through `/model` and kept with Ctrl+S is an explicit choice, and `findInitialMod
 harness reads it from the settings file whenever no `--model` reaches `main()` ahead of it, so
 `bin/lm` hands the flag over only when there is nothing saved to overrule. A choice made any other
 way lasts the session and no longer, so the status row marks a model that will not come back:
-`session only · Ctrl+S` follows the name. A model that will come back carries nothing, because that
-is what the operator expects to have, and it is the saved choice where there is one and `LM_MODEL`
-where there is none. The settings file is read on the way in and again on every model change, and
-the keystroke fires that event too, so keeping a choice clears the mark where it stands. The list
+`session only · /model` sits ahead of the name. It names the route rather than the keystroke,
+because the keystroke does nothing at the prompt where the row is read: the only key dispatch there
+is for shortcuts an extension registered, and this one registers none. Ctrl+S works inside the
+`/model` dialog, which the operator opens by typing `/model` or with Ctrl+L, and that dialog draws
+`Enter to select · Ctrl+S to set as default · Esc to cancel` itself, so the keystroke is taught
+where it works. The mark leads rather than follows so the name keeps the columns it had: the slot
+is flush with the right of the row, so a mark after the name would shift the name every time a
+choice was kept or made. A model that will come back carries nothing, because that is what the
+operator expects to have, and it is the saved choice where there is one and `LM_MODEL` where there
+is none. Which of the two a model is cannot be learned from the harness's model-change event, which
+it withholds whenever the model chosen is the one already in force: saving the model the session is
+already on, the commonest save there is, is announced to nobody. So the row derives its own answer
+as it draws, and reads the settings file again only when that file's own modification time or size
+has moved. What it compares is a provider and a model together, which is how the harness saves a
+default, because one provider's model is not another's however alike the two names read. The list
 itself:
 the extension hands the harness a `refreshModels` function, which the harness calls in the
 background once at startup and again whenever `/model` opens, and which reads the names from

@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import { modelAtNextLaunch } from "./selection.mts";
+import { join } from "node:path";
+import { getAgentDir, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { modelAtNextLaunch, type ModelChoice } from "./selection.mts";
 
 // The mark is block glyphs coloured from the theme rather than from RGB: a
 // terminal without truecolor gets the theme's own approximation instead of a
@@ -107,10 +108,13 @@ export function footerLines(theme: any, width: number, c: Chrome): string[] {
   const thinking = c.thinking ? theme.fg("dim", `think ${c.thinking}`) : "";
 
   // Only the model that will not come back is marked: the saved case is the one
-  // the operator expects, and a row saying so would be noise.
+  // the operator expects, and a row saying so would be noise. The mark leads so
+  // that the slot grows leftward and the name keeps the columns it had, and it
+  // names the route rather than the keystroke, which does nothing at the prompt
+  // where this row is read.
   const model = c.saved
     ? bold(c.model)
-    : `${bold(c.model)}  ${theme.fg("dim", "session only · Ctrl+S")}`;
+    : `${theme.fg("dim", "session only · /model")}  ${bold(c.model)}`;
 
   return [
     threeSlots(width, bold(shortenCwd(c.cwd, homedir())), c.branch ? bold(c.branch) : "", model),
@@ -155,12 +159,41 @@ export function silenceChangelog(
   }
 }
 
-function modelThatReturns(cwd: string): string | undefined {
+function modelThatReturns(cwd: string): ModelChoice | undefined {
   try {
     return modelAtNextLaunch(SettingsManager.create(cwd));
   } catch {
     return undefined;
   }
+}
+
+// The keystroke writes the settings file without always announcing it:
+// `_emitModelSelect` in the harness returns early when the model being saved is
+// the one already in force, which is the save the operator makes most often. So
+// the answer is derived where the row is drawn rather than taken from the event,
+// and the file's own mtime and size are what say the last answer still holds.
+function settingsStamp(): string | undefined {
+  try {
+    const s = statSync(join(getAgentDir(), "settings.json"), { throwIfNoEntry: false });
+    return s && `${s.mtimeMs}:${s.size}`;
+  } catch {
+    return undefined;
+  }
+}
+
+// The stamp is taken before the read, so a write that lands between the two is
+// read again on the next frame rather than cached as current.
+function watchModelThatReturns(cwd: string): () => ModelChoice | undefined {
+  let stamp = settingsStamp();
+  let choice = modelThatReturns(cwd);
+  return () => {
+    const now = settingsStamp();
+    if (now !== stamp) {
+      stamp = now;
+      choice = modelThatReturns(cwd);
+    }
+    return choice;
+  };
 }
 
 function compactionEnabled(cwd: string): boolean | undefined {
@@ -401,14 +434,6 @@ export function installChrome(pi: any, updated?: string): void {
   // nothing never sets one, and the block goes out in plain text.
   let ink: Ink | undefined;
 
-  // The model a next launch will open on. `Ctrl+S` writes it, and fires the same
-  // event a choice kept for the session alone does, so the file is read again on
-  // both rather than trusted from the launch.
-  let comesBack: string | undefined;
-  pi.on("model_select", (_event: any, ctx: any) => {
-    comesBack = modelThatReturns(ctx.cwd);
-  });
-
   // The same event fires for a reload and for each of the three ways a session
   // is replaced, where the chat carries on and a closing block would be a lie.
   // Only quitting ends the session, and the harness has already stopped the TUI
@@ -447,7 +472,7 @@ export function installChrome(pi: any, updated?: string): void {
     // because the same event fires again for a reload that installed nothing.
     if (updated && event?.reason === "startup") ctx.ui.notify(`harness updated to ${updated}`, "info");
     const autoCompact = compactionEnabled(ctx.cwd);
-    comesBack = modelThatReturns(ctx.cwd);
+    const comesBack = watchModelThatReturns(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
       ink = {
         bold: (text: string) => theme.bold(theme.fg("text", text)),
@@ -460,6 +485,7 @@ export function installChrome(pi: any, updated?: string): void {
       render: (width: number) => {
         const usage = ctx.getContextUsage();
         const { input, output } = totals(ctx.sessionManager.getEntries());
+        const next = comesBack();
         return footerLines(theme, width, {
           cwd: ctx.sessionManager.getCwd(),
           branch: footerData.getGitBranch(),
@@ -468,8 +494,12 @@ export function installChrome(pi: any, updated?: string): void {
           contextWindow: usage?.contextWindow ?? ctx.model?.contextWindow ?? 0,
           autoCompact,
           // Both unknowns are a claim this cannot make: a settings file it
-          // could not read, and a session with no model to compare.
-          saved: comesBack === undefined || ctx.model === undefined || ctx.model.id === comesBack,
+          // could not read, and a session with no model to compare. The provider
+          // is half of what names a model, so it is compared too.
+          saved:
+            next === undefined ||
+            ctx.model === undefined ||
+            (ctx.model.id === next.model && ctx.model.provider === next.provider),
           input,
           output,
           thinking: ctx.model?.reasoning ? ctx.thinkingLevel : undefined,

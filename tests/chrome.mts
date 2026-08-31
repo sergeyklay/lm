@@ -202,15 +202,22 @@ check("and an unknown context prints a question mark", true,
 check("a repository-less directory drops the branch", false,
   plain(footerLines(theme, 78, { ...chrome, branch: null })[0]).includes("main"));
 
-// A model chosen inside the chat and not kept dies with the session, and the
-// keystroke that keeps it is the harness's own. The row says so on that case
-// alone: a model that will come back is what the operator expects to have.
+// A model chosen inside the chat and not kept dies with the session, and the row
+// says so on that case alone: a model that will come back is what the operator
+// expects to have. The mark names `/model`, which is the route from the prompt
+// where the row is read; the keystroke that keeps a choice is inert there and
+// the dialog teaches it where it works.
 const unsaved = footerLines(theme, 78, { ...chrome, saved: false });
 check("a model that will not come back is marked as the session's alone", true,
-  plain(unsaved[0]).trimEnd().endsWith("qwen3.8:27b  session only · Ctrl+S"));
+  plain(unsaved[0]).trimEnd().endsWith("session only · /model  qwen3.8:27b"));
 check("in dim, beside the name it is about", true, styled(unsaved[0], "dim"));
 check("and a model that will come back carries nothing", false,
   plain(rows[0]).includes("session only"));
+// The mark leads, so the slot grows to the left and the name does not move
+// under the operator as a choice is kept or made.
+const nameColumn = (row: string) => plain(row).indexOf("qwen3.8:27b");
+check("and the name stands in the same columns whether the mark is drawn or not",
+  nameColumn(rows[0]), nameColumn(unsaved[0]));
 
 // A narrow terminal loses the middle first and the right slot second, and never
 // wraps: a wrapped status row pushes the chat off the screen.
@@ -265,11 +272,19 @@ const recorded = statSync(settingsFile).mtimeMs;
 changelog("0.84.4");
 check("recording the same version again does not touch the file", recorded, statSync(settingsFile).mtimeMs);
 
-// Which model comes back is the settings file's answer, so the chrome reads
-// that file rather than being told: on the way in, and again on every model
-// change, because Ctrl+S writes it through the event a session-only choice
-// fires too. Against the harness's own reader, in the scratch directory above.
-function statusModel(saved: Record<string, unknown>, model: string, kept?: Record<string, unknown>): string {
+// Which model comes back is the settings file's answer, so the chrome reads that
+// file rather than being told. It cannot be told: the harness emits no
+// `model_select` when the model saved is the one already in force, which is the
+// commonest save there is, so the row re-derives its answer as it draws. Against
+// the harness's own reader, in the scratch directory above. `kept` is a second
+// settings file written after the row has been drawn once and before it is drawn
+// again, with no event of any kind in between.
+function statusModel(
+  saved: Record<string, unknown>,
+  model: string,
+  kept?: Record<string, unknown>,
+  provider = "ollama",
+): string {
   writeFileSync(settingsFile, JSON.stringify(saved));
   const handlers: Record<string, (event: any, ctx: any) => void> = {};
   installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } });
@@ -277,7 +292,7 @@ function statusModel(saved: Record<string, unknown>, model: string, kept?: Recor
   const ctx = {
     hasUI: true,
     cwd: ROOT,
-    model: { id: model },
+    model: { id: model, provider },
     getContextUsage: () => undefined,
     sessionManager: { getCwd: () => ROOT, getEntries: () => [] },
     ui: {
@@ -287,10 +302,8 @@ function statusModel(saved: Record<string, unknown>, model: string, kept?: Recor
     },
   };
   handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
-  if (kept) {
-    writeFileSync(settingsFile, JSON.stringify(kept));
-    handlers.model_select({ type: "model_select", source: "set" }, ctx);
-  }
+  render(78);
+  if (kept) writeFileSync(settingsFile, JSON.stringify(kept));
   // The row is the directory, the padding, then the slot this is about.
   return plain(render(78)[0]).trimEnd().split(/ {3,}/).pop() ?? "";
 }
@@ -298,13 +311,20 @@ function statusModel(saved: Record<string, unknown>, model: string, kept?: Recor
 process.env.PI_CODING_AGENT_DIR = agentDir;
 process.env.LM_MODEL = "phi3:mini";
 const KEPT = { quietStartup: true, defaultProvider: "ollama", defaultModel: "gpt-oss:20b" };
-check("the chat marks a model the settings file does not name", "gpt-oss:20b  session only · Ctrl+S",
+check("the chat marks a model the settings file does not name", "session only · /model  gpt-oss:20b",
   statusModel({ quietStartup: true }, "gpt-oss:20b"));
 check("and says nothing of the one a launch with nothing saved opens on", "phi3:mini",
   statusModel({ quietStartup: true }, "phi3:mini"));
 check("a saved choice is the model that comes back", "gpt-oss:20b", statusModel(KEPT, "gpt-oss:20b"));
-check("and the file is read again on a model change, so keeping one clears the mark", "gpt-oss:20b",
+// The save the operator makes most often is on the model already in force, and
+// the harness announces that one to nobody. The row has to see it anyway.
+check("a save the harness never announces still clears the mark", "gpt-oss:20b",
   statusModel({ quietStartup: true }, "gpt-oss:20b", KEPT));
+// A default is a provider and an id together, and the harness writes the pair.
+// One provider's model is not another's, however alike the two names read.
+check("and a same-named model under another provider is not the one saved",
+  "session only · /model  gpt-oss:20b",
+  statusModel({ quietStartup: true, defaultProvider: "openrouter", defaultModel: "gpt-oss:20b" }, "gpt-oss:20b"));
 delete process.env.LM_MODEL;
 delete process.env.PI_CODING_AGENT_DIR;
 

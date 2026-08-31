@@ -258,19 +258,28 @@ suite. Gating on the occurrence count rather than on the patch's exit status ref
 given size is `node tests/chrome.mts | grep -c '^ok'`, which only grows and is read rather than
 quoted.
 
-The status row says when the model on it will not come back, so its group is over `footerLines`
-and `installChrome` in `src/chrome.mts` and `modelAtNextLaunch` in `src/selection.mts`. Five
-mutations, each predicted by case name before it was planted, each gated by importing the mutated
-file on an absolute path, and each confirmed by the value the mutated line produced. Drawing the
-hint unconditionally reddens five cases, the two that read a saved row among them, because a model
-that comes back then carries the mark as well. Drawing it on the saved state instead reddens those
-five and three more, which is the sharper kill: it is the only mutant that reddens both arms at
-once. Changing the string reddens exactly the two cases that read it. Making the `model_select`
-handler return a sentinel rather than re-read the settings file reddens exactly the case that
-rewrites that file and fires the event, which is the case that exists because the harness emits the
-same event for a choice kept for the session and for one the keystroke persisted. The fifth is the
-builder's own default: `saved: false` in the footer object reddens three, and it is what proves the
-row is drawn from the settings file rather than from the fixture.
+The status row says when the model on it will not come back, so its group is over `footerLines` and
+`installChrome` in `src/chrome.mts` and `modelAtNextLaunch` in `src/selection.mts`. Five mutations,
+each predicted by case name before it was planted, each gated by importing the mutated file on an
+absolute path, and each confirmed by the value the mutated line produced. Drawing the mark
+unconditionally reddens four cases, three of which read a saved row; it leaves green the case
+requiring the row to end in the model name, because the mark now leads the name instead of following
+it, and that case stopped being a detector of the mark when the mark moved. Drawing it on the saved
+state instead reddens those four and four more, which is the broadest kill: it is the only mutant
+that reddens both arms at once. It was predicted to redden nine and reddened eight, and the survivor
+is the correction worth keeping: the case pinning that the name stands in the same columns whether
+the mark is drawn or not holds under a swap of the arms, because a mark ahead of the name inside a
+slot flush with the right of the row moves the name in neither state. Only the mutant that puts the
+mark back after the name reddens that case, and it comes back reporting column 44 where the case
+wants 67, which is the measurement behind the mark's position. That mutant reddens four in all:
+three cases that read the mark beside the name and the one that reads the column. Suppressing the
+check on the settings file's modification time and size, so the cached answer is never re-read,
+reddens exactly the case that rewrites that file between two renders and fires no event, which is
+the case that exists because the harness emits no model-change event for a save on the model already
+in force. Dropping the provider from the comparison reddens exactly the case that saves the same
+model name under another provider. There is no event handler left in this group to mutate: the row
+re-derives its answer as it draws, so a handler for the event would be a second source for a value
+that already has one.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
