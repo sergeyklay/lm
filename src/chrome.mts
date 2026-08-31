@@ -411,6 +411,31 @@ export function dropHarnessResume(out: { write: (chunk: any, ...rest: any[]) => 
   };
 }
 
+// The harness repaints the title after every handler that could set one —
+// measured at one paint on the way in and two on a session switch, the last of
+// them after the rebind has re-emitted `session_start` — so a title set from an
+// event holds until the next repaint and no longer. Its repaints carry the name
+// instead: the leading word is replaced and the session name and directory it
+// composed beside it are left alone. The wrap is marked because the event fires
+// for every session and again for a reload, while the stream is the process's
+// own and is wrapped once.
+const TITLE = /^\x1b\]0;([^\x07]*)\x07$/;
+const OWNED = "lmTitle";
+
+export function ownTitle(out: { write: (chunk: any, ...rest: any[]) => boolean }): void {
+  const original = out.write;
+  if ((original as any)[OWNED]) return;
+  const write = function (this: unknown, chunk: any, ...rest: any[]): boolean {
+    const painted = typeof chunk === "string" ? TITLE.exec(chunk) : null;
+    if (!painted) return original.call(this, chunk, ...rest);
+    const parts = painted[1].split(" - ");
+    parts[0] = "lm";
+    return original.call(this, `\x1b]0;${parts.join(" - ")}\x07`, ...rest);
+  };
+  (write as any)[OWNED] = true;
+  out.write = write;
+}
+
 const DOUBLE_ESCAPE_MS = 500;
 
 // A press is not always a chunk of its own — tmux writes a double tap as one —
@@ -489,6 +514,7 @@ export function installChrome(pi: any, updated?: string): void {
   // factory.
   pi.on("session_start", (event: any, ctx: any) => {
     if (!ctx.hasUI) return;
+    ownTitle(process.stdout);
     // The session is already on the version this names, so it reports rather
     // than instructs, and it is a system message rather than a row of chrome:
     // the header is what the screen always says, and this happened once. `info`
