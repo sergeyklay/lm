@@ -1,10 +1,6 @@
 # Adding a tool
 
-Drop one file into a `tools/` directory. Nothing else changes: the index is the directory
-listing. Which directory is listed is the registry, and [running a verb](verbs.md) fixes that:
-the `tools/` of the repository you are standing in, unless `LM_TOOLS` names another directory
-instead. A project with neither has no verbs, and `lm` says so rather than answering out of some
-other project's.
+Drop one file into a `tools/` directory. Nothing else changes: the index is the directory listing. Which directory is listed is the registry, and [running a verb](verbs.md) fixes that: the `tools/` of the repository you are standing in, unless `LM_TOOLS` names another directory instead. A project with neither has no verbs, and `lm` says so rather than answering out of some other project's.
 
 ```bash
 name="verb"
@@ -18,39 +14,19 @@ render()   { :; }   # show the result to the human
 apply()    { :; }   # perform the side effect
 ```
 
-A verb is called as `lm <verb> [flags] [text]`, in any order. The runner takes `--dry-run`
-for itself and checks every other flag against `flags`, so a typo is refused rather than
-read as words. A flag the tool declared arrives as a variable, not as an argument:
-`--force` becomes `LM_FORCE=1`. Only text reaches `collect`, and text after `--` is text,
-dashes and all.
+A verb is called as `lm <verb> [flags] [text]`, in any order. The runner takes `--dry-run` for itself and checks every other flag against `flags`, so a typo is refused rather than read as words. A flag the tool declared arrives as a variable, not as an argument: `--force` becomes `LM_FORCE=1`. Only text reaches `collect`, and text after `--` is text, dashes and all.
 
-`lm <verb> --help` is generated from what the file declares — `name`, `description` and `flags` —
-so no verb writes a help handler. A declared flag is named there and not described, because the
-declaration carries its name and nothing else.
+`lm <verb> --help` is generated from what the file declares (`name`, `description` and `flags`), so no verb writes a help handler. A declared flag is named there and not described, because the declaration carries its name and nothing else.
 
-`schema()` is compiled to a GBNF grammar before the model is called, so a shape the
-compiler rejects costs the whole request: `HTTP 400 failed to parse grammar`, ahead of any
-prefill. Two limits bind every schema, at any depth. A `pattern` opens with `^` and closes
-with `$`, and uses no PCRE shorthand: `\d`, `\w` and `\s` all fail, including inside a
-character class, so write `[0-9]`. A `maxLength` of 2000 or more fails the same way; 1999
-passes. Worse than either is a pattern the compiler neither rejects nor supports:
-`^(?=.*z).*$` returns 200 and constrains nothing, so a new `pattern` is worth one throwaway
-call before it ships.
+`schema()` is compiled to a GBNF grammar before the model is called, so a shape the compiler rejects costs the whole request: `HTTP 400 failed to parse grammar`, ahead of any prefill. Two limits bind every schema, at any depth. A `pattern` opens with `^` and closes with `$`, and uses no PCRE shorthand: `\d`, `\w` and `\s` all fail, including inside a character class, so write `[0-9]`. A `maxLength` of 2000 or more fails the same way; 1999 passes. Worse than either is a pattern the compiler neither rejects nor supports: `^(?=.*z).*$` returns 200 and constrains nothing, so a new `pattern` is worth one throwaway call before it ships.
 
 `validate` prints violations rather than returning a boolean: the text is fed back to the model for the single retry.
 
 `apply` is the only function that talks to the human, and it does so through two functions the runner provides rather than through the terminal, because the terminal is not always the runner's to read: inside the chat the harness owns it. `confirm "text"` exits 7 when the human refuses, and [`verbs.md`](verbs.md) fixes what a refusal is: `n`, `no` or an empty line, against `y` or `yes` for consent, in either case, with anything else put back to them for as long as they keep giving it, since a confirmation runs after the model call and a typo is not a decision to throw a finished answer away. `ask "text"` prints one line of answer, so `labels=$(ask "Labels (bug, ci):")` works; an empty line is an answer and the tool decides what it means, while no answer at all exits 7 like a refused confirmation. Nothing in a tool file reads `/dev/tty` itself, and neither function exists in the four read-only phases, where a question would be asked before the human has approved anything. A tool file that calls one anyway is stopped there and the run exits 1 naming the function, because that is a defect in the tool file and not an answer the human withheld. The wording is the tool's: the runner never composes a question, because it would have to know what a tool's fields mean to ask about them.
 
-A tool refuses with `return 3` when there is nothing to work on, and `apply()` returns 8 when part
-of its work landed and the rest did not. Those two are the tool file's; the other codes are the
-runner's, and [`verbs.md`](verbs.md) lists them all.
+A tool refuses with `return 3` when there is nothing to work on, and `apply()` returns 8 when part of its work landed and the rest did not. Those two are the tool file's; the other codes are the runner's, and [`verbs.md`](verbs.md) lists them all.
 
-When `collect()` needs something the machine running the tests may not have, put the call
-behind a function so a fixture can replace it. `tools/issue.sh` reads the repository's labels
-through `_labels()` for that reason, and the three `issue` cases, which `ls tests/golden/*/*/env`
-names, define their own `_labels()` in `env`, so `gh` is never reached and the enum the
-case exists to pin is still built. Stubbing the seam beats skipping the case: a skipped case
-leaves the verb's most interesting path untested and says so only in passing.
+When `collect()` needs something the machine running the tests may not have, put the call behind a function so a fixture can replace it. `tools/issue.sh` reads the repository's labels through `_labels()` for that reason, and the three `issue` cases, which `ls tests/golden/*/*/env` names, define their own `_labels()` in `env`, so `gh` is never reached and the enum the case exists to pin is still built. Stubbing the seam beats skipping the case: a skipped case leaves the verb's most interesting path untested and says so only in passing.
 
 ## Tests
 
@@ -74,913 +50,142 @@ node tests/catalogue.mts          # which models the chat offers, what each decl
 LM_LIVE=1 node tests/verb-live.mts  # the retry, the budget, a verb inside the chat and the shell beside it, on the real model
 ```
 
-`golden.sh` builds a fixture repository per case and pins what the verb does around the
-model: the prompt `collect` writes, the shape `schema` asks for, the violations `validate`
-reports and the artefact `render` assembles. `--update` rewrites the expectations; read the
-diff before committing them.
-
-Every group of checks below has been made to go red, and that record is what makes a green run of
-them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each
-kills a different subset of the group's seven cases in `tests/runner.sh`: dropping the trap kills
-six, blanking the `which` argument kills four, and dropping the table's exclusion kills one — the
-trap also kills `a --which run hashes its prompt`, which belongs to the hash group beside it. The
-`changelog` internal-symbol check reports nothing over every bullet the changelog has published:
-45 when it landed, 47 on 2026-08-26 by
-`awk '/^## \[Unreleased\]/{u=1;next} /^## \[/{u=0} !u&&/^- /' CHANGELOG.md | wc -l`, and it names
-the internal function the bullet that shipped in `v0.0.2` reached for, which
-`git log -S 'formats the command list' -- CHANGELOG.md` locates, while passing the replacement
-written by hand to fix it. Naming that function here in back quotes would publish it and turn the
-check off, which is why this paragraph does not. The option guard is another: deleting it from
-`bin/lm`, a mutation `node --check` accepts, kills four of the six `tests/cli.mts` cases that
-cover it and leaves the two asserting only the exit status, because the argument then reaches the
-shell runner as a tool name and is refused with 2 there instead. The status was never the
-property at risk. The hashes the record carries have a group of their own. Seven mutations of
-`log_run` and of the `--which` prompt that `bash -n` accepts were run against the eight cases
-covering them, and five discriminate to a single case: hashing a constant kills only the case
-that edits `collect`, the empty string in place of `null` kills only the run that never asked, a
-length of `0` for a missing answer kills only its own case, dropping the `--which` prompt kills
-only that one, and hashing an empty answer rather than nulling it kills only its own. Two are
-broad and worth knowing as such: pinning the length to `null` kills both length cases, and
-dropping the prompt hash kills four. Every one of the eight has been observed red.
-Over the model's own numbers: five mutations that `bash -n` accepts cover the twelve cases holding
-them, and the one the task itself
-named (feeding the column the wall clock instead of the reply's `total_duration`) turns four
-red at once, including the two that read `lm stats`. Replacing the accumulator instead of adding
-to it turns exactly the two summing cases red, treating an absent number as zero turns the two
-null cases red, averaging the missing in as zero turns only the `lm stats` case red, and pinning
-`ms` to zero turns only the case that says the operator's wait is inside it. All twelve have been
-observed red. Another covers the two settings that carry the answer budget and stop the model
-thinking, which `tests/request.mts` reads off a recording server rather than from a reply.
-Neither is in the runner's control flow, so a run without them still succeeds and simply grows
-past the budget again: removing the field that names the budget turns two of the four cases red
-and leaves the reasoning case green, and removing the reasoning setting turns that one red and
-leaves the budget cases green. On the real model the budget is what `tests/verb-live.mts` covers
-from the other side, and its three truncation cases were confirmed red both ways: without the
-budget field the answer completes and none of the three fires, and without the runner's own
-truncation arm the exit code is still 5, from the answer that never arrived, so only the case
-reading the message goes red. The code alone cannot tell the two apart, which is why a case
-reads the message. What the chat asks for has a group of its own, and part of it
-is an absence: `tests/chat-request.mts` reads the request off a recording server through two
-instruments, the whole program in print mode and a session on a model a catalogue refresh built.
-Twelve mutations that node loads were run against its fourteen cases. Declaring the chat's budget again
-turns three red, one per place a budget can be read. Ignoring the card's `thinking` capability, or
-declaring the effort field unsupported, each turn four red, the three level cases and the one that
-reads what the chat opens at; dropping the map that carries the closed level turns exactly one red,
-which is the case the whole declaration exists for; declaring every model thinking turns red the two
-cases for a card that claims none, the one asked on a refreshed session and the one that launches
-on it. Dropping the verb's own `maxTokens`, which is the regression
-this half most risks, turns one red here and five in `tests/request.mts`; ignoring `LM_THINK` turns
-red the one case that sets it, and thinking by default turns red the one that does not. Dropping the
-seed `bin/lm` writes, so the harness's own default decides again, turns red the one case that
-reads what the chat opens at and nothing at all in `tests/chat.mts`; ignoring
-`LM_MODEL` turns red the two cases that launch on a card claiming no thinking, and two more in
-`tests/chat.mts`. Emptying the
-tag list turns five red rather than the one predicted, and the surplus is the finding: with no
-catalogue the chat falls back to the single declared entry, so the levels stop reaching the wire as
-well as the refresh stopping. The mutant worth keeping is the one that moves the per-model
-declaration out of `catalogue()` and applies it at `bin/lm`'s registration instead: the print-mode
-case stays green and the three level cases go red, which is the whole reason the second instrument
-exists, because print mode never refreshes a catalogue and a fix verified there alone ships a chat
-whose own session never sees the declaration. Two cases survived every mutant and are controls
-rather than assertions: that the recorder saw a completions request, and that the session opened on
-one model. The case reading the refresh is not one of them: it is among the five the emptied tag
-list reddens. In `tests/catalogue.mts`, ignoring the capability, forcing
-it, and claiming it for a card that could not be read turn red one case each, in that order. Two
-cases there stand on the deadline the launch reads the catalogue under, and both are needed:
-dropping the signal from `bin/lm`'s call reddens only the case that runs the program against a host
-that accepts the connection and never answers, while dropping it from the `fetch` inside
-`catalogue()` reddens that one and the in-process case beside it. Neither mutant fails by itself —
-both hang — so each case is raced against a timer of its own and reports the timeout as a value,
-which is what turns a suite that would never finish into two named failures. In the
-status rows, swapping the two right slots back to the layout before them turns four of the
-`tests/chrome.mts` cases red — the model's row, the level's, the one reading the second row's grey,
-and the empty-slot case — and leaves the case reading the spend on the left green, because that slot
-did not move; filling the slot for a model with no level to report turns red that case alone. Over the verbs inside the chat: replacing the registration's walk
-over the registry with a filter naming the four tool files leaves every case green except the one
-that drops a fifth file in, which is the case that exists for it; making the channel's
-confirmation always answer yes *while the run has not asked for the capability* turns the two declining cases in `tests/registry.mts` red, and
-three in `tests/chat.mts`, while leaving the approving ones green; and unwiring the channel from the chat's side, so a verb falls
-back to the terminal, turns the live case reading exit 7 red while the case asserting nothing was
-applied stays green, because a question no one can answer fails the run anyway. Only the pair
-distinguishes a refusal the human made from a refusal the plumbing made. Over the
-difference between no answer and an empty one: sending an empty line where the channel should
-close turns both unanswered cases red and leaves both empty-answer cases green. The first attempt
-at that mutation is the warning worth keeping: restoring the swallowed `read` failure in the
-bridge crashed the suite with `ERR_STREAM_WRITE_AFTER_END` instead of failing a case, because a
-body that had already asked its next question was answered into a pipe the refusal had closed.
-That is a mutant that parses and does not run, and it also named a hole in the channel: it now
-tolerates being answered after it closes. Another covers the chat's own header and status rows,
-where three mutations each redden exactly one case and each was run before it was believed:
-guessing the auto-compact label instead of reading the setting reddens the case that asserts an
-unread setting prints no mode, right-aligning the branch reddens the case that pins it near the
-middle, and dropping the version reddens the case that reads the name.
-
-What the chat installs before it opens, and the row it draws when it did, is a group of its own in
-the same suite. The message is pure and the arithmetic is not: `updateHarness` reads the declared
-range and the installed version off a clone, so the registry, npm and the clone are all seams a case
-supplies and no case reaches any of the three. A case that left the clone to the repository it runs
-from would be arithmetic about the machine it ran on, and the chat installs the newest the range
-admits on every launch, so the moment the operator opens the chat the installed version catches up
-with the newest and the cases that need a launch to move have nothing to move to. Each
-`updateHarness` case therefore hands `clone` a directory under `mktemp -d` holding a `package.json`
-that declares `^0.84.3`, and the harness's own package.json under node_modules declaring `0.84.3`.
-Two suites drive the whole program through `bin/lm` and so pay the launch's own request: they point
-`npm_config_registry` at a refused port, because `PI_OFFLINE` would also switch off the catalogue
-read one of them exists to measure. Without that they install a release into the clone they are
-running against, which is how the leak was found. Six
-mutations, each predicted by case name before it was planted, each gated by importing the mutated
-file on an absolute path, and each confirmed by the value the mutated line produced. Satisfying `*`
-instead of the range `package.json` declares reddens five: the three that read the arithmetic and
-the two that watch what a launch hands npm, which come back `1.0.0` and `0.85.0` where the range
-admits `0.84.4`. Dropping the comparison against the installed version reddens the two cases that
-require a launch already on the newest in range to report nothing, and both come back naming the
-version they are already on. Rethrowing rather than swallowing reddens exactly the one case that
-hands the registry an error, and reddens it as `threw Error: no route to host` rather than by
-crashing the suite, because that case awaits a rejection it expects not to get. Of the line itself, six more, driven
-by handing `installChrome` a stand-in for the harness that records what it was notified of and what
-header it was given. Putting the line back into the header reddens four: the two holding the header
-to its two rows, the one requiring it to say nothing about the harness, and an older case requiring
-every header row to carry the mark, which a row of text does not - new code killed by a case nobody
-wrote for it, and the second entry in this file's record of why a prediction is written down first.
-Deleting the notify call reddens the three that read the notice, the version it names and the level
-it goes out at, each coming back undefined. Moving the level from `info` to `warning` reddens only
-the case that reads the level; adding a restart instruction to the message reddens the case that
-reads the message and the one that forbids the word, each leaving the other green, which is what
-says the text and its level are pinned apart rather than twice. Dropping the guard on the version
-reddens the case requiring a launch that moved nothing to say nothing, which comes back notifying
-`harness updated to undefined`, and dropping the guard on the `startup` reason reddens the case
-requiring a reload not to repeat it.
-
-Five further mutations cover that clone, each predicted by case name before it was planted, each
-confirmed by the value the mutated line produced, and each gated by importing the mutated file on an
-absolute path, except the two planted in the suite itself, which are gated on the run printing at
-least one `ok` line. `installedVersion` reading the repository rather than the clone the case handed
-it reddens exactly the three cases the fixture exists for - `a launch installs the target and reports
-the version it moved to`, `naming that version to npm and no other` and `a launch already on the
-newest in range reports nothing` - which come back `undefined`, `[]` and `0.84.3`. It is the one
-mutant here whose kill set depends on the machine, and it is the defect the fixture repairs. Widening
-the fixture's own declared range to `*` reddens the first two of those, which come back `0.85.0`
-where the range admits `0.84.4`, and leaves the third green, because a launch already on the newest
-moves nowhere under any range. The two mutants above were re-derived against the fixture and are
-unchanged by it: satisfying `*` in `pickTarget` still reddens five, and dropping the comparison
-against the installed version still reddens two, which come back `0.84.4` and `0.84.3`.
-
-The fifth is a zero this record can explain, and the explanation is arithmetic rather than textual.
-`declaredRange` reading the repository rather than the clone reddens nothing at all even though the
-two disagree: this repository declares `^0.84.4` and the fixture `^0.84.3`, ranges that differ over
-exactly one version, `0.84.3` itself, and no case is placed to see that. The one that comes closest,
-`a launch already on the newest in range reports nothing`, publishes `0.84.3` alone and expects
-nothing under either range - under the fixture's because that version is already installed, under the
-repository's because it sits below the floor - so it survives by the other route rather than by the
-same one. The zero rests on the two ranges agreeing on every list the cases publish rather than on
-the declarations matching, and `package.json` is versioned, so what it rests on moves with a commit
-rather than with the machine. What says the mutant ran rather than missed is a read and a pair.
-Handed a clone carrying no `package.json` at all it still returns a range, and stepping the published
-list one version at a time pins that range to `>=0.84.4 <0.85.0`, which is the repository's
-declaration and nothing the clone could have supplied, where the unmutated line returns undefined for
-every one of those. Planted on top of the widened fixture, which alone reddens `a launch installs the
-target and reports the version it moved to` and `naming that version to npm and no other` as `0.85.0`
-and `["0.85.0"]`, it turns both green again, because the fixture's range is no longer what is read.
-The anchor rule earned its place here on the fixture rather than on the source -
-`grep -oF '"^0.84.3"' tests/chrome.mts | wc -l` returns 4, so the widening is planted on the whole
-declaration and not on the bare range three `pickTarget` cases pass as well.
-
-The version the harness compares its own release notes against is a settings write rather than a
-screen, and its cases carry five mutants of their own. Deleting the write reddens the two that read
-what was written, one through a stand-in and one through the harness's own settings file. Dropping
-the gate on having installed something reddens the case requiring a launch that installed nothing to
-leave the recorded version alone, which comes back writing `null`. Dropping the equality guard
-reddens the case refusing a second write and the one reading the file's timestamp back. Replacing
-the whole condition with `true` reddens both of those, the case for a machine with nothing recorded,
-and the one for a launch that installed nothing. The last two also redden the case that hands the
-settings a reader which throws, predicted for neither: removing either guard removes the read, so
-the throw never happens and the write goes through. That case pins two properties rather than one,
-that the throw is swallowed and that the recorded version is read before anything is written, and
-the correction is the third entry in this file's record of why a prediction is written down first.
-Making the catch write rather than swallow reddens that case alone. One case here is killed by no
-mutant and cannot be: the one requiring the neighbouring setting to survive the write guards the
-harness's settings manager rather than any line in this repository, as the case beside it does for
-`quietStartup`.
-
-The trap in that series is the anchor for the last of them. `// The chat opens either way.` occurs
-twice in `src/chrome.mts`, the second in `silenceStartup`, so a patch taking the first match lands
-in code no case in this group reads and reports an empty kill set, which reads as a hole in the
-suite. Gating on the occurrence count rather than on the patch's exit status refuses it, and
-`grep -c '// The chat opens either way.' src/chrome.mts` returns 2. What the suite counts at any
-given size is `node tests/chrome.mts | grep -c '^ok'`, which only grows and is read rather than
-quoted.
-
-What the chat remembers is a settings write and not a screen, so its group is over `rememberModel`,
-`rememberThinkingLevel` and `installChrome` in `src/chrome.mts`. Eight mutations, each predicted by
-case name before it was planted, each gated by importing the mutated file on an absolute path, and
-each confirmed by the value the mutated line produced. Dropping the write on a model change reddens
-the two cases that read the provider and the model id back out of the settings file, and neither of
-the two that call the function directly. Writing the provider where the model id belongs reddens one
-of that pair and the case recording what the function was asked for, and leaves the other half of
-the pair green, which is why the provider and the id are read by two cases rather than by one.
-Writing the level under the wrong model key reddens four: the three that read the level back and the
-one that records the call. Writing that level as the harness's global default as well reddens
-exactly the case requiring no global default to be written, which is what separates a level one
-model comes back at from a level every model would come back at. Dropping the guard on a half-named
-level reddens exactly the two cases that record what the functions were asked for. Putting a mark
-back ahead of the model name reddens exactly the two cases that read the row's model slot, and none
-of the cases pinning the row's other slots, because the mark grows the right slot leftward and moves
-nothing else.
-
-The two mutants that drop a registration are the correction worth keeping. Aimed at the first shape
-of this group they returned an empty kill set, which reads as a suite with a hole in it: the cases
-reached the handlers by name, so a registration that was gone threw where it was planted and killed
-the suite on the way to the assertion. That is a crashing mutant wearing a survivor's clothes.
-Firing each event through the handler table instead, and pinning the table itself, turns each of
-them into a named set: dropping either registration reddens the case that reads which events the
-chat listens for, plus exactly the cases that read what that handler wrote. The anchor trap is here
-too: `model.provider, model.id` occurs twice in `src/chrome.mts`, once in each remembering function,
-so a patch taking the first match lands in the wrong one and reports a kill set for a property it
-never touched. Counting occurrences before patching refuses it, and
-`grep -oF 'model.provider, model.id' src/chrome.mts | wc -l` returns 2.
-
-What the chat opens thinking at is a settings write and not a flag, so its group is over
-`initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by
-case name before it was planted, each gated by importing the mutated file on an absolute path, and
-each confirmed by the value the mutated line produced. Handing `--thinking` over again reddens six
-of the group's eight cases in `tests/chat.mts`: the five that read the model flags, which pin the
-whole array, and the one that reads that no launch hands a level over. Seeding over a level already saved
-reddens exactly the case that saves `high` and reads it back, which comes back `low`. Seeding
-nothing reddens exactly the case that reads the seed, which comes back undefined. Seeding `medium`
-instead reddens that case and the one in `tests/chat-request.mts` that reads what the chat opens at
-off the wire. The fifth is the control worth keeping: `bin/lm` never calling the seed reddens
-nothing at all in `tests/chat.mts`, because every case there calls the function itself, and reddens
-that same single case in `tests/chat-request.mts`, which comes back `medium`, the harness's own
-default. The wiring is held by that one case and by nothing else, and its own gate is
-`node --check`, which works on `bin/lm` because `bin/lm` is not a `.mts` file. The trap in the group
-is the write: the harness queues it, so a case reading the settings file on the next line reads the
-file before it. A launch gets the flush for free from the work it does next; a case has to ask for
-it.
-
-The same suite covers the block the chat prints on quitting, over three transcript fixtures in the
-harness's own on-disk shape rather than sessions anyone ran: one where three tools run against a
-single model, one where two run across a model change, which is the only thing that exercises
-the table's second row and the total under it, and one holding a question and no answer, which is a
-session that never reached the model and reports nothing. Flipping the one tool result the first fixture
-records as failed reddens three cases: the one that reads the counts, and the pair that drives `lm`
-on a copy of the fixture through a pseudo-terminal and ends it with an end of input. It leaves green
-the case that derives an all-worked session from the same fixture, and that pair is what separates
-the count from the form it prints.
-
-Ten mutations of the block in `src/chrome.mts` each redden the set predicted for them before they
-were planted. Restoring the withheld failure clause reddens four, among them the two cases that
-exist because that clause used to be withheld. Dropping the cached half of a model's input reddens
-four, left-aligning the numeric columns reddens seven, and widening every column heading fourfold
-reddens those seven and the case that hands the block eighty columns and reads every row back inside
-them. Blanking the session
-identifier reddens five, printing the resume paragraph for a session with no record to name reddens
-only the case that counts the block's paragraphs, and collapsing the sitting to zero reddens four. Three narrow the attribution of a model's
-spend: ignoring usage an entry carries rather than a message reddens the two compaction cases,
-renaming the model in force before anything has declared one reddens the case that reads `unknown`,
-and dropping the declaration entry from the walk reddens the case written for it. That last is the
-one worth keeping: planted before that case existed it reddened nothing, because every assistant
-record in both fixtures names its own model, and the branch it removes decides only where a
-compaction lands before the first reply under a newly declared model. The case was written for the
-mutant rather than the other way round.
-
-Two further mutants redden nothing but the pseudo-terminal cases, and nothing else can: refusing the
-quit reason and inverting the guard on whether there is a UI both leave every assertion over the
-summary green, because a block that is never printed reads exactly like a block that is right until
-something reads the terminal back. One more is a control for the procedure rather than for the code:
-dropping the cached half of the input from the totals the status row is built from reddens nothing
-at all, though the footer read back through the pseudo-terminal shows `↑37.0k` where a clean run
-shows `↑40.0k`. Nothing in the suite reads what the status row counts. Of the duration forms,
-dropping the round-minute case reddens three: the case written for it and the two that read a whole
-number of minutes off the block.
-
-The block carries two elapsed figures, the sitting and the conversation behind it, and six further
-mutations separate them. Neutralising the condition for the second row reddens three, and swapping
-the two figures reddens the same three: the unit case that reads both rows, and the pair driven
-through the pseudo-terminal, which is the only place the two figures differ, because the fixture's
-own record is dated before any run of the suite and the sitting is the seconds the case spends in
-the chat. Opening the
-sitting at the launch whatever the session record says reddens two, the case that pins where a fresh
-sitting opens and the one that reads the whole head of the block off the fixture. Reporting the
-conversation whether or not the session outlived the launch reddens three, among them the case that
-exists because a fresh session prints one row. The sixth is the one worth keeping: opening a
-record-less sitting at the first entry, which is what shipped before, was predicted to redden only
-the case written for that fallback and reddened three, because a reopened session takes the same
-branch; narrowed to leave that branch alone, it reddens the one case and nothing else. A prediction
-short of the kill set is the finding, not the disappointment.
-
-The last two lines of the block are a command, and which of the two forms it takes depends on where
-the session is kept, so six further mutations separate them. Every case below reads that command;
-the ones added with it that read the block's counts instead survive all six. Printing the identifier whatever the
-directory says reddens five: the three unit cases holding a session outside the harness's default
-session directory, the one that quotes a path a shell would split, and the pair driven through the
-pseudo-terminal on a session `--session-dir` put elsewhere. Printing the file whatever the directory
-says was predicted to redden four and reddened five, and the surplus is the finding: a file path is
-longer than an identifier, so the case reading every row of an eighty-column block back inside it
-goes red beside them, which is the whole reason the identifier is the line where it resolves.
-Dropping the quoting reddens only the case with a space in the path, and reading a directory the
-harness will not answer for as the default one reddens only the case written for it. The last two are aimed at the method that
-decides, which the harness ships on the session manager and leaves out of the type it hands an
-extension: never calling it reddens exactly the two cases that reopen a session from the harness's
-own directory and no unit case at all, which is why that pair is driven through a pseudo-terminal
-rather than asserted over `summarize`; negating what it returns reddens all four pseudo-terminal
-cases at once, the two locations swapping lines, which is what says the method is answering rather
-than merely being present. The series was itself perturbed before it was believed: replanted on an
-anchor occurring seven times, the driver refused the mutation rather than patching the first hit,
-which is the zero this record would otherwise have had to explain.
-
-How wide the block is drawn is the terminal's answer rather than a constant of the source, and eight
-mutations of `src/chrome.mts` separate the reading from the fallback, the fallback from the floor,
-and both from what each consumer is handed. Moving the fallback from 80 to 100 reddens three: the
-two unit cases that hand `summaryBlock` no width and a width of zero, and the one that reads the
-handler's own block back when the terminal reports nothing. Moving the floor from 20 to 1 reddens
-two, the case pinning where the narrowing stops and the one requiring every row of the broken
-command to carry more than one character of the path. Reading the width with `??` in place of `||`
-reddens six, five of them the cases driven through a pseudo-terminal: under `script -qc`, which is
-how those cases run, `process.stdout.columns` reports `0` rather than `undefined`, so `??` takes the
-zero, floors every live case to twenty, and the rows those cases match on come out too narrow to
-hold what they match. `script -qc 'node -e "console.log(process.stdout.columns)"' /dev/null` prints
-`0` where the same program on a plain pipe prints `undefined`, which is the whole reason that
-resolution is written with `||`. The sixth is the unit case written for that zero. Dropping
-`process.stdout.columns` from the call site reddens one, the case reading which width the handler
-bounded the block by. Two say which consumer gets the width rather than the fallback: handing the
-spend table the fallback reddens two, the case reading the model column on a terminal wider than
-eighty and the one reading it on a terminal narrower than twenty, and handing the resume command the
-fallback reddens two, the case keeping the command on one row where the terminal is wide enough for
-it and the handler case again. Dropping the `Math.max` that keeps the model column at least its own
-heading wide reddens one, the narrow case that would otherwise be given a negative width. Dropping
-the `\` from the rows the command is broken across reddens seven: the six unit cases that read a
-broken command back, three of them through a shell that rejoins the rows, and the pseudo-terminal
-case that pastes what the screen printed.
-
-The model column is the only cell that can outgrow what the four fixed columns leave it, and three
-further mutations cover the elision that keeps it inside. Refusing to elide reddens four: the case
-reading the elided identifier, the one requiring the total row to line up beneath two of them, the
-one reading every row of an eighty-column block that names a 54-character model, and the narrow
-case. Dropping the re-measure of the column after the elision reddens exactly the same four, so
-nothing here separates a table that never elides from one that elides and then pads the column to
-the width it had before. Refusing to elide was predicted to redden five and reddened four, and the
-case it left green is the finding: two identifiers sharing a prefix are told apart by an un-elided
-table anyway, since they differ in their tails. Only eliding from the end rather than the middle
-reddens that one, beside the elided-identifier case and the narrow one, three in all. It is the case
-for the middle rather than the case for the elision.
-
-The command names `--resume` and prints over two lines in the theme's own grey, and nine further
-mutations across `src/chrome.mts` and `bin/lm` separate the three claims in that sentence. Writing
-the command as `lm --session` again reddens eight: the five unit cases that read the last paragraph
-of the block, the two driven through a pseudo-terminal that read it back off the screen, and the one
-counting the resume lines the screen ends on, which comes back 1 because the second line no longer
-carries the word. Printing the two lines with no colour on them reddens two, the unit case that
-reads the block built with a theme's grey and the pseudo-terminal case that reads the escapes back
-off a capture nothing stripped. Not keeping the theme at all, which is the other half of the same
-claim, reddens exactly that second one and no unit case, because every unit case hands the block a
-colour of its own: the block is written after the harness has stopped the TUI, and the only thing
-that can say the header callback kept one for then is a terminal read back with its escapes still
-in it. The five cases that hold the block to what it says survive all three, and the case that quits
-a session holding a question and no answer survives them too.
-
-Four aim at the translation in `bin/lm` and one at the case it exposed. A guard that matches neither
-`--resume` nor `-r` reddens four: the two `tests/cli.mts` cases that read back which session the
-harness was asked for, and the two pseudo-terminal cases that reopen a session by the command the
-block prints. Handing the identifier over and leaving a copy behind reddens three, the two
-pseudo-terminal cases again and the one requiring the reopened chat to have asked the model nothing,
-which is the case that would otherwise survive a mutant of the line it was written for: with the
-translation gone entirely the picker opens, no chat is reached, and a screen with no error on it
-reads exactly like a clean run. Dropping the guard on `--` reddens only the case that reads the
-words the chat was handed back off the harness's JSON mode, and the substitution it makes is visible
-in the failure - `--session,zzzmarker` where `--resume,zzzmarker` was typed - which is why that case
-reads the words rather than asking whether a session was looked up: the harness treats both as text,
-so no lookup happens either way. Taking a flag after `--resume` as the name it wanted reddens only
-its own case, which reads `--continue` back as the session the harness went looking for.
-
-The fifth is the finding. Reading a missing argument as an empty string was predicted to redden the
-case pinning that a bare `--resume` reaches the harness's own list, and reddened nothing: an empty
-name is one the harness reads as no session at all, so it opened a new chat and looked nothing up,
-which is what that case asserted. Two lines produce the same absence and the case could not say
-which. Rewritten to require the picker's own label on the screen, it reddens under the same mutant,
-because a translated bare flag opens a chat and draws no picker. The anchor rule earned its place
-here too, and by a route the earlier series did not meet: `dim(` occurs twice in `src/chrome.mts`
-and both occurrences are on one line, so a gate counting lines reports 1 and passes an anchor a gate
-counting occurrences refuses. Replanted there, the mutant meant for the command patched the label
-above it and returned the kill set of the colour mutant instead - two cases, a clean-looking kill of
-a property nobody was testing.
-
-The harness writes a resume line of its own after that one and the chat drops it as it is written,
-so six further mutations aim at the wrap that does the dropping. Never installing the wrap reddens
-exactly two, both driven through the pseudo-terminal: the case requiring the harness's line to be
-absent, and the one counting the resume lines on the screen, which comes back 2. Never restoring the
-original write reddens the two unit cases written for the restore and nothing driven through the
-terminal, because the process writes nothing after that line and exits, so only a second line like
-it, offered to a sink, says whether the wrap came off; under the mutant that sink still holds the
-chunk before it. Reading the chunk without stripping its escapes reddens four, since the harness
-dims its label and the line then no longer opens on the words the match is anchored to. Broadening
-the match to any chunk carrying `resume` reddens nine: this project's own block is written through
-the wrap deliberately, so a match loose enough to take the block takes it, and the eight cases that
-read the block off the terminal go red beside the unit case written for that property. The case
-counting resume lines survives that one and is worth knowing as coarse, because the harness's line
-prints once the wrap has come off on the block and the count is one either way. The fifth is the
-finding: dropping the guard that requires a text chunk was predicted to redden only the case that
-writes a buffer through the wrap and reddened two, the second being the case after it, which counts
-what the sink received and is one short because the throw happened before the buffer got there. That
-buffer case reads a throw as a value rather than letting it end the run, which is the whole reason a
-mutant crashing where it is planted still has a kill set anyone can attribute. The sixth aims at
-where the wrap is installed rather than at what it matches: installing it only once there is a block
-to print, which is what shipped before, reddens exactly one, the pseudo-terminal case that quits the
-session holding a question and no answer, which counts one resume line on the screen where a clean
-run counts none. Every case that reads a block off the terminal stays green under it, and that green
-is what says the moved call ran at all.
-
-The frame around the block is the last group, and nine mutations of `src/chrome.mts` separate what
-the rows are sized against from how they are drawn. Padding each row to the terminal rather than to
-the interior the frame leaves was predicted to redden three and reddened five, and the surplus is
-the finding: the two eighty-column bounds cases, `every row of it reads on an eighty-column
-terminal` and `and so does one naming the session by its file and the model by a 54-character
-identifier`, assert `visibleWidth(l) <= 80` over the whole row rather than over what the row says,
-so a frame drawn without measuring breaks them too. Five cases went red and every case
-reading what the block says stayed green, which is the shape a real kill has, and predicting from
-the frame's own cases alone is what misses the other two. The five are a subset rather than a
-share: what the suite holds at any size is
-`node tests/chrome.mts | grep -cE '^(ok|FAIL) '`, which only grows, so it is read rather than
-quoted.
-
-The other eight each reddened exactly the set predicted for them. Forcing the fit gate to `true`
-reddens the two written for it, `a terminal that cannot hold the frame is given the block without
-one` and `and wherever it is drawn it bounds every row to the terminal it was drawn for`. Removing
-the cap on the shared value column reddens four, and taking the table's shared floor to `0` reddens
-one, `and the table's model column is the shared one wide rather than a negative width`. Sizing the
-rule under the table's header to that header rather than to the table's span reddens nine. The last
-four redden a single case each and no two the same one: `.map(ink.accent)` for `.map(ink.bold)`
-reddens `the command that reopens the session is in the accent colour`, `ink.bold("Spend")` for
-`"Spend"` reddens `each section is headed in bold`, dropping the padding rows reddens `set off from
-the border by a blank row under it and another above the foot`, and leaving the top and bottom
-border uncoloured reddens `the frame and the rule under the table's header wear the border colour`.
-Four disjoint single-case kills is not a set a mutant that never ran can produce, and for the
-padding rows and the border colour the mutated file was read back as well rather than the patch's
-exit status trusted.
-
-This series gated on the import rather than on `node --check`, which exits 0 on a hard syntax error
-in a `.mts` file on `node v24.14.1`, and it required that import to catch `SyntaxError` in
-particular, proved first on the unmutated copy, which imports, and on a file with a syntax error,
-which does not. It reproduced the absolute-path trap this file already records. The anchor rule
-earned its place again, and by the same route the `dim(` anchor did: `ink.border(` occurs four
-times over three lines, so `grep -o 'ink\.border(' src/chrome.mts | wc -l` returns 4 where
-`grep -c 'ink\.border(' src/chrome.mts` returns 3, and replanted there the driver refused the
-anchor rather than patching the first hit.
-
-`node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it
-exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`,
-which every module under `src/` and `tests/` does, while the same bytes saved as `.mjs` are
-rejected as they should be. The gate that works is an import: `node -e 'import(process.argv[1])'`
-on the mutated file throws the `SyntaxError` `--check` swallowed. An ungated mutant that does not
-parse reddens every case at once, which is the shape that reads like coverage and demonstrates
-nothing, so a gate that never objects is worse here than no gate at all. Give that import an
-absolute path: handed `src/chrome.mts` it dies on `Cannot find package 'src'`, which is a gate that
-rejects every mutant including the ones that parse, and reads exactly like one that objects for the
-right reason.
-One group covers the one `apply` whose command line nothing else sees. Every other verb hands its
-command what `render` already printed, so the golden fixtures cover it without `git` or `gh` being
-called; `issue` assembles a `--label` list from what the human typed, and that list had only ever
-been read by eye. Four mutations of `tools/issue.sh` that `bash -n` accepts and that run: dropping
-the trim reddens only the case with a space after the comma, reading an empty reply as no labels
-reddens only the case that keeps what the model proposed, taking the word `none` literally reddens
-only its own case, and removing the confirmation from a run that did not ask for the capability reddens two (the exit code and the absence of
-the call), which is the pair worth having, because a verb that creates the issue and then asks is
-indistinguishable from one that asks first until the first time someone says no.
-
-Another covers the dialog a person answers, which nothing had ever driven: `tests/registry.mts`
-hands `applyAsk` an `Ask` of its own and never enters `src/chat.mts`, while the live case runs in
-print mode, where `hasUI` is false and the refusal is the runner's rather than a person's. The
-model is a recording server for these, because the subject is the dialog and not the answer. Six
-mutations of `src/chat.mts` and `src/registry.mts` that `node --check` accepts and that run, each
-confirmed by the dialog or the side effect the mutated line was supposed to produce: showing the
-tool's question without the artefact `render` printed above it reddens only the two cases that read
-what the human was shown; replacing the dialog with a refusal the chat makes on their behalf
-reddens the five approving cases and leaves the declining ones green; dropping the verb's name from
-the dialog's label reddens only the case that reads it; the chat no longer saying a refusal
-happened reddens only the two cases that read its words; sending an empty line where the channel
-should close reddens the three cases that hold no answer apart from an empty one, because the body
-then goes on to ask its second question and is answered; and a confirmation that always answers yes
-where the capability was not asked for reddens the declining cases here too. The first attempt at these is the warning worth keeping: the
-case that cleans up the approved run's artefact removed it without `force`, so a mutant that
-suppressed the side effect crashed the suite at that line rather than reddening a case, and a
-suite that dies partway prints a plausible run of `ok` lines and proves nothing.
-
-One group covers the one code no page carried. Three sites reach exit 1 and each now has a case
-asserting the digit rather than its inequality with zero: the `REFUSE` prelude spending it on a
-diagnostic, a body whose command fails, and a body killed before it can return a status. Three
-mutations of `src/registry.mts` that `node --check` accepts and that run, each reddening a
-different one: `REFUSE` exiting 2 reddens only the read-only case; `apply()` falling back to
-`r.status ?? 0` reddens only the killed case and leaves the failing body green, because that
-body's status was never null; and dropping `-e` from the shell `apply` runs under reddens the
-failing body and its sibling. The negative control is the part worth keeping: written as
-`status !== 0`, the read-only case survives `REFUSE` exiting 2 with no failure reported at all,
-so an assertion against zero cannot notice a code that changed to another non-zero one.
-
-The sample the clean column withholds itself below has a group of its own. Three mutations of
-`libexec/lm-stats` that `bash -n` accepts and that run, each confirmed to have executed by the
-column the mutated line printed: lowering the minimum to one reddens only the two-run case, with
-`100%` where the case wants `n<14`, and removing the conditional from the `awk` reddens exactly
-the same one the same way. Raising the minimum to 999 reddens both that case and the fourteen-run
-one, because the marker carries the number it withheld itself under, so both read `n<999`. The
-two run-count checks stay green under all three, which is what makes the share the thing being
-measured. The fourteen-run case is the positive control, and only the widening mutant reaches
-it: without that case the column could withhold every share it is ever asked for and a green run
-would report the withholding as correct.
-
-The same column split at a date has a group of its own, and it writes the log by hand rather than
-running a verb, because `libexec/lm-stats` reads nothing else. Five mutations of it that `bash -n`
-accepts and that run, each confirmed by the row or the message the mutated line printed: swapping
-the two periods reddens 6 of the 15 cases and leaves every argument case green; lowering the
-minimum to one reddens the 4 that expect a period to withhold itself, printing `100%` over
-thirteen runs and `n<1` over none; taking the repository filter off the split reddens exactly 1,
-where a record from another repository joins the later period; accepting any `--since` value
-reddens the 3 that refuse one, exiting 0 where they want 2; and removing the empty-`LM_LOG` guard
-reddens 1.
-
-Two first attempts are the warnings worth keeping, and they fail in opposite directions. The
-repository mutation was first planted at an anchor that appears in the table's own query as well,
-so it landed there, parsed, ran and killed nothing: zero kills is not a strong suite, it is the
-signature of a mutant that never reached the code the cases read. And the empty-`LM_LOG` case first
-asserted the exit code alone, which the very next guard produces as well, so removing the guard
-under test left the case green - a case that reads a status two lines can produce has to read the
-words too, or it cannot tell which line answered.
-
-Which caller a run came from is written by both runners and read by neither, so its group spans
-the three suites that hold the record's shape: `tests/runner.sh` for the shell writer,
-`tests/chat.mts` for the Node one, and `tests/stats.sh` for a log holding records written on both
-sides of the field's arrival. `tests/chat.mts` enters each caller the way it is entered in earnest,
-`bin/lm` as a process of its own against the registration the chat itself uses, over a fixture that
-refuses in `collect` so neither side reaches a model. Counted 2026-08-30 with `grep -c '^ok'` over
-each suite's output: `tests/runner.sh` at 91, `tests/chat.mts` at 31 and `tests/stats.sh` at 26.
-
-Eight mutations, each predicted by case name before it was planted, each gated, and each confirmed
-by the value the mutated line put in the record. On the Node side: the chat declaring no caller
-reddens 3, giving both callers `cli` and collapsing the case that requires the two records to
-differ in that one field; dropping the field from the record reddens 5, which is every case in the
-group but the one reading the workflow tag beside it; `runWorkflow` dropping the environment
-it is handed reddens only the case run by a workflow; and `callerOf` returning whatever it was given rather
-than a member of the set reddens only the case that hands it a name the set does not hold. On the
-shell side: the same widening reddens the same one case, dropping `caller` from the `jq` object
-reddens 4, and hardcoding `cli` reddens the 2 that expect something else, which is what says the
-two callers are pinned apart rather than merely pinned.
-
-The prediction that was wrong is the one worth keeping. Counting only records that carry a caller,
-in the table's own query in `libexec/lm-stats`, was predicted to redden the one case reading the
-runs column and reddened three: the `awk` reads that column as the denominator of the clean share
-too, so an older case pinning the share over a heap died with it. New code killed by a case nobody
-wrote for it, which is the second time this file records that shape.
-
-That mutant is also the group's only evidence for its control. `libexec/lm-stats` reads the field
-in a block of its own and nowhere in the table, so no mutation of what writes the field can redden
-the case that reads a log of both shapes through the table; the inserted filter is what shows the
-case could fail at all.
-
-That block has a group of its own, seven cases in `tests/stats.sh` over a log holding all three
-shapes at once: a run the chat ran, a run typed at the command line, and a run written before the
-field, which names neither. Four mutations of `libexec/lm-stats` that `bash -n` accepts and that
-run, each predicted by case name before it was planted and each confirmed by the line the mutated
-code printed. Counting the records that name no caller as the command line's reddens exactly the
-three cases whose logs hold such a record, printing `4 of 19` where the three-shape case wants
-`4 of 10`; dropping the block reddens all seven, including the one that reads the heading; and
-printing a share instead of the two counts reddens six, every one but the heading case, printing
-`40%` for the same log. The three cases whose logs name a caller on every record stay green under
-the first mutation and die under the third, which is what tells the narrowed denominator apart
-from the two counts. The control is the clean minimum lowered to one: it reddens the four cases
-in the group above that expect a period to withhold its share and leaves all seven of these
-green, so what the new cases read is the caller block and not the reader as a whole.
-
-The last group in the live suite covers the shell the chat carries beside the verbs, and its shape
-is a concession rather than a preference. Asked plainly to commit, this model reached for the shell
-in 4 of 6 sessions measured on 2026-08-27, taking the refusal at its word in the other two, so an
-assertion that it goes past would be red about a third of the time with nothing wrong here. What the two arms assert instead is the capability
-the page claims: with the shell, `HEAD` moves and no record the log holds accounts for it; with
-`--exclude-tools bash`, the same request reaches the verb, stops there and leaves `HEAD` where it
-started. Three mutations, each killing exactly one case and each confirmed by the row it printed:
-rewording the sentence out of `docs/verbs.md` reddens the case that reads the page; handing the
-shell arm `--exclude-tools bash` reddens the case that claims the shell moved `HEAD`; and blanking
-`LM_LOG` for the session reddens the case that asserts a record exists. That third one is why the
-record count is asserted separately from the records' exit codes: with an empty log the check that
-every record is non-zero passes over no records at all, and under the mutation it passed in exactly
-that way.
-
-Consent has two groups, because it has two halves. The capability needs no terminal, so
-`tests/registry.mts` drives `apply()` with and without it over a tool that both confirms and asks,
-and `tests/issue-labels.sh` drives the one tool whose command line depends on what the answer was.
-Four mutations, each killing exactly the predicted case names and each leaving every other case in
-the suite still reported rather than cut short: the unattended `confirm` refusing reddens 2, its
-`ask` answering `y` instead of an empty line reddens 1, `apply` ignoring the flag reddens the same 2
-as the first, and `apply` assuming yes for every run reddens the 2 that hold today's refusal down.
-The first attempt at the first is the warning worth keeping, and it is the second time this file
-records that shape: the case reading the artefact read it without `existsSync`, so the mutant
-crashed the suite at that line instead of reddening the case above it, and the kill set came back
-one name short of the prediction rather than wrong in a way anyone would notice.
-
-The two affordances are not one thing twice, so `tests/request.mts` drives the seam that reads them
-apart from the run that uses it: the flag alone, the variable alone, neither, and a variable set to
-something other than `1`. Three mutations, each killing exactly one of them - the seam ignoring the
-variable, the seam ignoring the flag, and the flag no longer reaching the tool's own shell.
-`lm ship --yes` has cases of its own in `tests/ship.sh`, because a workflow runs its verbs
-rather than letting anyone type a flag at them: `parseArgs` in `src/verb.mts` turns the flag into
-`LM_YES=1` in the environment `runWorkflow` hands each verb, the way that environment already
-carries `LM_WORKFLOW`. Dropping that assignment reddens the one case that counts how many verbs
-saw the variable. The mutation that reddens nothing is worth as much - forwarding `--yes` as an
-argument to each verb kills no case, because the runner declares that flag and every verb consumes
-it rather than refusing it, so the defect this group was first written for cannot happen on this
-driver at all. The case asserting the flag was not forwarded went for that reason, and a case that
-free text is forwarded took its place.
-
-The bounded wait is the other half, and `tests/consent.sh` cannot afford to wait for it: the bound
-is 120 seconds, so its cases take the shipped text of the reading functions out of the shell runner
-and substitute only the number, which leaves the number itself to cases that grep for it in both
-runners. `bash tests/consent.sh | grep -c '^ok'` counts them, at 67 on 2026-08-30. The number they
-substitute is five seconds and not one, because the bound is a deadline for the whole confirmation
-rather than for each reading: a case that answers three times and reads the re-ask between each has
-to fit every answer and every wait inside the one number, and at one second the later answers
-arrived after it had already passed. That reads as a broken loop rather than as a bound too small
-for the case, so the substituted number is itself part of what the cases assert. The extraction is
-one `sed` range from `_read` to `ask`, so a function added between them is carried along rather than
-left out of every driven case without saying so - which is what a two-range extraction did, and
-which is why `_deadline` sits between `_read` and `_verdict` rather than beside the constant it
-reads. The split is deliberate and it is also a limit worth stating: the shell runner's lines are
-driven under a pty and the Node runner's are read rather than driven, because the two are built from
-the same shape and only one of them is cheap to put a terminal in front of.
-
-Eleven mutations for the bound, each predicted by case name before it was planted. Computing the
-deadline inside `_read` instead of once per confirmation reddens 3, and it is the whole case for the
-deadline being total: the run that keeps typing past it stops returning 7 and returns the harness's
-124 instead, because a reading answered before its own bound expires never times out and the loop
-never ends. Taking the bound off the shell read reddens 3; deleting the shell line that says why the
-wait ended reddens 2; spelling the bound into the Node timeout line by hand reddens the 1 that names
-it; and taking the spaces out of the Node deadline's arithmetic reddens 2 while the same edit to the
-shell one reddens 1. Spelling a different bound into the shell deadline reddens the 5 behaviour
-cases while both text cases that grep for the number survive - which is what shows the text and the
-behaviour are checked separately rather than twice, and the same separation shows again in the two
-mutations that rewrite the remaining-time arithmetic without changing what it computes and redden
-exactly one text case each. One prediction was wrong and is the useful one. An expired deadline that
-forces a yes instead of exiting was predicted at 6 and reddened 4: `nobody typing reaches a
-decision` survived, because a first reading with the whole bound still in front of it times out
-inside `read -t` and never reaches the branch that runs when nothing is left, and `and without it
-the same run still refuses` died unpredicted, because the unattended script carries the reading
-functions without the constant, so its deadline is the epoch and every reading takes that branch.
-
-Two harness faults cost more than the kills. The feeder holding the pty open ended before the
-harness did, so the blocked read hit end of input and exited 7 by that route, and a case reading
-only the status reported a bound that was not there. And a series killed by the tool's own wall
-clock left a mutant in the working tree twice, the second time with `trap ... EXIT INT TERM`
-installed, which did not fire: what proves a restore is `cmp` against the pre-series copy in the
-same command, never a trap and never the intention to restore.
-
-What the answer may say is the third half, and it is what the driven cases mostly are. Fourteen
-mutations of `_verdict`, `confirm` and the words the re-ask uses, each predicted by case name first.
-Narrowing the yes set to a bare lowercase `y` reddens 7; dropping the bare `y` from it reddens 16;
-widening the no set's verdict to a yes reddens 8. The pair that pays for the prompt counts is the
-narrowed no set, which reddens exactly 3: the text case and the two that count how often the
-question was put, while `the word no is a refusal` and `a bare empty line is a refusal` both
-survive, because a value that falls through to the re-ask still exits 7 when nobody answers the next
-one. A case reading only that status cannot say which line answered.
-
-The message and the loop are pinned apart, which is why the wording could change without the loop
-moving. Dropping the period from the shell message reddens 4; putting the `lm: ` prefix back on it
-reddens 5, one of them the case that reads that line whole and finds a program name on it that the
-program is standing at its own prompt to say; echoing the answer back beside the message reddens 4,
-because the terminal has already printed it; and wording the re-ask as a timeout reddens 8,
-including the three that a re-ask is not reported as one. Capping the loop at two readings reddens
-6 and breaking after the first reddens 12, and what separates the two sets is only what a third
-answer is allowed to do. Writing `[ "$v" = 2 ] || break` as an `if` reddens exactly one text case in
-each runner and nothing else, the loop being unchanged. The Node mutations in this group redden
-exactly their own text case each, which is the limit above restated.
-
-The registry is one directory, and the group that pins it is split across the two runners because
-the resolution is: `libexec/lm-verb` answers `--list` and `bin/lm` dispatches, and each resolves for
-itself. `tests/cli.mts` stands `lm` in five kinds of directory - a repository with no `tools/` of
-its own, one shipping a name the installation also ships, one shipping a name it does not, a
-directory that is no repository at all, and a run with `LM_TOOLS` set - and `tests/registry.mts`
-drives `list()` over one directory and over none. The group is 33 cases: the 30 at the end of
-`tests/cli.mts` from `a project with no tools of its own lists nothing` onwards, and 3 in
-`tests/registry.mts`. Counted 2026-08-30 with `node tests/cli.mts | grep -c '^ok'` at 72
-and `node tests/registry.mts | grep -c '^ok'` at 52.
-
-Twelve mutations, each predicted by case name before it was planted and each compared as a name
-set. The two that carry the change restore the fallback the registry no longer has. Making
-`registry()` in `bin/lm` answer with the installation's `tools/` when the project has none reddens
-5, every one of them a case that reaches the Node runner: the three that read `lm --help` in a
-project with no `tools/`, and the two that read what `lm commit` says and returns there. Making
-the shell runner's `DIR` fall back the same way reddens 6, and the two sets are disjoint: the three
-that read `--list`, the two that read the shell runner's own refusal, and the one that reads its
-usage. That each set belongs to one runner alone is what says the two are pinned apart rather than
-once, and it is also what the change cost: the case that asks both runners for the registry and
-requires the same answer now dies under neither, because it stands in a project that has a `tools/`
-and no resolver falls back there.
-
-Letting the project's `tools/` win over `LM_TOOLS` reddens 2 in `bin/lm`, both of them dispatch
-cases, and 1 in the shell runner, the case that reads the listing. Printing the verb heading
-whether or not there are verbs reddens 2, the case reading that the heading is absent and the case
-reading that nothing points at a description which is not there; printing the `Available:`
-announcement over an empty list reddens 1 in each runner; and printing the shell runner's own
-`Commands:` heading over an empty listing reddens 1. `list()` indexing every file rather than the
-`.sh` ones reddens the one case whose fixture carries a `notatool.txt`.
-
-Two are equivalent, and both sit on machinery a one-directory registry cannot exercise. Dropping
-the shell listing's `[ -n "$DIR" ] || return 0` kills nothing: with `DIR` empty the glob is
-`/*.sh`, which matches nothing, so the loop runs and prints the same nothing. The site is confirmed
-to have executed rather than assumed, by `bash -x` showing `for f in "$DIR"/*.sh` reached under
-the mutant where the intact file returns before it. Taking the sort off that listing kills nothing
-either: one directory's glob is already in order, so the sort guards against a locale rather than
-against an interleave, and the listing under the mutant is byte-identical.
-
-The warning worth keeping is the twelfth, a crashing mutant that reads as coverage from one side
-and as nothing from the other. Dropping `if (!dir) return [];` from `list()` makes
-`readdirSync(undefined)` throw. In `tests/registry.mts` that ends the suite at the case written for
-it: the run exits 1 after 51 `ok` lines with no `FAIL` line at all, so a harness reading case names
-sees an empty kill set while the exit status sees the kill. And in `tests/cli.mts` the two cases
-asserting `--help` names no verbs and no workflows both pass under it, because a `bin/lm` that
-throws prints nothing and an assertion of absence is satisfied by nothing. What catches it there is
-the one positive case beside them, that the rest of the help still prints. A section asserted
-absent needs a case asserting what is still present, or a crash reads as the feature working.
-
-Two harness faults cost more than several of the kills. The first series wrote each mutant's backup
-beside the file it was mutating, and `bin/lm.pre` reddened `bin holds one command`, a case about
-`ls bin/` that no mutant in the series could reach: a kill set carrying a name from outside the
-group is the harness reporting on itself. And `node --check` is not a parse gate for these files:
-it accepts a duplicate `const` in any `.mts` carrying an `import`, which is the error that stopped
-`tests/cli.mts` loading while it was being written, so what gated every Node mutant here is the
-suite printing at least one `ok` line, and the shell mutants were gated on `bash -n`.
-
-The twelve leave part of the group unreddened. Their kill sets, unioned by case name, cover 17 of
-the 33, counting the one killed as a crash. The 16 that stand are the ones a mutation of the
-resolvers cannot reach: that a project's own file is what runs, what its refusal returns, what its
-generated help says, and that a workflow resolves its verbs through the same registry. Each is
-pinned by a fixture rather than by a resolver, which is why a series aimed at the resolvers misses
-them.
-
-The delivery has a group of its own, and it sits on the driver the operator uses rather than
-beside it. `tests/ship.sh` runs `bin/lm ship` into `runWorkflow` over `tools/ship.sh`, with
-`commit` and `pr` written as tool files of the suite's own and a recording server answering the one
-model call each makes, so every line a delivery runs is run here and none of it needs a GPU.
-`grep -c '^check ' tests/ship.sh` counts the cases, at 61 as this is written.
-
-Twenty-six mutations beside the two on `--yes` above, each predicted by case name before it was
-planted, each gated on the anchor occurring exactly once under `grep -oF ... | wc -l`, and each
-compared as a name set rather than a count. Re-derived in full 2026-08-30, because the cases the
-verb's own group added moved most of the earlier kill sets.
-
-The workflow's own lines, one property each. Taking the `git switch -q -c` out of `prepare()`
-reddens five: the two that read `main` after a run and the three that read the branch an exit-8 run
-left, and not the case reading the branch name, because `after_commit` renames whatever branch is
-current, so a commit made on `main` still ends up on a branch called after its subject. Dropping
-`LM_WORKFLOW` from the environment `runWorkflow` builds reddens five, the two that read the tag and
-the three that look the placeholder up by name. Dropping the `--dry-run` guard from the workflow's
-own `step()` reddens the three rehearsal cases that read the branch and the reflog; the tree cases
-survive it now, because `prepare()` no longer writes to the tree. Removing the line that says the
-workflow's own steps did not run reddens only the case that reads it. `_name()` returning a
-constant reddens the case reading the branch name. Cutting the placeholder whether or not `--here`
-was given reddens the two `--here` cases that read a branch. Never calling `failed_<verb>` reddens
-the three that read what a refusal left behind. Deleting `git branch -q -D` from `failed_commit`
-reddens the two that read the branch list after a refusal. Dropping the free text from the
-arguments each verb is handed reddens the one that reads it. Dropping the runner's own `--dry-run`
-guard, in `src/verb.mts`, reddens the three rehearsal cases that read the commit and the tree.
-
-Three of those are broad and worth knowing as such: running only the first verb reddens six, the
-three that read `pr` and the three that count both verbs; swallowing a verb's non-zero status
-reddens thirteen, across the refusal, the clean-tree and both hook groups, because every non-zero
-in the suite travels the same line; and handing every verb `--dry-run` reddens twenty-nine, which
-is what covers every case saying a commit landed.
-
-Then the verb's own, which is where the cases that read a repository are. Committing the whole
-index instead of the group - dropping the `git reset -q --` narrowing in `apply()` - reddens
-fifteen, every case that reads how many commits landed or what one carried, and leaves the
-one-group case green: that control exists for this mutant, because with a single commit there is
-nothing to narrow and a wrong `apply()` looks exactly like a right one. Restoring `git add -A` to
-`prepare()` *behind its `--no-stage` guard* reddens **nothing**, which is the finding: the verb
-stages the same tree in `apply()`, so what the deletion buys is not the grouping but the flag's
-meaning. Staging in `prepare()` regardless of the flag reddens the two `--no-stage` cases.
-Dropping the moved-HEAD guard from `failed_commit()` reddens the three that read what an exit-8 run
-left on its branch, and leaves the two refusal cases green, because nothing landed in those.
-
-Two mutants aim at the hook contract and both redden exactly one case, `and the rejection was not
-retried`: retrying whichever way the probe answered, and probing the whole tree rather than the
-failing group. The second is `git diff --quiet` with no pathspec, which is the form measured
-2026-08-27 and wrong under an index `apply()` narrows per group. It needs saying how that case had
-to be built, because two earlier shapes of it reported a clean kill for nothing. The exit code
-cannot discriminate: a retried rejection lands nowhere either and reports 8 just the same, so the
-case counts the hook's own runs instead of reading a status. And the rejection has to fall on a
-group that is **not the last**, because only then is a later group's file dirty relative to the
-narrowed index; with the rejection on the last group the unscoped probe answers 0 like the scoped
-one and the mutant killed nothing at all. Measured 2026-08-30 in a throwaway repository: rejection
-on the last of three, whole tree 0 and `git diff --quiet -- c.txt` 0; rejection on the second of
-three, whole tree 1 and `git diff --quiet -- b.txt` 0.
-
-The deterministic half of the same verb is the nine `commit` cases under `tests/golden/commit`,
-which `ls tests/golden/commit | wc -l` counts, and six mutations cover them. Reading the index
-instead of the whole tree reddens fifteen expectations across five cases and leaves every
-`no-stage` one green, which is the subset that makes it a kill rather than a crash: under the flag
-the index is the input either way. Dropping the untracked half of the input alone reddens four, the
-prompt and the schema of the two cases that carry an untracked file. Dropping `files` from the
-schema item reddens all nine `schema` expectations and nothing else. Reading only the first group
-in `validate()` reddens the one case whose planted violation sits in the second, and leaves the one
-whose violation sits in the first green. Changing the `description` reddens the `tests/cli.mts`
-case that pins it. Rendering only the first group reddens six, and the sixth is a warning rather
-than a kill: on the zero-group case the mutant iterates once over a group that is not there and
-prints `null: null`, so it crashed where it was planted rather than truncating anything. Five of
-those six are the truncation the mutant was for; the prediction had named five and the sixth is why
-a kill set is compared by name.
-
-Two fixtures are shaped by mutants that had been too coarse to see, and both are worth reading
-before either is simplified. The rehearsal case reads `git status --porcelain` over a tree carrying
-a file staged and modified again on top of it and an untracked one beside it, because on a tree
-that is merely staged a mutation that stages changes nothing the case can see. And the
-`--no-stage` case reads the working tree rather than the index, because the index is empty both
-when nothing was staged and when what was staged has just been committed, so a mutation that
-stages everything leaves an index-reading case green.
-
-Nine cases no mutation in the series reddens, and they are controls rather than assertions: that a
-refusal leaves no commit, with and without `--here`; that the work is still staged after one; that
-a rehearsal exits 0, stages nothing and still prints what `commit` would do; that one group exits 0;
-and that the whole series came out of one model call. Each holds an absence or a completion that no
-mutation of the workflow can manufacture on its own.
-
-The release has a group of its own, and it is split the way a verb's always is here. The six cases
-under `tests/golden/release`, which `ls tests/golden/release | wc -l` counts, pin the four
-read-only functions; `tests/release.sh` drives `apply()`, which no fixture can reach because
-`confirm` reads `/dev/tty`. That suite runs the shell runner with `curl` stubbed against a
-repository under `mktemp -d` that has a bare remote of its own, so the two pushes are real and
-land nowhere anybody owns, and `npm install --package-lock-only` runs inside that repository with
-`npm_config_registry` pointed at a refused port. Counted 2026-08-30 with
-`bash tests/release.sh | grep -c '^ok'` at 44 and `bash tests/golden.sh | grep -c '^ok   release/'`
-at 30.
-
-Twenty mutations, each predicted by case name before it was planted, each gated on the anchor
-occurring exactly once under `grep -oF ... | wc -l` and on `bash -n`, and each confirmed by the
-value the mutated line produced.
-
-The answer's own shape. Widening the bump enum to free text reddens eight: all six `schema`
-expectations and the two cases that read the enum and the enumerated fields off the stubbed
-request. Dropping the `validate()` rule against a summary that names the version reddens exactly
-`release/rejected/violations`.
-
-The two versions of the same sentence are pinned apart, which is the point of having both. The tag
-message losing its `lm <version> - ` prefix in `apply()` reddens one, `and reads lm <version> -
-<summary>`; making the tag lightweight rather than annotated reddens that one and `the tag is
-annotated`. Rewording the commit subject `apply()` writes reddens one, `whose subject names the
-version`, while rewording the subject `render()` prints reddens eight: the two that read the
-rendered commit, from a run and from a rehearsal, and all six `render` expectations. Stripping the
-prefix from `render()`'s tag line reddens eight the same way.
-
-What `apply()` does to the repository, one property each. Not repairing the foot links reddens the
-two that read them; opening no dated heading reddens `the [Unreleased] section is emptied` and `the
-entries stand under a dated heading`; dropping `npm install --package-lock-only` reddens `and so
-does package-lock.json` and `and which carries the three together`, because a lock file that did
-not change is not in a commit made with a pathspec; not rewriting `package.json`'s version reddens
-those two and `package.json says the new version`; and removing both pushes reddens `the branch
-reached the remote` and `and so did the tag`.
-
-What `collect()` refuses, and where. Dropping the guard on a version that is not three numbers
-reddens three; no longer refusing a version the arithmetic cannot reach reddens five; and the
-operator's version no longer pinning the bump reddens `release/pinned/prompt` and `a named version
-pins the bump`.
-
-Four findings, and they are what the record is for. The first attempt at moving the `[Unreleased]`
-guard out of `collect()` and into `apply()` deleted the `local n; n=$(_entries)` line above it,
-which `collect()` reads three lines later, so under `set -u` every case died and 36 went red at
-once: a mutant that parses, crashes where it is planted, and reads as thorough coverage. Replanted
-so that only the `if` moves, it reddens three where five were predicted, and the two survivors are
-the finding: `an empty [Unreleased] exits 3` and `and says there is nothing under it` both stay
-green, because the guard in `apply()` exits 3 and says the same words. Only `before any model
-call`, which counts what the stubbed `curl` was asked, can tell the two placements apart. The same
-shape appears twice more and each time the survivor is named here rather than repaired: `no
-package.json exits 3` survives the removal of its own guard, because the version-shape guard below
-it exits 3 too, and `release/no-unreleased/prompt` survives the removal of the missing-section
-guard, because the empty-section guard below it refuses first; in both, the case reading the words
-is what dies.
-
-The third is the runner's. Moving `libexec/lm-verb`'s `--dry-run` guard to after `apply` was
-predicted to redden the four rehearsal cases that read the repository, and reddened five: `a cut
-exits 0` goes with them, because `(( DRY ))` moved to the end of the file becomes the last command
-the runner executes and a false arithmetic test exits 1. `a rehearsal exits 0` and `and says it did
-nothing` stay green under it, and that green is what says the moved line ran. The fourth is two
-under-predictions of the same kind: collect no longer saying which version the project is at was
-predicted at three and reddened four, and no longer refusing an unreachable version was predicted
-at three and reddened five, both times because the prediction was written from `tests/release.sh`
-alone and forgot the fixture case that covers the same line.
-
-Sixteen cases no mutation in the series reddens, and they are controls rather than assertions. Six
-hold what a refusal or a rehearsal leaves behind, which rests on the runner's own `confirm` and is
-covered where that lives. Eight are the `violations` and `stderr` expectations that are empty
-because the answer is clean or the verb said nothing, an absence no mutation of this verb can
-manufacture. The other two are `and lands exactly one commit`, which one `git commit` cannot fail
-to satisfy, and `one model call paid for all of it`, which is what makes every count beside it
-readable.
-
-`shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a
-defect to fix. Every tool reports `SC2148` because it carries no shebang, which is honest
-(`libexec/lm-verb` sources it and never executes it), and one `SC2034` per declaration the runner
-reads after sourcing and the file itself never uses: `name` and `description` everywhere, plus
-`flags` where a tool declares one. Measured 2026-08-30 across the five verbs with
-`for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: `changelog` four, `commit` four,
-`issue` three, `pr` three, `release` three. A tool reporting one more than its declarations account for carries
-something the others do not, and that is what to look at.
-
-`changelog` is the one, and its extra is a false positive worth leaving. Its validator matches
-the backticked spans in a drafted bullet, so the regex contains literal backticks inside single
-quotes, and `SC2016` reads those as a command substitution that will not expand. Quoting it any
-other way changes what the pattern matches. `shellcheck -f gcc tools/changelog.sh` names the
-line.
+`golden.sh` builds a fixture repository per case and pins what the verb does around the model: the prompt `collect` writes, the shape `schema` asks for, the violations `validate` reports and the artefact `render` assembles. `--update` rewrites the expectations; read the diff before committing them.
+
+Every group of checks below has been made to go red, and that record is what makes a green run of them worth anything. Of the three mutations of the `--which` logging that `bash -n` accepts, each kills a different subset of the group's seven cases in `tests/runner.sh`: dropping the trap kills six, blanking the `which` argument kills four, and dropping the table's exclusion kills one; the trap also kills `a --which run hashes its prompt`, which belongs to the hash group beside it. The `changelog` internal-symbol check reports nothing over every bullet the changelog has published: 45 when it landed, 47 on 2026-08-26 by `awk '/^## \[Unreleased\]/{u=1;next} /^## \[/{u=0} !u&&/^- /' CHANGELOG.md | wc -l`, and it names the internal function the bullet that shipped in `v0.0.2` reached for, which `git log -S 'formats the command list' -- CHANGELOG.md` locates, while passing the replacement written by hand to fix it. Naming that function here in back quotes would publish it and turn the check off, which is why this paragraph does not. The option guard is another: deleting it from `bin/lm`, a mutation `node --check` accepts, kills four of the six `tests/cli.mts` cases that cover it and leaves the two asserting only the exit status, because the argument then reaches the shell runner as a tool name and is refused with 2 there instead. The status was never the property at risk. The hashes the record carries have a group of their own. Seven mutations of `log_run` and of the `--which` prompt that `bash -n` accepts were run against the eight cases covering them, and five discriminate to a single case: hashing a constant kills only the case that edits `collect`, the empty string in place of `null` kills only the run that never asked, a length of `0` for a missing answer kills only its own case, dropping the `--which` prompt kills only that one, and hashing an empty answer rather than nulling it kills only its own. Two are broad and worth knowing as such: pinning the length to `null` kills both length cases, and dropping the prompt hash kills four. Every one of the eight has been observed red. Over the model's own numbers: five mutations that `bash -n` accepts cover the twelve cases holding them, and the one the task itself named (feeding the column the wall clock instead of the reply's `total_duration`) turns four red at once, including the two that read `lm stats`. Replacing the accumulator instead of adding to it turns exactly the two summing cases red, treating an absent number as zero turns the two null cases red, averaging the missing in as zero turns only the `lm stats` case red, and pinning `ms` to zero turns only the case that says the operator's wait is inside it. All twelve have been observed red. Another covers the two settings that carry the answer budget and stop the model thinking, which `tests/request.mts` reads off a recording server rather than from a reply. Neither is in the runner's control flow, so a run without them still succeeds and simply grows past the budget again: removing the field that names the budget turns two of the four cases red and leaves the reasoning case green, and removing the reasoning setting turns that one red and leaves the budget cases green. On the real model the budget is what `tests/verb-live.mts` covers from the other side, and its three truncation cases were confirmed red both ways: without the budget field the answer completes and none of the three fires, and without the runner's own truncation arm the exit code is still 5, from the answer that never arrived, so only the case reading the message goes red. The code alone cannot tell the two apart, which is why a case reads the message. What the chat asks for has a group of its own, and part of it is an absence: `tests/chat-request.mts` reads the request off a recording server through two instruments, the whole program in print mode and a session on a model a catalogue refresh built. Twelve mutations that node loads were run against its fourteen cases. Declaring the chat's budget again turns three red, one per place a budget can be read. Ignoring the card's `thinking` capability, or declaring the effort field unsupported, each turn four red, the three level cases and the one that reads what the chat opens at; dropping the map that carries the closed level turns exactly one red, which is the case the whole declaration exists for; declaring every model thinking turns red the two cases for a card that claims none, the one asked on a refreshed session and the one that launches on it. Dropping the verb's own `maxTokens`, which is the regression this half most risks, turns one red here and five in `tests/request.mts`; ignoring `LM_THINK` turns red the one case that sets it, and thinking by default turns red the one that does not. Dropping the seed `bin/lm` writes, so the harness's own default decides again, turns red the one case that reads what the chat opens at and nothing at all in `tests/chat.mts`; ignoring `LM_MODEL` turns red the two cases that launch on a card claiming no thinking, and two more in `tests/chat.mts`. Emptying the tag list turns five red rather than the one predicted, and the surplus is the finding: with no catalogue the chat falls back to the single declared entry, so the levels stop reaching the wire as well as the refresh stopping. The mutant worth keeping is the one that moves the per-model declaration out of `catalogue()` and applies it at `bin/lm`'s registration instead: the print-mode case stays green and the three level cases go red, which is the whole reason the second instrument exists, because print mode never refreshes a catalogue and a fix verified there alone ships a chat whose own session never sees the declaration. Two cases survived every mutant and are controls rather than assertions: that the recorder saw a completions request, and that the session opened on one model. The case reading the refresh is not one of them: it is among the five the emptied tag list reddens. In `tests/catalogue.mts`, ignoring the capability, forcing it, and claiming it for a card that could not be read turn red one case each, in that order. Two cases there stand on the deadline the launch reads the catalogue under, and both are needed: dropping the signal from `bin/lm`'s call reddens only the case that runs the program against a host that accepts the connection and never answers, while dropping it from the `fetch` inside `catalogue()` reddens that one and the in-process case beside it. Neither mutant fails by itself (both hang), so each case is raced against a timer of its own and reports the timeout as a value, which is what turns a suite that would never finish into two named failures. In the status rows, swapping the two right slots back to the layout before them turns four of the `tests/chrome.mts` cases red (the model's row, the level's, the one reading the second row's grey, and the empty-slot case) and leaves the case reading the spend on the left green, because that slot did not move; filling the slot for a model with no level to report turns red that case alone. Over the verbs inside the chat: replacing the registration's walk over the registry with a filter naming the four tool files leaves every case green except the one that drops a fifth file in, which is the case that exists for it; making the channel's confirmation always answer yes *while the run has not asked for the capability* turns the two declining cases in `tests/registry.mts` red, and three in `tests/chat.mts`, while leaving the approving ones green; and unwiring the channel from the chat's side, so a verb falls back to the terminal, turns the live case reading exit 7 red while the case asserting nothing was applied stays green, because a question no one can answer fails the run anyway. Only the pair distinguishes a refusal the human made from a refusal the plumbing made. Over the difference between no answer and an empty one: sending an empty line where the channel should close turns both unanswered cases red and leaves both empty-answer cases green. The first attempt at that mutation is the warning worth keeping: restoring the swallowed `read` failure in the bridge crashed the suite with `ERR_STREAM_WRITE_AFTER_END` instead of failing a case, because a body that had already asked its next question was answered into a pipe the refusal had closed. That is a mutant that parses and does not run, and it also named a hole in the channel: it now tolerates being answered after it closes. Another covers the chat's own header and status rows, where three mutations each redden exactly one case and each was run before it was believed: guessing the auto-compact label instead of reading the setting reddens the case that asserts an unread setting prints no mode, right-aligning the branch reddens the case that pins it near the middle, and dropping the version reddens the case that reads the name.
+
+What the chat installs before it opens, and the row it draws when it did, is a group of its own in the same suite. The message is pure and the arithmetic is not: `updateHarness` reads the declared range and the installed version off a clone, so the registry, npm and the clone are all seams a case supplies and no case reaches any of the three. A case that left the clone to the repository it runs from would be arithmetic about the machine it ran on, and the chat installs the newest the range admits on every launch, so the moment the operator opens the chat the installed version catches up with the newest and the cases that need a launch to move have nothing to move to. Each `updateHarness` case therefore hands `clone` a directory under `mktemp -d` holding a `package.json` that declares `^0.84.3`, and the harness's own package.json under node_modules declaring `0.84.3`. Two suites drive the whole program through `bin/lm` and so pay the launch's own request: they point `npm_config_registry` at a refused port, because `PI_OFFLINE` would also switch off the catalogue read one of them exists to measure. Without that they install a release into the clone they are running against, which is how the leak was found. Six mutations, each predicted by case name before it was planted, each gated by importing the mutated file on an absolute path, and each confirmed by the value the mutated line produced. Satisfying `*` instead of the range `package.json` declares reddens five: the three that read the arithmetic and the two that watch what a launch hands npm, which come back `1.0.0` and `0.85.0` where the range admits `0.84.4`. Dropping the comparison against the installed version reddens the two cases that require a launch already on the newest in range to report nothing, and both come back naming the version they are already on. Rethrowing rather than swallowing reddens exactly the one case that hands the registry an error, and reddens it as `threw Error: no route to host` rather than by crashing the suite, because that case awaits a rejection it expects not to get. Of the line itself, six more, driven by handing `installChrome` a stand-in for the harness that records what it was notified of and what header it was given. Putting the line back into the header reddens four: the two holding the header to its two rows, the one requiring it to say nothing about the harness, and an older case requiring every header row to carry the mark, which a row of text does not - new code killed by a case nobody wrote for it, and the second entry in this file's record of why a prediction is written down first. Deleting the notify call reddens the three that read the notice, the version it names and the level it goes out at, each coming back undefined. Moving the level from `info` to `warning` reddens only the case that reads the level; adding a restart instruction to the message reddens the case that reads the message and the one that forbids the word, each leaving the other green, which is what says the text and its level are pinned apart rather than twice. Dropping the guard on the version reddens the case requiring a launch that moved nothing to say nothing, which comes back notifying `harness updated to undefined`, and dropping the guard on the `startup` reason reddens the case requiring a reload not to repeat it.
+
+Five further mutations cover that clone, each predicted by case name before it was planted, each confirmed by the value the mutated line produced, and each gated by importing the mutated file on an absolute path, except the two planted in the suite itself, which are gated on the run printing at least one `ok` line. `installedVersion` reading the repository rather than the clone the case handed it reddens exactly the three cases the fixture exists for - `a launch installs the target and reports the version it moved to`, `naming that version to npm and no other` and `a launch already on the newest in range reports nothing` - which come back `undefined`, `[]` and `0.84.3`. It is the one mutant here whose kill set depends on the machine, and it is the defect the fixture repairs. Widening the fixture's own declared range to `*` reddens the first two of those, which come back `0.85.0` where the range admits `0.84.4`, and leaves the third green, because a launch already on the newest moves nowhere under any range. The two mutants above were re-derived against the fixture and are unchanged by it: satisfying `*` in `pickTarget` still reddens five, and dropping the comparison against the installed version still reddens two, which come back `0.84.4` and `0.84.3`.
+
+The fifth is a zero this record can explain, and the explanation is arithmetic rather than textual. `declaredRange` reading the repository rather than the clone reddens nothing at all even though the two disagree: this repository declares `^0.84.4` and the fixture `^0.84.3`, ranges that differ over exactly one version, `0.84.3` itself, and no case is placed to see that. The one that comes closest, `a launch already on the newest in range reports nothing`, publishes `0.84.3` alone and expects nothing under either range - under the fixture's because that version is already installed, under the repository's because it sits below the floor - so it survives by the other route rather than by the same one. The zero rests on the two ranges agreeing on every list the cases publish rather than on the declarations matching, and `package.json` is versioned, so what it rests on moves with a commit rather than with the machine. What says the mutant ran rather than missed is a read and a pair. Handed a clone carrying no `package.json` at all it still returns a range, and stepping the published list one version at a time pins that range to `>=0.84.4 <0.85.0`, which is the repository's declaration and nothing the clone could have supplied, where the unmutated line returns undefined for every one of those. Planted on top of the widened fixture, which alone reddens `a launch installs the target and reports the version it moved to` and `naming that version to npm and no other` as `0.85.0` and `["0.85.0"]`, it turns both green again, because the fixture's range is no longer what is read. The anchor rule earned its place here on the fixture rather than on the source - `grep -oF '"^0.84.3"' tests/chrome.mts | wc -l` returns 4, so the widening is planted on the whole declaration and not on the bare range three `pickTarget` cases pass as well.
+
+The version the harness compares its own release notes against is a settings write rather than a screen, and its cases carry five mutants of their own. Deleting the write reddens the two that read what was written, one through a stand-in and one through the harness's own settings file. Dropping the gate on having installed something reddens the case requiring a launch that installed nothing to leave the recorded version alone, which comes back writing `null`. Dropping the equality guard reddens the case refusing a second write and the one reading the file's timestamp back. Replacing the whole condition with `true` reddens both of those, the case for a machine with nothing recorded, and the one for a launch that installed nothing. The last two also redden the case that hands the settings a reader which throws, predicted for neither: removing either guard removes the read, so the throw never happens and the write goes through. That case pins two properties rather than one, that the throw is swallowed and that the recorded version is read before anything is written, and the correction is the third entry in this file's record of why a prediction is written down first. Making the catch write rather than swallow reddens that case alone. One case here is killed by no mutant and cannot be: the one requiring the neighbouring setting to survive the write guards the harness's settings manager rather than any line in this repository, as the case beside it does for `quietStartup`.
+
+The trap in that series is the anchor for the last of them. `// The chat opens either way.` occurs twice in `src/chrome.mts`, the second in `silenceStartup`, so a patch taking the first match lands in code no case in this group reads and reports an empty kill set, which reads as a hole in the suite. Gating on the occurrence count rather than on the patch's exit status refuses it, and `grep -c '// The chat opens either way.' src/chrome.mts` returns 2. What the suite counts at any given size is `node tests/chrome.mts | grep -c '^ok'`, which only grows and is read rather than quoted.
+
+What the chat remembers is a settings write and not a screen, so its group is over `rememberModel`, `rememberThinkingLevel` and `installChrome` in `src/chrome.mts`. Eight mutations, each predicted by case name before it was planted, each gated by importing the mutated file on an absolute path, and each confirmed by the value the mutated line produced. Dropping the write on a model change reddens the two cases that read the provider and the model id back out of the settings file, and neither of the two that call the function directly. Writing the provider where the model id belongs reddens one of that pair and the case recording what the function was asked for, and leaves the other half of the pair green, which is why the provider and the id are read by two cases rather than by one. Writing the level under the wrong model key reddens four: the three that read the level back and the one that records the call. Writing that level as the harness's global default as well reddens exactly the case requiring no global default to be written, which is what separates a level one model comes back at from a level every model would come back at. Dropping the guard on a half-named level reddens exactly the two cases that record what the functions were asked for. Putting a mark back ahead of the model name reddens exactly the two cases that read the row's model slot, and none of the cases pinning the row's other slots, because the mark grows the right slot leftward and moves nothing else.
+
+The two mutants that drop a registration are the correction worth keeping. Aimed at the first shape of this group they returned an empty kill set, which reads as a suite with a hole in it: the cases reached the handlers by name, so a registration that was gone threw where it was planted and killed the suite on the way to the assertion. That is a crashing mutant wearing a survivor's clothes. Firing each event through the handler table instead, and pinning the table itself, turns each of them into a named set: dropping either registration reddens the case that reads which events the chat listens for, plus exactly the cases that read what that handler wrote. The anchor trap is here too: `model.provider, model.id` occurs twice in `src/chrome.mts`, once in each remembering function, so a patch taking the first match lands in the wrong one and reports a kill set for a property it never touched. Counting occurrences before patching refuses it, and `grep -oF 'model.provider, model.id' src/chrome.mts | wc -l` returns 2.
+
+What the chat opens thinking at is a settings write and not a flag, so its group is over `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by case name before it was planted, each gated by importing the mutated file on an absolute path, and each confirmed by the value the mutated line produced. Handing `--thinking` over again reddens six of the group's eight cases in `tests/chat.mts`: the five that read the model flags, which pin the whole array, and the one that reads that no launch hands a level over. Seeding over a level already saved reddens exactly the case that saves `high` and reads it back, which comes back `low`. Seeding nothing reddens exactly the case that reads the seed, which comes back undefined. Seeding `medium` instead reddens that case and the one in `tests/chat-request.mts` that reads what the chat opens at off the wire. The fifth is the control worth keeping: `bin/lm` never calling the seed reddens nothing at all in `tests/chat.mts`, because every case there calls the function itself, and reddens that same single case in `tests/chat-request.mts`, which comes back `medium`, the harness's own default. The wiring is held by that one case and by nothing else, and its own gate is `node --check`, which works on `bin/lm` because `bin/lm` is not a `.mts` file. The trap in the group is the write: the harness queues it, so a case reading the settings file on the next line reads the file before it. A launch gets the flush for free from the work it does next; a case has to ask for it.
+
+The same suite covers the block the chat prints on quitting, over three transcript fixtures in the harness's own on-disk shape rather than sessions anyone ran: one where three tools run against a single model, one where two run across a model change, which is the only thing that exercises the table's second row and the total under it, and one holding a question and no answer, which is a session that never reached the model and reports nothing. Flipping the one tool result the first fixture records as failed reddens three cases: the one that reads the counts, and the pair that drives `lm` on a copy of the fixture through a pseudo-terminal and ends it with an end of input. It leaves green the case that derives an all-worked session from the same fixture, and that pair is what separates the count from the form it prints.
+
+Ten mutations of the block in `src/chrome.mts` each redden the set predicted for them before they were planted. Restoring the withheld failure clause reddens four, among them the two cases that exist because that clause used to be withheld. Dropping the cached half of a model's input reddens four, left-aligning the numeric columns reddens seven, and widening every column heading fourfold reddens those seven and the case that hands the block eighty columns and reads every row back inside them. Blanking the session identifier reddens five, printing the resume paragraph for a session with no record to name reddens only the case that counts the block's paragraphs, and collapsing the sitting to zero reddens four. Three narrow the attribution of a model's spend: ignoring usage an entry carries rather than a message reddens the two compaction cases, renaming the model in force before anything has declared one reddens the case that reads `unknown`, and dropping the declaration entry from the walk reddens the case written for it. That last is the one worth keeping: planted before that case existed it reddened nothing, because every assistant record in both fixtures names its own model, and the branch it removes decides only where a compaction lands before the first reply under a newly declared model. The case was written for the mutant rather than the other way round.
+
+Two further mutants redden nothing but the pseudo-terminal cases, and nothing else can: refusing the quit reason and inverting the guard on whether there is a UI both leave every assertion over the summary green, because a block that is never printed reads exactly like a block that is right until something reads the terminal back. One more is a control for the procedure rather than for the code: dropping the cached half of the input from the totals the status row is built from reddens nothing at all, though the footer read back through the pseudo-terminal shows `↑37.0k` where a clean run shows `↑40.0k`. Nothing in the suite reads what the status row counts. Of the duration forms, dropping the round-minute case reddens three: the case written for it and the two that read a whole number of minutes off the block.
+
+The block carries two elapsed figures, the sitting and the conversation behind it, and six further mutations separate them. Neutralising the condition for the second row reddens three, and swapping the two figures reddens the same three: the unit case that reads both rows, and the pair driven through the pseudo-terminal, which is the only place the two figures differ, because the fixture's own record is dated before any run of the suite and the sitting is the seconds the case spends in the chat. Opening the sitting at the launch whatever the session record says reddens two, the case that pins where a fresh sitting opens and the one that reads the whole head of the block off the fixture. Reporting the conversation whether or not the session outlived the launch reddens three, among them the case that exists because a fresh session prints one row. The sixth is the one worth keeping: opening a record-less sitting at the first entry, which is what shipped before, was predicted to redden only the case written for that fallback and reddened three, because a reopened session takes the same branch; narrowed to leave that branch alone, it reddens the one case and nothing else. A prediction short of the kill set is the finding, not the disappointment.
+
+The last two lines of the block are a command, and which of the two forms it takes depends on where the session is kept, so six further mutations separate them. Every case below reads that command; the ones added with it that read the block's counts instead survive all six. Printing the identifier whatever the directory says reddens five: the three unit cases holding a session outside the harness's default session directory, the one that quotes a path a shell would split, and the pair driven through the pseudo-terminal on a session `--session-dir` put elsewhere. Printing the file whatever the directory says was predicted to redden four and reddened five, and the surplus is the finding: a file path is longer than an identifier, so the case reading every row of an eighty-column block back inside it goes red beside them, which is the whole reason the identifier is the line where it resolves. Dropping the quoting reddens only the case with a space in the path, and reading a directory the harness will not answer for as the default one reddens only the case written for it. The last two are aimed at the method that decides, which the harness ships on the session manager and leaves out of the type it hands an extension: never calling it reddens exactly the two cases that reopen a session from the harness's own directory and no unit case at all, which is why that pair is driven through a pseudo-terminal rather than asserted over `summarize`; negating what it returns reddens all four pseudo-terminal cases at once, the two locations swapping lines, which is what says the method is answering rather than merely being present. The series was itself perturbed before it was believed: replanted on an anchor occurring seven times, the driver refused the mutation rather than patching the first hit, which is the zero this record would otherwise have had to explain.
+
+How wide the block is drawn is the terminal's answer rather than a constant of the source, and eight mutations of `src/chrome.mts` separate the reading from the fallback, the fallback from the floor, and both from what each consumer is handed. Moving the fallback from 80 to 100 reddens three: the two unit cases that hand `summaryBlock` no width and a width of zero, and the one that reads the handler's own block back when the terminal reports nothing. Moving the floor from 20 to 1 reddens two, the case pinning where the narrowing stops and the one requiring every row of the broken command to carry more than one character of the path. Reading the width with `??` in place of `||` reddens six, five of them the cases driven through a pseudo-terminal: under `script -qc`, which is how those cases run, `process.stdout.columns` reports `0` rather than `undefined`, so `??` takes the zero, floors every live case to twenty, and the rows those cases match on come out too narrow to hold what they match. `script -qc 'node -e "console.log(process.stdout.columns)"' /dev/null` prints `0` where the same program on a plain pipe prints `undefined`, which is the whole reason that resolution is written with `||`. The sixth is the unit case written for that zero. Dropping `process.stdout.columns` from the call site reddens one, the case reading which width the handler bounded the block by. Two say which consumer gets the width rather than the fallback: handing the spend table the fallback reddens two, the case reading the model column on a terminal wider than eighty and the one reading it on a terminal narrower than twenty, and handing the resume command the fallback reddens two, the case keeping the command on one row where the terminal is wide enough for it and the handler case again. Dropping the `Math.max` that keeps the model column at least its own heading wide reddens one, the narrow case that would otherwise be given a negative width. Dropping the `\` from the rows the command is broken across reddens seven: the six unit cases that read a broken command back, three of them through a shell that rejoins the rows, and the pseudo-terminal case that pastes what the screen printed.
+
+The model column is the only cell that can outgrow what the four fixed columns leave it, and three further mutations cover the elision that keeps it inside. Refusing to elide reddens four: the case reading the elided identifier, the one requiring the total row to line up beneath two of them, the one reading every row of an eighty-column block that names a 54-character model, and the narrow case. Dropping the re-measure of the column after the elision reddens exactly the same four, so nothing here separates a table that never elides from one that elides and then pads the column to the width it had before. Refusing to elide was predicted to redden five and reddened four, and the case it left green is the finding: two identifiers sharing a prefix are told apart by an un-elided table anyway, since they differ in their tails. Only eliding from the end rather than the middle reddens that one, beside the elided-identifier case and the narrow one, three in all. It is the case for the middle rather than the case for the elision.
+
+The command names `--resume` and prints over two lines in the theme's own grey, and nine further mutations across `src/chrome.mts` and `bin/lm` separate the three claims in that sentence. Writing the command as `lm --session` again reddens eight: the five unit cases that read the last paragraph of the block, the two driven through a pseudo-terminal that read it back off the screen, and the one counting the resume lines the screen ends on, which comes back 1 because the second line no longer carries the word. Printing the two lines with no colour on them reddens two, the unit case that reads the block built with a theme's grey and the pseudo-terminal case that reads the escapes back off a capture nothing stripped. Not keeping the theme at all, which is the other half of the same claim, reddens exactly that second one and no unit case, because every unit case hands the block a colour of its own: the block is written after the harness has stopped the TUI, and the only thing that can say the header callback kept one for then is a terminal read back with its escapes still in it. The five cases that hold the block to what it says survive all three, and the case that quits a session holding a question and no answer survives them too.
+
+Four aim at the translation in `bin/lm` and one at the case it exposed. A guard that matches neither `--resume` nor `-r` reddens four: the two `tests/cli.mts` cases that read back which session the harness was asked for, and the two pseudo-terminal cases that reopen a session by the command the block prints. Handing the identifier over and leaving a copy behind reddens three, the two pseudo-terminal cases again and the one requiring the reopened chat to have asked the model nothing, which is the case that would otherwise survive a mutant of the line it was written for: with the translation gone entirely the picker opens, no chat is reached, and a screen with no error on it reads exactly like a clean run. Dropping the guard on `--` reddens only the case that reads the words the chat was handed back off the harness's JSON mode, and the substitution it makes is visible in the failure - `--session,zzzmarker` where `--resume,zzzmarker` was typed - which is why that case reads the words rather than asking whether a session was looked up: the harness treats both as text, so no lookup happens either way. Taking a flag after `--resume` as the name it wanted reddens only its own case, which reads `--continue` back as the session the harness went looking for.
+
+The fifth is the finding. Reading a missing argument as an empty string was predicted to redden the case pinning that a bare `--resume` reaches the harness's own list, and reddened nothing: an empty name is one the harness reads as no session at all, so it opened a new chat and looked nothing up, which is what that case asserted. Two lines produce the same absence and the case could not say which. Rewritten to require the picker's own label on the screen, it reddens under the same mutant, because a translated bare flag opens a chat and draws no picker. The anchor rule earned its place here too, and by a route the earlier series did not meet: `dim(` occurs twice in `src/chrome.mts` and both occurrences are on one line, so a gate counting lines reports 1 and passes an anchor a gate counting occurrences refuses. Replanted there, the mutant meant for the command patched the label above it and returned the kill set of the colour mutant instead - two cases, a clean-looking kill of a property nobody was testing.
+
+The harness writes a resume line of its own after that one and the chat drops it as it is written, so six further mutations aim at the wrap that does the dropping. Never installing the wrap reddens exactly two, both driven through the pseudo-terminal: the case requiring the harness's line to be absent, and the one counting the resume lines on the screen, which comes back 2. Never restoring the original write reddens the two unit cases written for the restore and nothing driven through the terminal, because the process writes nothing after that line and exits, so only a second line like it, offered to a sink, says whether the wrap came off; under the mutant that sink still holds the chunk before it. Reading the chunk without stripping its escapes reddens four, since the harness dims its label and the line then no longer opens on the words the match is anchored to. Broadening the match to any chunk carrying `resume` reddens nine: this project's own block is written through the wrap deliberately, so a match loose enough to take the block takes it, and the eight cases that read the block off the terminal go red beside the unit case written for that property. The case counting resume lines survives that one and is worth knowing as coarse, because the harness's line prints once the wrap has come off on the block and the count is one either way. The fifth is the finding: dropping the guard that requires a text chunk was predicted to redden only the case that writes a buffer through the wrap and reddened two, the second being the case after it, which counts what the sink received and is one short because the throw happened before the buffer got there. That buffer case reads a throw as a value rather than letting it end the run, which is the whole reason a mutant crashing where it is planted still has a kill set anyone can attribute. The sixth aims at where the wrap is installed rather than at what it matches: installing it only once there is a block to print, which is what shipped before, reddens exactly one, the pseudo-terminal case that quits the session holding a question and no answer, which counts one resume line on the screen where a clean run counts none. Every case that reads a block off the terminal stays green under it, and that green is what says the moved call ran at all.
+
+The frame around the block is the last group, and nine mutations of `src/chrome.mts` separate what the rows are sized against from how they are drawn. Padding each row to the terminal rather than to the interior the frame leaves was predicted to redden three and reddened five, and the surplus is the finding: the two eighty-column bounds cases, `every row of it reads on an eighty-column terminal` and `and so does one naming the session by its file and the model by a 54-character identifier`, assert `visibleWidth(l) <= 80` over the whole row rather than over what the row says, so a frame drawn without measuring breaks them too. Five cases went red and every case reading what the block says stayed green, which is the shape a real kill has, and predicting from the frame's own cases alone is what misses the other two. The five are a subset rather than a share: what the suite holds at any size is `node tests/chrome.mts | grep -cE '^(ok|FAIL) '`, which only grows, so it is read rather than quoted.
+
+The other eight each reddened exactly the set predicted for them. Forcing the fit gate to `true` reddens the two written for it, `a terminal that cannot hold the frame is given the block without one` and `and wherever it is drawn it bounds every row to the terminal it was drawn for`. Removing the cap on the shared value column reddens four, and taking the table's shared floor to `0` reddens one, `and the table's model column is the shared one wide rather than a negative width`. Sizing the rule under the table's header to that header rather than to the table's span reddens nine. The last four redden a single case each and no two the same one: `.map(ink.accent)` for `.map(ink.bold)` reddens `the command that reopens the session is in the accent colour`, `ink.bold("Spend")` for `"Spend"` reddens `each section is headed in bold`, dropping the padding rows reddens `set off from the border by a blank row under it and another above the foot`, and leaving the top and bottom border uncoloured reddens `the frame and the rule under the table's header wear the border colour`. Four disjoint single-case kills is not a set a mutant that never ran can produce, and for the padding rows and the border colour the mutated file was read back as well rather than the patch's exit status trusted.
+
+This series gated on the import rather than on `node --check`, which exits 0 on a hard syntax error in a `.mts` file on `node v24.14.1`, and it required that import to catch `SyntaxError` in particular, proved first on the unmutated copy, which imports, and on a file with a syntax error, which does not. It reproduced the absolute-path trap this file already records. The anchor rule earned its place again, and by the same route the `dim(` anchor did: `ink.border(` occurs four times over three lines, so `grep -o 'ink\.border(' src/chrome.mts | wc -l` returns 4 where `grep -c 'ink\.border(' src/chrome.mts` returns 3, and replanted there the driver refused the anchor rather than patching the first hit.
+
+`node --check` cannot gate a mutant of any module here, and it fails silently. On Node v24.13.0 and v24.14.1 it exits 0 on a `.mts` file it cannot parse whenever that file carries an `import` or an `export`, which every module under `src/` and `tests/` does, while the same bytes saved as `.mjs` are rejected as they should be. The gate that works is an import: `node -e 'import(process.argv[1])'` on the mutated file throws the `SyntaxError` `--check` swallowed. An ungated mutant that does not parse reddens every case at once, which is the shape that reads like coverage and demonstrates nothing, so a gate that never objects is worse here than no gate at all. Give that import an absolute path: handed `src/chrome.mts` it dies on `Cannot find package 'src'`, which is a gate that rejects every mutant including the ones that parse, and reads exactly like one that objects for the right reason. One group covers the one `apply` whose command line nothing else sees. Every other verb hands its command what `render` already printed, so the golden fixtures cover it without `git` or `gh` being called; `issue` assembles a `--label` list from what the human typed, and that list had only ever been read by eye. Four mutations of `tools/issue.sh` that `bash -n` accepts and that run: dropping the trim reddens only the case with a space after the comma, reading an empty reply as no labels reddens only the case that keeps what the model proposed, taking the word `none` literally reddens only its own case, and removing the confirmation from a run that did not ask for the capability reddens two (the exit code and the absence of the call), which is the pair worth having, because a verb that creates the issue and then asks is indistinguishable from one that asks first until the first time someone says no.
+
+Another covers the dialog a person answers, which nothing had ever driven: `tests/registry.mts` hands `applyAsk` an `Ask` of its own and never enters `src/chat.mts`, while the live case runs in print mode, where `hasUI` is false and the refusal is the runner's rather than a person's. The model is a recording server for these, because the subject is the dialog and not the answer. Six mutations of `src/chat.mts` and `src/registry.mts` that `node --check` accepts and that run, each confirmed by the dialog or the side effect the mutated line was supposed to produce: showing the tool's question without the artefact `render` printed above it reddens only the two cases that read what the human was shown; replacing the dialog with a refusal the chat makes on their behalf reddens the five approving cases and leaves the declining ones green; dropping the verb's name from the dialog's label reddens only the case that reads it; the chat no longer saying a refusal happened reddens only the two cases that read its words; sending an empty line where the channel should close reddens the three cases that hold no answer apart from an empty one, because the body then goes on to ask its second question and is answered; and a confirmation that always answers yes where the capability was not asked for reddens the declining cases here too. The first attempt at these is the warning worth keeping: the case that cleans up the approved run's artefact removed it without `force`, so a mutant that suppressed the side effect crashed the suite at that line rather than reddening a case, and a suite that dies partway prints a plausible run of `ok` lines and proves nothing.
+
+One group covers the one code no page carried. Three sites reach exit 1 and each now has a case asserting the digit rather than its inequality with zero: the `REFUSE` prelude spending it on a diagnostic, a body whose command fails, and a body killed before it can return a status. Three mutations of `src/registry.mts` that `node --check` accepts and that run, each reddening a different one: `REFUSE` exiting 2 reddens only the read-only case; `apply()` falling back to `r.status ?? 0` reddens only the killed case and leaves the failing body green, because that body's status was never null; and dropping `-e` from the shell `apply` runs under reddens the failing body and its sibling. The negative control is the part worth keeping: written as `status !== 0`, the read-only case survives `REFUSE` exiting 2 with no failure reported at all, so an assertion against zero cannot notice a code that changed to another non-zero one.
+
+The sample the clean column withholds itself below has a group of its own. Three mutations of `libexec/lm-stats` that `bash -n` accepts and that run, each confirmed to have executed by the column the mutated line printed: lowering the minimum to one reddens only the two-run case, with `100%` where the case wants `n<14`, and removing the conditional from the `awk` reddens exactly the same one the same way. Raising the minimum to 999 reddens both that case and the fourteen-run one, because the marker carries the number it withheld itself under, so both read `n<999`. The two run-count checks stay green under all three, which is what makes the share the thing being measured. The fourteen-run case is the positive control, and only the widening mutant reaches it: without that case the column could withhold every share it is ever asked for and a green run would report the withholding as correct.
+
+The same column split at a date has a group of its own, and it writes the log by hand rather than running a verb, because `libexec/lm-stats` reads nothing else. Five mutations of it that `bash -n` accepts and that run, each confirmed by the row or the message the mutated line printed: swapping the two periods reddens 6 of the 15 cases and leaves every argument case green; lowering the minimum to one reddens the 4 that expect a period to withhold itself, printing `100%` over thirteen runs and `n<1` over none; taking the repository filter off the split reddens exactly 1, where a record from another repository joins the later period; accepting any `--since` value reddens the 3 that refuse one, exiting 0 where they want 2; and removing the empty-`LM_LOG` guard reddens 1.
+
+Two first attempts are the warnings worth keeping, and they fail in opposite directions. The repository mutation was first planted at an anchor that appears in the table's own query as well, so it landed there, parsed, ran and killed nothing: zero kills is not a strong suite, it is the signature of a mutant that never reached the code the cases read. And the empty-`LM_LOG` case first asserted the exit code alone, which the very next guard produces as well, so removing the guard under test left the case green - a case that reads a status two lines can produce has to read the words too, or it cannot tell which line answered.
+
+Which caller a run came from is written by both runners and read by neither, so its group spans the three suites that hold the record's shape: `tests/runner.sh` for the shell writer, `tests/chat.mts` for the Node one, and `tests/stats.sh` for a log holding records written on both sides of the field's arrival. `tests/chat.mts` enters each caller the way it is entered in earnest, `bin/lm` as a process of its own against the registration the chat itself uses, over a fixture that refuses in `collect` so neither side reaches a model. Counted 2026-08-30 with `grep -c '^ok'` over each suite's output: `tests/runner.sh` at 91, `tests/chat.mts` at 31 and `tests/stats.sh` at 26.
+
+Eight mutations, each predicted by case name before it was planted, each gated, and each confirmed by the value the mutated line put in the record. On the Node side: the chat declaring no caller reddens 3, giving both callers `cli` and collapsing the case that requires the two records to differ in that one field; dropping the field from the record reddens 5, which is every case in the group but the one reading the workflow tag beside it; `runWorkflow` dropping the environment it is handed reddens only the case run by a workflow; and `callerOf` returning whatever it was given rather than a member of the set reddens only the case that hands it a name the set does not hold. On the shell side: the same widening reddens the same one case, dropping `caller` from the `jq` object reddens 4, and hardcoding `cli` reddens the 2 that expect something else, which is what says the two callers are pinned apart rather than merely pinned.
+
+The prediction that was wrong is the one worth keeping. Counting only records that carry a caller, in the table's own query in `libexec/lm-stats`, was predicted to redden the one case reading the runs column and reddened three: the `awk` reads that column as the denominator of the clean share too, so an older case pinning the share over a heap died with it. New code killed by a case nobody wrote for it, which is the second time this file records that shape.
+
+That mutant is also the group's only evidence for its control. `libexec/lm-stats` reads the field in a block of its own and nowhere in the table, so no mutation of what writes the field can redden the case that reads a log of both shapes through the table; the inserted filter is what shows the case could fail at all.
+
+That block has a group of its own, seven cases in `tests/stats.sh` over a log holding all three shapes at once: a run the chat ran, a run typed at the command line, and a run written before the field, which names neither. Four mutations of `libexec/lm-stats` that `bash -n` accepts and that run, each predicted by case name before it was planted and each confirmed by the line the mutated code printed. Counting the records that name no caller as the command line's reddens exactly the three cases whose logs hold such a record, printing `4 of 19` where the three-shape case wants `4 of 10`; dropping the block reddens all seven, including the one that reads the heading; and printing a share instead of the two counts reddens six, every one but the heading case, printing `40%` for the same log. The three cases whose logs name a caller on every record stay green under the first mutation and die under the third, which is what tells the narrowed denominator apart from the two counts. The control is the clean minimum lowered to one: it reddens the four cases in the group above that expect a period to withhold its share and leaves all seven of these green, so what the new cases read is the caller block and not the reader as a whole.
+
+The last group in the live suite covers the shell the chat carries beside the verbs, and its shape is a concession rather than a preference. Asked plainly to commit, this model reached for the shell in 4 of 6 sessions measured on 2026-08-27, taking the refusal at its word in the other two, so an assertion that it goes past would be red about a third of the time with nothing wrong here. What the two arms assert instead is the capability the page claims: with the shell, `HEAD` moves and no record the log holds accounts for it; with `--exclude-tools bash`, the same request reaches the verb, stops there and leaves `HEAD` where it started. Three mutations, each killing exactly one case and each confirmed by the row it printed: rewording the sentence out of `docs/verbs.md` reddens the case that reads the page; handing the shell arm `--exclude-tools bash` reddens the case that claims the shell moved `HEAD`; and blanking `LM_LOG` for the session reddens the case that asserts a record exists. That third one is why the record count is asserted separately from the records' exit codes: with an empty log the check that every record is non-zero passes over no records at all, and under the mutation it passed in exactly that way.
+
+Consent has two groups, because it has two halves. The capability needs no terminal, so `tests/registry.mts` drives `apply()` with and without it over a tool that both confirms and asks, and `tests/issue-labels.sh` drives the one tool whose command line depends on what the answer was. Four mutations, each killing exactly the predicted case names and each leaving every other case in the suite still reported rather than cut short: the unattended `confirm` refusing reddens 2, its `ask` answering `y` instead of an empty line reddens 1, `apply` ignoring the flag reddens the same 2 as the first, and `apply` assuming yes for every run reddens the 2 that hold today's refusal down. The first attempt at the first is the warning worth keeping, and it is the second time this file records that shape: the case reading the artefact read it without `existsSync`, so the mutant crashed the suite at that line instead of reddening the case above it, and the kill set came back one name short of the prediction rather than wrong in a way anyone would notice.
+
+The two affordances are not one thing twice, so `tests/request.mts` drives the seam that reads them apart from the run that uses it: the flag alone, the variable alone, neither, and a variable set to something other than `1`. Three mutations, each killing exactly one of them - the seam ignoring the variable, the seam ignoring the flag, and the flag no longer reaching the tool's own shell. `lm ship --yes` has cases of its own in `tests/ship.sh`, because a workflow runs its verbs rather than letting anyone type a flag at them: `parseArgs` in `src/verb.mts` turns the flag into `LM_YES=1` in the environment `runWorkflow` hands each verb, the way that environment already carries `LM_WORKFLOW`. Dropping that assignment reddens the one case that counts how many verbs saw the variable. The mutation that reddens nothing is worth as much - forwarding `--yes` as an argument to each verb kills no case, because the runner declares that flag and every verb consumes it rather than refusing it, so the defect this group was first written for cannot happen on this driver at all. The case asserting the flag was not forwarded went for that reason, and a case that free text is forwarded took its place.
+
+The bounded wait is the other half, and `tests/consent.sh` cannot afford to wait for it: the bound is 120 seconds, so its cases take the shipped text of the reading functions out of the shell runner and substitute only the number, which leaves the number itself to cases that grep for it in both runners. `bash tests/consent.sh | grep -c '^ok'` counts them, at 67 on 2026-08-30. The number they substitute is five seconds and not one, because the bound is a deadline for the whole confirmation rather than for each reading: a case that answers three times and reads the re-ask between each has to fit every answer and every wait inside the one number, and at one second the later answers arrived after it had already passed. That reads as a broken loop rather than as a bound too small for the case, so the substituted number is itself part of what the cases assert. The extraction is one `sed` range from `_read` to `ask`, so a function added between them is carried along rather than left out of every driven case without saying so - which is what a two-range extraction did, and which is why `_deadline` sits between `_read` and `_verdict` rather than beside the constant it reads. The split is deliberate and it is also a limit worth stating: the shell runner's lines are driven under a pty and the Node runner's are read rather than driven, because the two are built from the same shape and only one of them is cheap to put a terminal in front of.
+
+Eleven mutations for the bound, each predicted by case name before it was planted. Computing the deadline inside `_read` instead of once per confirmation reddens 3, and it is the whole case for the deadline being total: the run that keeps typing past it stops returning 7 and returns the harness's 124 instead, because a reading answered before its own bound expires never times out and the loop never ends. Taking the bound off the shell read reddens 3; deleting the shell line that says why the wait ended reddens 2; spelling the bound into the Node timeout line by hand reddens the 1 that names it; and taking the spaces out of the Node deadline's arithmetic reddens 2 while the same edit to the shell one reddens 1. Spelling a different bound into the shell deadline reddens the 5 behaviour cases while both text cases that grep for the number survive - which is what shows the text and the behaviour are checked separately rather than twice, and the same separation shows again in the two mutations that rewrite the remaining-time arithmetic without changing what it computes and redden exactly one text case each. One prediction was wrong and is the useful one. An expired deadline that forces a yes instead of exiting was predicted at 6 and reddened 4: `nobody typing reaches a decision` survived, because a first reading with the whole bound still in front of it times out inside `read -t` and never reaches the branch that runs when nothing is left, and `and without it the same run still refuses` died unpredicted, because the unattended script carries the reading functions without the constant, so its deadline is the epoch and every reading takes that branch.
+
+Two harness faults cost more than the kills. The feeder holding the pty open ended before the harness did, so the blocked read hit end of input and exited 7 by that route, and a case reading only the status reported a bound that was not there. And a series killed by the tool's own wall clock left a mutant in the working tree twice, the second time with `trap ... EXIT INT TERM` installed, which did not fire: what proves a restore is `cmp` against the pre-series copy in the same command, never a trap and never the intention to restore.
+
+What the answer may say is the third half, and it is what the driven cases mostly are. Fourteen mutations of `_verdict`, `confirm` and the words the re-ask uses, each predicted by case name first. Narrowing the yes set to a bare lowercase `y` reddens 7; dropping the bare `y` from it reddens 16; widening the no set's verdict to a yes reddens 8. The pair that pays for the prompt counts is the narrowed no set, which reddens exactly 3: the text case and the two that count how often the question was put, while `the word no is a refusal` and `a bare empty line is a refusal` both survive, because a value that falls through to the re-ask still exits 7 when nobody answers the next one. A case reading only that status cannot say which line answered.
+
+The message and the loop are pinned apart, which is why the wording could change without the loop moving. Dropping the period from the shell message reddens 4; putting the `lm: ` prefix back on it reddens 5, one of them the case that reads that line whole and finds a program name on it that the program is standing at its own prompt to say; echoing the answer back beside the message reddens 4, because the terminal has already printed it; and wording the re-ask as a timeout reddens 8, including the three that a re-ask is not reported as one. Capping the loop at two readings reddens 6 and breaking after the first reddens 12, and what separates the two sets is only what a third answer is allowed to do. Writing `[ "$v" = 2 ] || break` as an `if` reddens exactly one text case in each runner and nothing else, the loop being unchanged. The Node mutations in this group redden exactly their own text case each, which is the limit above restated.
+
+The registry is one directory, and the group that pins it is split across the two runners because the resolution is: `libexec/lm-verb` answers `--list` and `bin/lm` dispatches, and each resolves for itself. `tests/cli.mts` stands `lm` in five kinds of directory - a repository with no `tools/` of its own, one shipping a name the installation also ships, one shipping a name it does not, a directory that is no repository at all, and a run with `LM_TOOLS` set - and `tests/registry.mts` drives `list()` over one directory and over none. The group is 33 cases: the 30 at the end of `tests/cli.mts` from `a project with no tools of its own lists nothing` onwards, and 3 in `tests/registry.mts`. Counted 2026-08-30 with `node tests/cli.mts | grep -c '^ok'` at 72 and `node tests/registry.mts | grep -c '^ok'` at 52.
+
+Twelve mutations, each predicted by case name before it was planted and each compared as a name set. The two that carry the change restore the fallback the registry no longer has. Making `registry()` in `bin/lm` answer with the installation's `tools/` when the project has none reddens 5, every one of them a case that reaches the Node runner: the three that read `lm --help` in a project with no `tools/`, and the two that read what `lm commit` says and returns there. Making the shell runner's `DIR` fall back the same way reddens 6, and the two sets are disjoint: the three that read `--list`, the two that read the shell runner's own refusal, and the one that reads its usage. That each set belongs to one runner alone is what says the two are pinned apart rather than once, and it is also what the change cost: the case that asks both runners for the registry and requires the same answer now dies under neither, because it stands in a project that has a `tools/` and no resolver falls back there.
+
+Letting the project's `tools/` win over `LM_TOOLS` reddens 2 in `bin/lm`, both of them dispatch cases, and 1 in the shell runner, the case that reads the listing. Printing the verb heading whether or not there are verbs reddens 2, the case reading that the heading is absent and the case reading that nothing points at a description which is not there; printing the `Available:` announcement over an empty list reddens 1 in each runner; and printing the shell runner's own `Commands:` heading over an empty listing reddens 1. `list()` indexing every file rather than the `.sh` ones reddens the one case whose fixture carries a `notatool.txt`.
+
+Two are equivalent, and both sit on machinery a one-directory registry cannot exercise. Dropping the shell listing's `[ -n "$DIR" ] || return 0` kills nothing: with `DIR` empty the glob is `/*.sh`, which matches nothing, so the loop runs and prints the same nothing. The site is confirmed to have executed rather than assumed, by `bash -x` showing `for f in "$DIR"/*.sh` reached under the mutant where the intact file returns before it. Taking the sort off that listing kills nothing either: one directory's glob is already in order, so the sort guards against a locale rather than against an interleave, and the listing under the mutant is byte-identical.
+
+The warning worth keeping is the twelfth, a crashing mutant that reads as coverage from one side and as nothing from the other. Dropping `if (!dir) return [];` from `list()` makes `readdirSync(undefined)` throw. In `tests/registry.mts` that ends the suite at the case written for it: the run exits 1 after 51 `ok` lines with no `FAIL` line at all, so a harness reading case names sees an empty kill set while the exit status sees the kill. And in `tests/cli.mts` the two cases asserting `--help` names no verbs and no workflows both pass under it, because a `bin/lm` that throws prints nothing and an assertion of absence is satisfied by nothing. What catches it there is the one positive case beside them, that the rest of the help still prints. A section asserted absent needs a case asserting what is still present, or a crash reads as the feature working.
+
+Two harness faults cost more than several of the kills. The first series wrote each mutant's backup beside the file it was mutating, and `bin/lm.pre` reddened `bin holds one command`, a case about `ls bin/` that no mutant in the series could reach: a kill set carrying a name from outside the group is the harness reporting on itself. And `node --check` is not a parse gate for these files: it accepts a duplicate `const` in any `.mts` carrying an `import`, which is the error that stopped `tests/cli.mts` loading while it was being written, so what gated every Node mutant here is the suite printing at least one `ok` line, and the shell mutants were gated on `bash -n`.
+
+The twelve leave part of the group unreddened. Their kill sets, unioned by case name, cover 17 of the 33, counting the one killed as a crash. The 16 that stand are the ones a mutation of the resolvers cannot reach: that a project's own file is what runs, what its refusal returns, what its generated help says, and that a workflow resolves its verbs through the same registry. Each is pinned by a fixture rather than by a resolver, which is why a series aimed at the resolvers misses them.
+
+The delivery has a group of its own, and it sits on the driver the operator uses rather than beside it. `tests/ship.sh` runs `bin/lm ship` into `runWorkflow` over `tools/ship.sh`, with `commit` and `pr` written as tool files of the suite's own and a recording server answering the one model call each makes, so every line a delivery runs is run here and none of it needs a GPU. `grep -c '^check ' tests/ship.sh` counts the cases, at 61 as this is written.
+
+Twenty-six mutations beside the two on `--yes` above, each predicted by case name before it was planted, each gated on the anchor occurring exactly once under `grep -oF ... | wc -l`, and each compared as a name set rather than a count. Re-derived in full 2026-08-30, because the cases the verb's own group added moved most of the earlier kill sets.
+
+The workflow's own lines, one property each. Taking the `git switch -q -c` out of `prepare()` reddens five: the two that read `main` after a run and the three that read the branch an exit-8 run left, and not the case reading the branch name, because `after_commit` renames whatever branch is current, so a commit made on `main` still ends up on a branch called after its subject. Dropping `LM_WORKFLOW` from the environment `runWorkflow` builds reddens five, the two that read the tag and the three that look the placeholder up by name. Dropping the `--dry-run` guard from the workflow's own `step()` reddens the three rehearsal cases that read the branch and the reflog; the tree cases survive it now, because `prepare()` no longer writes to the tree. Removing the line that says the workflow's own steps did not run reddens only the case that reads it. `_name()` returning a constant reddens the case reading the branch name. Cutting the placeholder whether or not `--here` was given reddens the two `--here` cases that read a branch. Never calling `failed_<verb>` reddens the three that read what a refusal left behind. Deleting `git branch -q -D` from `failed_commit` reddens the two that read the branch list after a refusal. Dropping the free text from the arguments each verb is handed reddens the one that reads it. Dropping the runner's own `--dry-run` guard, in `src/verb.mts`, reddens the three rehearsal cases that read the commit and the tree.
+
+Three of those are broad and worth knowing as such: running only the first verb reddens six, the three that read `pr` and the three that count both verbs; swallowing a verb's non-zero status reddens thirteen, across the refusal, the clean-tree and both hook groups, because every non-zero in the suite travels the same line; and handing every verb `--dry-run` reddens twenty-nine, which is what covers every case saying a commit landed.
+
+Then the verb's own, which is where the cases that read a repository are. Committing the whole index instead of the group - dropping the `git reset -q --` narrowing in `apply()` - reddens fifteen, every case that reads how many commits landed or what one carried, and leaves the one-group case green: that control exists for this mutant, because with a single commit there is nothing to narrow and a wrong `apply()` looks exactly like a right one. Restoring `git add -A` to `prepare()` *behind its `--no-stage` guard* reddens **nothing**, which is the finding: the verb stages the same tree in `apply()`, so what the deletion buys is not the grouping but the flag's meaning. Staging in `prepare()` regardless of the flag reddens the two `--no-stage` cases. Dropping the moved-HEAD guard from `failed_commit()` reddens the three that read what an exit-8 run left on its branch, and leaves the two refusal cases green, because nothing landed in those.
+
+Two mutants aim at the hook contract and both redden exactly one case, `and the rejection was not retried`: retrying whichever way the probe answered, and probing the whole tree rather than the failing group. The second is `git diff --quiet` with no pathspec, which is the form measured 2026-08-27 and wrong under an index `apply()` narrows per group. It needs saying how that case had to be built, because two earlier shapes of it reported a clean kill for nothing. The exit code cannot discriminate: a retried rejection lands nowhere either and reports 8 just the same, so the case counts the hook's own runs instead of reading a status. And the rejection has to fall on a group that is **not the last**, because only then is a later group's file dirty relative to the narrowed index; with the rejection on the last group the unscoped probe answers 0 like the scoped one and the mutant killed nothing at all. Measured 2026-08-30 in a throwaway repository: rejection on the last of three, whole tree 0 and `git diff --quiet -- c.txt` 0; rejection on the second of three, whole tree 1 and `git diff --quiet -- b.txt` 0.
+
+The deterministic half of the same verb is the nine `commit` cases under `tests/golden/commit`, which `ls tests/golden/commit | wc -l` counts, and six mutations cover them. Reading the index instead of the whole tree reddens fifteen expectations across five cases and leaves every `no-stage` one green, which is the subset that makes it a kill rather than a crash: under the flag the index is the input either way. Dropping the untracked half of the input alone reddens four, the prompt and the schema of the two cases that carry an untracked file. Dropping `files` from the schema item reddens all nine `schema` expectations and nothing else. Reading only the first group in `validate()` reddens the one case whose planted violation sits in the second, and leaves the one whose violation sits in the first green. Changing the `description` reddens the `tests/cli.mts` case that pins it. Rendering only the first group reddens six, and the sixth is a warning rather than a kill: on the zero-group case the mutant iterates once over a group that is not there and prints `null: null`, so it crashed where it was planted rather than truncating anything. Five of those six are the truncation the mutant was for; the prediction had named five and the sixth is why a kill set is compared by name.
+
+Two fixtures are shaped by mutants that had been too coarse to see, and both are worth reading before either is simplified. The rehearsal case reads `git status --porcelain` over a tree carrying a file staged and modified again on top of it and an untracked one beside it, because on a tree that is merely staged a mutation that stages changes nothing the case can see. And the `--no-stage` case reads the working tree rather than the index, because the index is empty both when nothing was staged and when what was staged has just been committed, so a mutation that stages everything leaves an index-reading case green.
+
+Nine cases no mutation in the series reddens, and they are controls rather than assertions: that a refusal leaves no commit, with and without `--here`; that the work is still staged after one; that a rehearsal exits 0, stages nothing and still prints what `commit` would do; that one group exits 0; and that the whole series came out of one model call. Each holds an absence or a completion that no mutation of the workflow can manufacture on its own.
+
+The release has a group of its own, and it is split the way a verb's always is here. The six cases under `tests/golden/release`, which `ls tests/golden/release | wc -l` counts, pin the four read-only functions; `tests/release.sh` drives `apply()`, which no fixture can reach because `confirm` reads `/dev/tty`. That suite runs the shell runner with `curl` stubbed against a repository under `mktemp -d` that has a bare remote of its own, so the two pushes are real and land nowhere anybody owns, and `npm install --package-lock-only` runs inside that repository with `npm_config_registry` pointed at a refused port. Counted 2026-08-30 with `bash tests/release.sh | grep -c '^ok'` at 44 and `bash tests/golden.sh | grep -c '^ok   release/'` at 30.
+
+Twenty mutations, each predicted by case name before it was planted, each gated on the anchor occurring exactly once under `grep -oF ... | wc -l` and on `bash -n`, and each confirmed by the value the mutated line produced.
+
+The answer's own shape. Widening the bump enum to free text reddens eight: all six `schema` expectations and the two cases that read the enum and the enumerated fields off the stubbed request. Dropping the `validate()` rule against a summary that names the version reddens exactly `release/rejected/violations`.
+
+The two versions of the same sentence are pinned apart, which is the point of having both. The tag message losing its `lm <version> - ` prefix in `apply()` reddens one, `and reads lm <version> - <summary>`; making the tag lightweight rather than annotated reddens that one and `the tag is annotated`. Rewording the commit subject `apply()` writes reddens one, `whose subject names the version`, while rewording the subject `render()` prints reddens eight: the two that read the rendered commit, from a run and from a rehearsal, and all six `render` expectations. Stripping the prefix from `render()`'s tag line reddens eight the same way.
+
+What `apply()` does to the repository, one property each. Not repairing the foot links reddens the two that read them; opening no dated heading reddens `the [Unreleased] section is emptied` and `the entries stand under a dated heading`; dropping `npm install --package-lock-only` reddens `and so does package-lock.json` and `and which carries the three together`, because a lock file that did not change is not in a commit made with a pathspec; not rewriting `package.json`'s version reddens those two and `package.json says the new version`; and removing both pushes reddens `the branch reached the remote` and `and so did the tag`.
+
+What `collect()` refuses, and where. Dropping the guard on a version that is not three numbers reddens three; no longer refusing a version the arithmetic cannot reach reddens five; and the operator's version no longer pinning the bump reddens `release/pinned/prompt` and `a named version pins the bump`.
+
+Four findings, and they are what the record is for. The first attempt at moving the `[Unreleased]` guard out of `collect()` and into `apply()` deleted the `local n; n=$(_entries)` line above it, which `collect()` reads three lines later, so under `set -u` every case died and 36 went red at once: a mutant that parses, crashes where it is planted, and reads as thorough coverage. Replanted so that only the `if` moves, it reddens three where five were predicted, and the two survivors are the finding: `an empty [Unreleased] exits 3` and `and says there is nothing under it` both stay green, because the guard in `apply()` exits 3 and says the same words. Only `before any model call`, which counts what the stubbed `curl` was asked, can tell the two placements apart. The same shape appears twice more and each time the survivor is named here rather than repaired: `no package.json exits 3` survives the removal of its own guard, because the version-shape guard below it exits 3 too, and `release/no-unreleased/prompt` survives the removal of the missing-section guard, because the empty-section guard below it refuses first; in both, the case reading the words is what dies.
+
+The third is the runner's. Moving `libexec/lm-verb`'s `--dry-run` guard to after `apply` was predicted to redden the four rehearsal cases that read the repository, and reddened five: `a cut exits 0` goes with them, because `(( DRY ))` moved to the end of the file becomes the last command the runner executes and a false arithmetic test exits 1. `a rehearsal exits 0` and `and says it did nothing` stay green under it, and that green is what says the moved line ran. The fourth is two under-predictions of the same kind: collect no longer saying which version the project is at was predicted at three and reddened four, and no longer refusing an unreachable version was predicted at three and reddened five, both times because the prediction was written from `tests/release.sh` alone and forgot the fixture case that covers the same line.
+
+Sixteen cases no mutation in the series reddens, and they are controls rather than assertions. Six hold what a refusal or a rehearsal leaves behind, which rests on the runner's own `confirm` and is covered where that lives. Eight are the `violations` and `stderr` expectations that are empty because the answer is clean or the verb said nothing, an absence no mutation of this verb can manufacture. The other two are `and lands exactly one commit`, which one `git commit` cannot fail to satisfy, and `one model call paid for all of it`, which is what makes every count beside it readable.
+
+`shellcheck tools/*.sh` cannot be brought to silence, and the count is the check rather than a defect to fix. Every tool reports `SC2148` because it carries no shebang, which is honest (`libexec/lm-verb` sources it and never executes it), and one `SC2034` per declaration the runner reads after sourcing and the file itself never uses: `name` and `description` everywhere, plus `flags` where a tool declares one. Measured 2026-08-30 across the five verbs with `for f in tools/*.sh; do shellcheck -f gcc "$f" | wc -l; done`: `changelog` four, `commit` four, `issue` three, `pr` three, `release` three. A tool reporting one more than its declarations account for carries something the others do not, and that is what to look at.
+
+`changelog` is the one, and its extra is a false positive worth leaving. Its validator matches the backticked spans in a drafted bullet, so the regex contains literal backticks inside single quotes, and `SC2016` reads those as a command substitution that will not expand. Quoting it any other way changes what the pattern matches. `shellcheck -f gcc tools/changelog.sh` names the line.
