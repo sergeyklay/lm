@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
+import { modelAtNextLaunch } from "./selection.mts";
 
 // The mark is block glyphs coloured from the theme rather than from RGB: a
 // terminal without truecolor gets the theme's own approximation instead of a
@@ -63,6 +64,7 @@ export type Chrome = {
   contextTokens: number | null;
   contextWindow: number;
   autoCompact: boolean | undefined;
+  saved: boolean;
   input: number;
   output: number;
   thinking: string | undefined;
@@ -104,8 +106,14 @@ export function footerLines(theme: any, width: number, c: Chrome): string[] {
   // whatever the model does, so the slot stays empty rather than saying it.
   const thinking = c.thinking ? theme.fg("dim", `think ${c.thinking}`) : "";
 
+  // Only the model that will not come back is marked: the saved case is the one
+  // the operator expects, and a row saying so would be noise.
+  const model = c.saved
+    ? bold(c.model)
+    : `${bold(c.model)}  ${theme.fg("dim", "session only · Ctrl+S")}`;
+
   return [
-    threeSlots(width, bold(shortenCwd(c.cwd, homedir())), c.branch ? bold(c.branch) : "", bold(c.model)),
+    threeSlots(width, bold(shortenCwd(c.cwd, homedir())), c.branch ? bold(c.branch) : "", model),
     threeSlots(width, spent, "", thinking),
   ];
 }
@@ -144,6 +152,14 @@ export function silenceChangelog(
     }
   } catch {
     // The chat opens either way.
+  }
+}
+
+function modelThatReturns(cwd: string): string | undefined {
+  try {
+    return modelAtNextLaunch(SettingsManager.create(cwd));
+  } catch {
+    return undefined;
   }
 }
 
@@ -385,6 +401,14 @@ export function installChrome(pi: any, updated?: string): void {
   // nothing never sets one, and the block goes out in plain text.
   let ink: Ink | undefined;
 
+  // The model a next launch will open on. `Ctrl+S` writes it, and fires the same
+  // event a choice kept for the session alone does, so the file is read again on
+  // both rather than trusted from the launch.
+  let comesBack: string | undefined;
+  pi.on("model_select", (_event: any, ctx: any) => {
+    comesBack = modelThatReturns(ctx.cwd);
+  });
+
   // The same event fires for a reload and for each of the three ways a session
   // is replaced, where the chat carries on and a closing block would be a lie.
   // Only quitting ends the session, and the harness has already stopped the TUI
@@ -423,6 +447,7 @@ export function installChrome(pi: any, updated?: string): void {
     // because the same event fires again for a reload that installed nothing.
     if (updated && event?.reason === "startup") ctx.ui.notify(`harness updated to ${updated}`, "info");
     const autoCompact = compactionEnabled(ctx.cwd);
+    comesBack = modelThatReturns(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
       ink = {
         bold: (text: string) => theme.bold(theme.fg("text", text)),
@@ -442,6 +467,9 @@ export function installChrome(pi: any, updated?: string): void {
           contextTokens: usage?.tokens ?? null,
           contextWindow: usage?.contextWindow ?? ctx.model?.contextWindow ?? 0,
           autoCompact,
+          // Both unknowns are a claim this cannot make: a settings file it
+          // could not read, and a session with no model to compare.
+          saved: comesBack === undefined || ctx.model === undefined || ctx.model.id === comesBack,
           input,
           output,
           thinking: ctx.model?.reasoning ? ctx.thinkingLevel : undefined,

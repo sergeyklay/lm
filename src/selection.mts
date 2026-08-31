@@ -1,5 +1,10 @@
 import { modelId } from "./provider.mts";
 
+type SavedChoice = { getDefaultProvider(): unknown; getDefaultModel(): unknown };
+
+const savedInPi = (settings: SavedChoice) =>
+  Boolean(settings.getDefaultProvider() && settings.getDefaultModel());
+
 // What the chat opens on, which is not what a verb asks. `LM_MODEL` names the
 // verb's model and is the chat's default rather than its override: a model the
 // operator chose inside the chat and saved is an explicit choice, and passing
@@ -7,12 +12,14 @@ import { modelId } from "./provider.mts";
 // harness only when it has no saved choice of its own, and `findInitialModel` in
 // `dist/core/model-resolver.js` reads that choice from the settings file when
 // nothing reaches `main()` ahead of it.
-export function initialSelection(settings: {
-  getDefaultProvider(): unknown;
-  getDefaultModel(): unknown;
-}): string[] {
-  const savedInPi = Boolean(settings.getDefaultProvider() && settings.getDefaultModel());
-  return savedInPi ? [] : ["--provider", "ollama", "--model", modelId()];
+export function initialSelection(settings: SavedChoice): string[] {
+  return savedInPi(settings) ? [] : ["--provider", "ollama", "--model", modelId()];
+}
+
+// The model the next launch will open on, decided in the same order and read
+// back so the chat can say when the model in force is not it.
+export function modelAtNextLaunch(settings: SavedChoice): string {
+  return savedInPi(settings) ? String(settings.getDefaultModel()) : modelId();
 }
 
 // The level a chat opens on when nothing else says so, and a seed rather than an

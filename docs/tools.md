@@ -226,8 +226,23 @@ The trap in that series is the anchor for the last of them. `// The chat opens e
 twice in `src/chrome.mts`, the second in `silenceStartup`, so a patch taking the first match lands
 in code no case in this group reads and reports an empty kill set, which reads as a hole in the
 suite. Gating on the occurrence count rather than on the patch's exit status refuses it, and
-`grep -c '// The chat opens either way.' src/chrome.mts` returns 2. Counted 2026-08-30 with
-`node tests/chrome.mts | grep -c '^ok'` at 135.
+`grep -c '// The chat opens either way.' src/chrome.mts` returns 2. What the suite counts at any
+given size is `node tests/chrome.mts | grep -c '^ok'`, which only grows and is read rather than
+quoted.
+
+The status row says when the model on it will not come back, so its group is over `footerLines`
+and `installChrome` in `src/chrome.mts` and `modelAtNextLaunch` in `src/selection.mts`. Five
+mutations, each predicted by case name before it was planted, each gated by importing the mutated
+file on an absolute path, and each confirmed by the value the mutated line produced. Drawing the
+hint unconditionally reddens five cases, the two that read a saved row among them, because a model
+that comes back then carries the mark as well. Drawing it on the saved state instead reddens those
+five and three more, which is the sharper kill: it is the only mutant that reddens both arms at
+once. Changing the string reddens exactly the two cases that read it. Making the `model_select`
+handler return a sentinel rather than re-read the settings file reddens exactly the case that
+rewrites that file and fires the event, which is the case that exists because the harness emits the
+same event for a choice kept for the session and for one the keystroke persisted. The fifth is the
+builder's own default: `saved: false` in the footer object reddens three, and it is what proves the
+row is drawn from the settings file rather than from the fixture.
 
 What the chat opens thinking at is a settings write and not a flag, so its group is over
 `initialSelection` and the seed beside it in `src/selection.mts`. Five mutations, each predicted by

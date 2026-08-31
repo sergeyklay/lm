@@ -27,7 +27,13 @@ verb in the registry beside it. The chat offers every model ollama has, and open
 operator saved inside it, falling back to `LM_MODEL` when they have saved none. A model chosen
 through `/model` and kept with Ctrl+S is an explicit choice, and `findInitialModel` in the
 harness reads it from the settings file whenever no `--model` reaches `main()` ahead of it, so
-`bin/lm` hands the flag over only when there is nothing saved to overrule. The list itself:
+`bin/lm` hands the flag over only when there is nothing saved to overrule. A choice made any other
+way lasts the session and no longer, so the status row marks a model that will not come back:
+`session only · Ctrl+S` follows the name. A model that will come back carries nothing, because that
+is what the operator expects to have, and it is the saved choice where there is one and `LM_MODEL`
+where there is none. The settings file is read on the way in and again on every model change, and
+the keystroke fires that event too, so keeping a choice clears the mark where it stands. The list
+itself:
 the extension hands the harness a `refreshModels` function, which the harness calls in the
 background once at startup and again whenever `/model` opens, and which reads the names from
 `/api/tags` and each card from `/api/show`. Each model declares the smaller of its card's own

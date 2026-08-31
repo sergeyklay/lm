@@ -153,6 +153,7 @@ const chrome = {
   contextTokens: 1200,
   contextWindow: 32768,
   autoCompact: true,
+  saved: true,
   input: 12345,
   output: 1234,
   thinking: "medium",
@@ -188,6 +189,16 @@ check("and an unknown context prints a question mark", true,
   plain(footerLines(theme, 78, { ...chrome, contextTokens: null })[1]).startsWith("?/32.8k"));
 check("a repository-less directory drops the branch", false,
   plain(footerLines(theme, 78, { ...chrome, branch: null })[0]).includes("main"));
+
+// A model chosen inside the chat and not kept dies with the session, and the
+// keystroke that keeps it is the harness's own. The row says so on that case
+// alone: a model that will come back is what the operator expects to have.
+const unsaved = footerLines(theme, 78, { ...chrome, saved: false });
+check("a model that will not come back is marked as the session's alone", true,
+  plain(unsaved[0]).trimEnd().endsWith("qwen3.8:27b  session only · Ctrl+S"));
+check("in dim, beside the name it is about", true, styled(unsaved[0], "dim"));
+check("and a model that will come back carries nothing", false,
+  plain(rows[0]).includes("session only"));
 
 // A narrow terminal loses the middle first and the right slot second, and never
 // wraps: a wrapped status row pushes the chat off the screen.
@@ -241,6 +252,49 @@ check("and the setting beside it is left as it was", "light",
 const recorded = statSync(settingsFile).mtimeMs;
 changelog("0.84.4");
 check("recording the same version again does not touch the file", recorded, statSync(settingsFile).mtimeMs);
+
+// Which model comes back is the settings file's answer, so the chrome reads
+// that file rather than being told: on the way in, and again on every model
+// change, because Ctrl+S writes it through the event a session-only choice
+// fires too. Against the harness's own reader, in the scratch directory above.
+function statusModel(saved: Record<string, unknown>, model: string, kept?: Record<string, unknown>): string {
+  writeFileSync(settingsFile, JSON.stringify(saved));
+  const handlers: Record<string, (event: any, ctx: any) => void> = {};
+  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } });
+  let render: (width: number) => string[] = () => [];
+  const ctx = {
+    hasUI: true,
+    cwd: ROOT,
+    model: { id: model },
+    getContextUsage: () => undefined,
+    sessionManager: { getCwd: () => ROOT, getEntries: () => [] },
+    ui: {
+      notify: () => {},
+      setHeader: () => {},
+      setFooter: (factory: any) => { render = factory(undefined, theme, { getGitBranch: () => null }).render; },
+    },
+  };
+  handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+  if (kept) {
+    writeFileSync(settingsFile, JSON.stringify(kept));
+    handlers.model_select({ type: "model_select", source: "set" }, ctx);
+  }
+  // The row is the directory, the padding, then the slot this is about.
+  return plain(render(78)[0]).trimEnd().split(/ {3,}/).pop() ?? "";
+}
+
+process.env.PI_CODING_AGENT_DIR = agentDir;
+process.env.LM_MODEL = "phi3:mini";
+const KEPT = { quietStartup: true, defaultProvider: "ollama", defaultModel: "gpt-oss:20b" };
+check("the chat marks a model the settings file does not name", "gpt-oss:20b  session only · Ctrl+S",
+  statusModel({ quietStartup: true }, "gpt-oss:20b"));
+check("and says nothing of the one a launch with nothing saved opens on", "phi3:mini",
+  statusModel({ quietStartup: true }, "phi3:mini"));
+check("a saved choice is the model that comes back", "gpt-oss:20b", statusModel(KEPT, "gpt-oss:20b"));
+check("and the file is read again on a model change, so keeping one clears the mark", "gpt-oss:20b",
+  statusModel({ quietStartup: true }, "gpt-oss:20b", KEPT));
+delete process.env.LM_MODEL;
+delete process.env.PI_CODING_AGENT_DIR;
 
 rmSync(work, { recursive: true, force: true });
 
