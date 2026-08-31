@@ -8,6 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, installChrome, silenceChangelog, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
@@ -124,27 +125,38 @@ check("a newer release outside the range is refused", undefined,
 check("and nothing moves when the newest in range is already installed", undefined,
   pickTarget(["0.84.3", "0.84.4", "0.85.0"], "^0.84.3", "0.84.4"));
 
+// A clone the chat has never opened in: a real one installs the newest the range
+// admits on every launch, so it has nothing left for these cases to move it to.
+const behindDir = mkdtempSync(join(tmpdir(), "lm-clone-"));
+const behindHarness = join(behindDir, "node_modules", "@earendil-works", "pi-coding-agent");
+mkdirSync(behindHarness, { recursive: true });
+writeFileSync(join(behindDir, "package.json"),
+  JSON.stringify({ dependencies: { "@earendil-works/pi-coding-agent": "^0.84.3" } }));
+writeFileSync(join(behindHarness, "package.json"), JSON.stringify({ version: "0.84.3" }));
+const behind = pathToFileURL(`${behindDir}/`);
+
 const npm: string[] = [];
 check("a launch installs the target and reports the version it moved to", "0.84.4",
-  await updateHarness({ published: async () => ["0.84.3", "0.84.4", "0.85.0"], install: (v) => { npm.push(v); return true; } }));
+  await updateHarness({ clone: behind, published: async () => ["0.84.3", "0.84.4", "0.85.0"], install: (v) => { npm.push(v); return true; } }));
 check("naming that version to npm and no other", ["0.84.4"], npm);
 check("a launch already on the newest in range reports nothing", undefined,
-  await updateHarness({ published: async () => ["0.84.3"], install: () => true }));
+  await updateHarness({ clone: behind, published: async () => ["0.84.3"], install: () => true }));
 
 // Every way this can fail leaves the chat opening on the version installed, with
 // nothing printed and nothing thrown: an update that did not happen is not news.
 check("PI_OFFLINE asks the registry nothing at all", undefined,
-  await updateHarness({ allowNetwork: false, published: async () => { throw new Error("asked"); }, install: () => true })
+  await updateHarness({ clone: behind, allowNetwork: false, published: async () => { throw new Error("asked"); }, install: () => true })
     .catch((e) => `threw ${e}`));
 check("a registry that cannot be reached is silent rather than an error", undefined,
-  await updateHarness({ published: async () => { throw new Error("no route to host"); }, install: () => true })
+  await updateHarness({ clone: behind, published: async () => { throw new Error("no route to host"); }, install: () => true })
     .catch((e) => `threw ${e}`));
 check("a registry answering rubbish is silent too", undefined,
-  await updateHarness({ published: async () => ["not a version"], install: () => true })
+  await updateHarness({ clone: behind, published: async () => ["not a version"], install: () => true })
     .catch((e) => `threw ${e}`));
 check("and an install that fails reports no version", undefined,
-  await updateHarness({ published: async () => ["0.84.4"], install: () => false })
+  await updateHarness({ clone: behind, published: async () => ["0.84.4"], install: () => false })
     .catch((e) => `threw ${e}`));
+rmSync(behindDir, { recursive: true, force: true });
 
 const chrome = {
   cwd: "/home/ubuntu/lm",

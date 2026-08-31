@@ -176,9 +176,15 @@ unread setting prints no mode, right-aligning the branch reddens the case that p
 middle, and dropping the version reddens the case that reads the name.
 
 What the chat installs before it opens, and the row it draws when it did, is a group of its own in
-the same suite. The version arithmetic and the message are both pure, so they are pinned off the
-network with the registry and npm behind seams a case supplies, and no case reaches either. Two
-suites drive the whole program through `bin/lm` and so pay the launch's own request: they point
+the same suite. The message is pure and the arithmetic is not: `updateHarness` reads the declared
+range and the installed version off a clone, so the registry, npm and the clone are all seams a case
+supplies and no case reaches any of the three. A case that left the clone to the repository it runs
+from would be arithmetic about the machine it ran on, and the chat installs the newest the range
+admits on every launch, so the moment the operator opens the chat the installed version catches up
+with the newest and the cases that need a launch to move have nothing to move to. Each
+`updateHarness` case therefore hands `clone` a directory under `mktemp -d` holding a `package.json`
+that declares `^0.84.3`, and the harness's own package.json under node_modules declaring `0.84.3`.
+Two suites drive the whole program through `bin/lm` and so pay the launch's own request: they point
 `npm_config_registry` at a refused port, because `PI_OFFLINE` would also switch off the catalogue
 read one of them exists to measure. Without that they install a release into the clone they are
 running against, which is how the leak was found. Six
@@ -204,6 +210,28 @@ says the text and its level are pinned apart rather than twice. Dropping the gua
 reddens the case requiring a launch that moved nothing to say nothing, which comes back notifying
 `harness updated to undefined`, and dropping the guard on the `startup` reason reddens the case
 requiring a reload not to repeat it.
+
+Five further mutations cover that clone, each predicted by case name before it was planted, each
+confirmed by the value the mutated line produced, and each gated by importing the mutated file on an
+absolute path, except the two planted in the suite itself, which are gated on the run printing at
+least one `ok` line. `installedVersion` reading the repository rather than the clone the case handed
+it reddens exactly the three cases the fixture exists for - `a launch installs the target and reports
+the version it moved to`, `naming that version to npm and no other` and `a launch already on the
+newest in range reports nothing` - which come back `undefined`, `[]` and `0.84.3`. It is the one
+mutant here whose kill set depends on the machine, and it is the defect the fixture repairs. Widening
+the fixture's own declared range to `*` reddens the first two of those, which come back `0.85.0`
+where the range admits `0.84.4`, and leaves the third green, because a launch already on the newest
+moves nowhere under any range. The two mutants above were re-derived against the fixture and are
+unchanged by it: satisfying `*` in `pickTarget` still reddens five, and dropping the comparison
+against the installed version still reddens two, which come back `0.84.4` and `0.84.3`.
+
+The fifth is a zero this record can explain. `declaredRange` reading the repository rather than the
+clone reddens nothing at all, because this repository declares the same `^0.84.3` the fixture does,
+so no case can tell the two apart. What says it ran rather than missed is the pair: planted on top of
+the widened fixture, which alone reddens two, it reddens nothing, because the fixture's range is no
+longer what is read. The anchor rule earned its place here on the fixture rather than on the source -
+`grep -oF '"^0.84.3"' tests/chrome.mts | wc -l` returns 4, so the widening is planted on the whole
+declaration and not on the bare range three `pickTarget` cases pass as well.
 
 The version the harness compares its own release notes against is a settings write rather than a
 screen, and its cases carry five mutants of their own. Deleting the write reddens the two that read
@@ -440,10 +468,12 @@ the interior the frame leaves was predicted to redden three and reddened five, a
 the finding: the two eighty-column bounds cases, `every row of it reads on an eighty-column
 terminal` and `and so does one naming the session by its file and the model by a 54-character
 identifier`, assert `visibleWidth(l) <= 80` over the whole row rather than over what the row says,
-so a frame drawn without measuring breaks them too. Five of 138 cases went red and every case
+so a frame drawn without measuring breaks them too. Five cases went red and every case
 reading what the block says stayed green, which is the shape a real kill has, and predicting from
-the frame's own cases alone is what misses the other two. Counted 2026-08-30 with
-`node tests/chrome.mts | grep -cE '^(ok|FAIL) '` at 138.
+the frame's own cases alone is what misses the other two. The five are a subset rather than a
+share: what the suite holds at any size is
+`node tests/chrome.mts | grep -cE '^(ok|FAIL) '`, which only grows, so it is read rather than
+quoted.
 
 The other eight each reddened exactly the set predicted for them. Forcing the fit gate to `true`
 reddens the two written for it, `a terminal that cannot hold the frame is given the block without
