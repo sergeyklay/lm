@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-31
+
 ### Added
 
 - The chat remembers the model you chose and the thinking level you chose for it, with nothing to press and nothing new on the screen. Pick a model with `/model` and the next launch opens on it; set a level with `/thinking` and that level comes back with that model, while another model keeps its own. Nothing is announced and no keystroke is involved: choosing is the act, and a chat that has to be told to remember is one you have to remember to tell. A model nothing has been chosen for yet opens at `low`, which is one notch below what the harness would pick on its own. `LM_MODEL` still names the model a verb asks, and now also overrides the chat for one launch when you set it in the environment, so `LM_MODEL=phi3:mini lm` opens there once without disturbing what the chat remembers. Before, the chat opened on `LM_MODEL` however many times you had picked another model, and a level you chose was gone by the next launch.
@@ -213,7 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pr`, which writes a pull request description from `git log <default>..HEAD`
 - `issue`, which drafts a GitHub issue and picks its labels from the repository's own taxonomy
 
-[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sergeyklay/lm/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sergeyklay/lm/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sergeyklay/lm/compare/v0.0.5...v0.1.0
 [0.0.5]: https://github.com/sergeyklay/lm/compare/v0.0.4...v0.0.5
