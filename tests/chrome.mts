@@ -7,9 +7,9 @@
 import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { headerLines, footerLines, DoubleEscapeEditor, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, DoubleEscapeEditor, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, ownTitle, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -828,6 +828,29 @@ check("and the original write is back the moment it has been", true, sink.write 
 check("so a second line like it reaches the terminal", HARNESS_LINE,
   (sink.write(HARNESS_LINE), String(written.at(-1))));
 
+// Every title the harness paints leaves with this project's name in front of it,
+// which is what makes the name survive a repaint nothing of this project's ran
+// before. The chunk is matched whole, so the wrap has nothing to say about any
+// other escape the harness writes.
+const osc = (title: string) => `\x1b]0;${title}\x07`;
+const titled: unknown[] = [];
+const screen = { write: (chunk: unknown) => { titled.push(chunk); return true; } };
+ownTitle(screen);
+const owned = screen.write;
+check("the harness's name is replaced by this project's", osc("lm - lm"),
+  (screen.write(osc("π - lm")), String(titled.at(-1))));
+check("and the session name it composed is left where it put it", osc("lm - a name - lm"),
+  (screen.write(osc("π - a name - lm")), String(titled.at(-1))));
+check("a chunk that is not a title is written as it came", "\x1b[2J",
+  (screen.write("\x1b[2J"), String(titled.at(-1))));
+check("and a title that arrived as bytes leaves as bytes", true,
+  (screen.write(Buffer.from(osc("π - lm"))), Buffer.isBuffer(titled.at(-1))));
+// `session_start` fires for every session and again for a reload, and the stream
+// is the process's own: a second install would put a second wrap on every write
+// the chat makes for the rest of the sitting.
+ownTitle(screen);
+check("a second install leaves the one wrap that is already there", true, screen.write === owned);
+
 // The unit cases above say the block is right. This says the harness reaches the
 // handler that prints it, on the quit path and to the terminal it has already
 // restored, which no assertion over `summarize` can show.
@@ -837,6 +860,7 @@ async function quitAfterOpening(
   argv: (session: string, dir: string) => string,
   holds: (quit: string) => string = (quit) => quit,
   from: string = FIXTURE,
+  drive?: (send: (keys: string) => void, until: (text: string) => Promise<string>) => Promise<void>,
 ): Promise<{ printed: string; raw: string; session: string }> {
   const quit = mkdtempSync(join(tmpdir(), "lm-quit-"));
   const dir = holds(quit);
@@ -855,6 +879,16 @@ async function quitAfterOpening(
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline && !seen().includes("for commands")) await wait(200);
+  if (drive) {
+    // The capture at the moment a thing appears, so a case reads the screen it
+    // named rather than whatever the screen holds once the run is over.
+    const until = async (text: string): Promise<string> => {
+      const end = Date.now() + 30_000;
+      while (Date.now() < end && !seen().includes(text)) await wait(200);
+      return seen();
+    };
+    await drive((keys) => { chat.stdin.write(keys); }, until);
+  }
   // Repeated because the key reaches a TUI that may still be drawing its first
   // frame, and an end of input it has not started reading is an end of input lost.
   while (Date.now() < deadline && chat.exitCode === null) {
@@ -958,6 +992,35 @@ check("a session that asked nothing opens the chat like any other", true,
   askedNothing.printed.includes("for commands"));
 check("and quitting it leaves no resume line on the screen, this project's or the harness's", 0,
   askedNothing.printed.split("\n").filter((l) => /[Rr]esume/.test(l)).length);
+
+// The window title is what the operator reads in a tab they are not looking at,
+// and the harness repaints it after every handler that could set it: once on the
+// way in, twice more on a session switch. So it is read back from the bytes the
+// terminal received rather than from the process that wrote them, at launch and
+// again after a `/new`, because a title that is only right at launch is worse
+// than one this project never touched.
+const OSC_TITLE = /\x1b\]0;([^\x07]*)\x07/g;
+const titles = (capture: string): string[] => [...capture.matchAll(OSC_TITLE)].map((m) => m[1]);
+
+let launched = "";
+const switched = await quitAfterOpening(
+  (s, d) => `chat --session ${s} --session-dir ${d}`, undefined, undefined,
+  async (send, until) => {
+    launched = await until("\x1b]0;");
+    send("/new\r");
+    await until("New session started");
+  });
+const WINDOW = `lm - ${basename(ROOT)}`;
+check("the window title the terminal receives names this project", WINDOW,
+  titles(launched).at(-1) ?? "no title reached the terminal");
+// The control: without it a run whose keystroke never landed would satisfy the
+// case below by reading the launch title a second time.
+check("and a session switch is what the case below reads the title after", true,
+  switched.printed.includes("New session started"));
+check("which the title survives, because the harness repaints it after the switch", WINDOW,
+  titles(switched.raw).at(-1) ?? "no title reached the terminal");
+check("with the harness's own name on none of the titles the terminal received", [],
+  titles(switched.raw).filter((t) => !t.startsWith("lm")));
 
 if (fail) { console.log("FAILED"); process.exit(1); }
 console.log("all cases passed");
