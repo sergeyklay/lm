@@ -1,8 +1,6 @@
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { getAgentDir, SettingsManager } from "@earendil-works/pi-coding-agent";
-import { modelAtNextLaunch, type ModelChoice } from "./selection.mts";
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
 
 // The mark is block glyphs coloured from the theme rather than from RGB: a
 // terminal without truecolor gets the theme's own approximation instead of a
@@ -65,7 +63,6 @@ export type Chrome = {
   contextTokens: number | null;
   contextWindow: number;
   autoCompact: boolean | undefined;
-  saved: boolean;
   input: number;
   output: number;
   thinking: string | undefined;
@@ -107,17 +104,8 @@ export function footerLines(theme: any, width: number, c: Chrome): string[] {
   // whatever the model does, so the slot stays empty rather than saying it.
   const thinking = c.thinking ? theme.fg("dim", `think ${c.thinking}`) : "";
 
-  // Only the model that will not come back is marked: the saved case is the one
-  // the operator expects, and a row saying so would be noise. The mark leads so
-  // that the slot grows leftward and the name keeps the columns it had, and it
-  // names the route rather than the keystroke, which does nothing at the prompt
-  // where this row is read.
-  const model = c.saved
-    ? bold(c.model)
-    : `${theme.fg("dim", "session only · /model")}  ${bold(c.model)}`;
-
   return [
-    threeSlots(width, bold(shortenCwd(c.cwd, homedir())), c.branch ? bold(c.branch) : "", model),
+    threeSlots(width, bold(shortenCwd(c.cwd, homedir())), c.branch ? bold(c.branch) : "", bold(c.model)),
     threeSlots(width, spent, "", thinking),
   ];
 }
@@ -159,41 +147,39 @@ export function silenceChangelog(
   }
 }
 
-function modelThatReturns(cwd: string): ModelChoice | undefined {
+// A model is the pair, never the id alone: the harness resolves a remembered
+// choice by provider and id together, and one provider's model is not another's
+// however alike the two names read.
+type Chosen = { provider: string; id: string };
+
+// The chat opens on what it was last on, and the harness writes neither half of
+// that by itself: it saves a model only under the keystroke in its own dialog,
+// and `/thinking` saves nothing at all. So both are written here, each where the
+// harness's own resolver reads it back.
+export function rememberModel(
+  settings: { setDefaultModelAndProvider(provider: string, model: string): void },
+  model: Chosen | undefined,
+): void {
   try {
-    return modelAtNextLaunch(SettingsManager.create(cwd));
+    if (model) settings.setDefaultModelAndProvider(model.provider, model.id);
   } catch {
-    return undefined;
+    // The chat carries on with the model the operator just chose.
   }
 }
 
-// The keystroke writes the settings file without always announcing it:
-// `_emitModelSelect` in the harness returns early when the model being saved is
-// the one already in force, which is the save the operator makes most often. So
-// the answer is derived where the row is drawn rather than taken from the event,
-// and the file's own mtime and size are what say the last answer still holds.
-function settingsStamp(): string | undefined {
+// Under the model the level belongs to rather than as the global default, which
+// is what makes it the level that model comes back at: the harness prefers a
+// per-model entry over its default, at launch and on every switch alike.
+export function rememberThinkingLevel(
+  settings: { setModelThinkingLevel(provider: string, model: string, level: string): void },
+  model: Chosen | undefined,
+  level: string | undefined,
+): void {
   try {
-    const s = statSync(join(getAgentDir(), "settings.json"), { throwIfNoEntry: false });
-    return s && `${s.mtimeMs}:${s.size}`;
+    if (model && level) settings.setModelThinkingLevel(model.provider, model.id, level);
   } catch {
-    return undefined;
+    // The chat carries on at the level the operator just chose.
   }
-}
-
-// The stamp is taken before the read, so a write that lands between the two is
-// read again on the next frame rather than cached as current.
-function watchModelThatReturns(cwd: string): () => ModelChoice | undefined {
-  let stamp = settingsStamp();
-  let choice = modelThatReturns(cwd);
-  return () => {
-    const now = settingsStamp();
-    if (now !== stamp) {
-      stamp = now;
-      choice = modelThatReturns(cwd);
-    }
-    return choice;
-  };
 }
 
 function compactionEnabled(cwd: string): boolean | undefined {
@@ -459,6 +445,17 @@ export function installChrome(pi: any, updated?: string): void {
     process.stdout.write(`\n${summaryBlock(summary, ink, process.stdout.columns).join("\n")}\n`);
   });
 
+  // The two choices the operator makes and expects to still have next time. Each
+  // arrives once, from the harness, and neither is saved by it. A level names no
+  // model, so it is written under the model in force, which is already the new
+  // one when a switch is what changed the level.
+  pi.on("model_select", (event: any, ctx: any) => {
+    rememberModel(SettingsManager.create(ctx.cwd), event?.model);
+  });
+  pi.on("thinking_level_select", (event: any, ctx: any) => {
+    rememberThinkingLevel(SettingsManager.create(ctx.cwd), ctx.model, event?.level);
+  });
+
   // The header is built before extensions initialise, and `setHeader` is a no-op
   // until it exists, so this waits for session_start rather than running in the
   // factory.
@@ -472,7 +469,6 @@ export function installChrome(pi: any, updated?: string): void {
     // because the same event fires again for a reload that installed nothing.
     if (updated && event?.reason === "startup") ctx.ui.notify(`harness updated to ${updated}`, "info");
     const autoCompact = compactionEnabled(ctx.cwd);
-    const comesBack = watchModelThatReturns(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
       ink = {
         bold: (text: string) => theme.bold(theme.fg("text", text)),
@@ -485,7 +481,6 @@ export function installChrome(pi: any, updated?: string): void {
       render: (width: number) => {
         const usage = ctx.getContextUsage();
         const { input, output } = totals(ctx.sessionManager.getEntries());
-        const next = comesBack();
         return footerLines(theme, width, {
           cwd: ctx.sessionManager.getCwd(),
           branch: footerData.getGitBranch(),
@@ -493,13 +488,6 @@ export function installChrome(pi: any, updated?: string): void {
           contextTokens: usage?.tokens ?? null,
           contextWindow: usage?.contextWindow ?? ctx.model?.contextWindow ?? 0,
           autoCompact,
-          // Both unknowns are a claim this cannot make: a settings file it
-          // could not read, and a session with no model to compare. The provider
-          // is half of what names a model, so it is compared too.
-          saved:
-            next === undefined ||
-            ctx.model === undefined ||
-            (ctx.model.id === next.model && ctx.model.provider === next.provider),
           input,
           output,
           thinking: ctx.model?.reasoning ? ctx.thinkingLevel : undefined,

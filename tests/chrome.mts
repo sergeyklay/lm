@@ -9,7 +9,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, installChrome, silenceChangelog, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -165,7 +165,6 @@ const chrome = {
   contextTokens: 1200,
   contextWindow: 32768,
   autoCompact: true,
-  saved: true,
   input: 12345,
   output: 1234,
   thinking: "medium",
@@ -201,23 +200,6 @@ check("and an unknown context prints a question mark", true,
   plain(footerLines(theme, 78, { ...chrome, contextTokens: null })[1]).startsWith("?/32.8k"));
 check("a repository-less directory drops the branch", false,
   plain(footerLines(theme, 78, { ...chrome, branch: null })[0]).includes("main"));
-
-// A model chosen inside the chat and not kept dies with the session, and the row
-// says so on that case alone: a model that will come back is what the operator
-// expects to have. The mark names `/model`, which is the route from the prompt
-// where the row is read; the keystroke that keeps a choice is inert there and
-// the dialog teaches it where it works.
-const unsaved = footerLines(theme, 78, { ...chrome, saved: false });
-check("a model that will not come back is marked as the session's alone", true,
-  plain(unsaved[0]).trimEnd().endsWith("session only · /model  qwen3.8:27b"));
-check("in dim, beside the name it is about", true, styled(unsaved[0], "dim"));
-check("and a model that will come back carries nothing", false,
-  plain(rows[0]).includes("session only"));
-// The mark leads, so the slot grows to the left and the name does not move
-// under the operator as a choice is kept or made.
-const nameColumn = (row: string) => plain(row).indexOf("qwen3.8:27b");
-check("and the name stands in the same columns whether the mark is drawn or not",
-  nameColumn(rows[0]), nameColumn(unsaved[0]));
 
 // A narrow terminal loses the middle first and the right slot second, and never
 // wraps: a wrapped status row pushes the chat off the screen.
@@ -272,19 +254,13 @@ const recorded = statSync(settingsFile).mtimeMs;
 changelog("0.84.4");
 check("recording the same version again does not touch the file", recorded, statSync(settingsFile).mtimeMs);
 
-// Which model comes back is the settings file's answer, so the chrome reads that
-// file rather than being told. It cannot be told: the harness emits no
-// `model_select` when the model saved is the one already in force, which is the
-// commonest save there is, so the row re-derives its answer as it draws. Against
-// the harness's own reader, in the scratch directory above. `kept` is a second
-// settings file written after the row has been drawn once and before it is drawn
-// again, with no event of any kind in between.
-function statusModel(
-  saved: Record<string, unknown>,
-  model: string,
-  kept?: Record<string, unknown>,
-  provider = "ollama",
-): string {
+// What the chat remembers, and where it writes it. The harness saves neither
+// half by itself: a model only under the keystroke in its own dialog, and a
+// level not at all. So the cases drive the two events the harness does send,
+// against its own settings file in the scratch directory above, and read the
+// file back. Its writes are queued, so what reached disk is polled for rather
+// than assumed.
+function chatOn(saved: Record<string, unknown>, model: { provider: string; id: string } | undefined) {
   writeFileSync(settingsFile, JSON.stringify(saved));
   const handlers: Record<string, (event: any, ctx: any) => void> = {};
   installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } });
@@ -292,7 +268,7 @@ function statusModel(
   const ctx = {
     hasUI: true,
     cwd: ROOT,
-    model: { id: model, provider },
+    model,
     getContextUsage: () => undefined,
     sessionManager: { getCwd: () => ROOT, getEntries: () => [] },
     ui: {
@@ -302,30 +278,81 @@ function statusModel(
     },
   };
   handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
-  render(78);
-  if (kept) writeFileSync(settingsFile, JSON.stringify(kept));
+  // Through the table rather than by name: an event the chat stopped listening
+  // for has to fail the case that reads what the handler wrote, not abort the
+  // suite on the way to it.
+  const fire = (name: string, event: any) => handlers[name]?.(event, ctx);
   // The row is the directory, the padding, then the slot this is about.
-  return plain(render(78)[0]).trimEnd().split(/ {3,}/).pop() ?? "";
+  const statusModel = () => plain(render(78)[0]).trimEnd().split(/ {3,}/).pop() ?? "";
+  return { handlers, fire, statusModel };
+}
+
+async function settled(want: (settings: any) => boolean): Promise<any> {
+  for (let i = 0; i < 200; i += 1) {
+    const settings = JSON.parse(readFileSync(settingsFile, "utf8"));
+    if (want(settings)) return settings;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return JSON.parse(readFileSync(settingsFile, "utf8"));
 }
 
 process.env.PI_CODING_AGENT_DIR = agentDir;
-process.env.LM_MODEL = "phi3:mini";
-const KEPT = { quietStartup: true, defaultProvider: "ollama", defaultModel: "gpt-oss:20b" };
-check("the chat marks a model the settings file does not name", "session only · /model  gpt-oss:20b",
-  statusModel({ quietStartup: true }, "gpt-oss:20b"));
-check("and says nothing of the one a launch with nothing saved opens on", "phi3:mini",
-  statusModel({ quietStartup: true }, "phi3:mini"));
-check("a saved choice is the model that comes back", "gpt-oss:20b", statusModel(KEPT, "gpt-oss:20b"));
-// The save the operator makes most often is on the model already in force, and
-// the harness announces that one to nobody. The row has to see it anyway.
-check("a save the harness never announces still clears the mark", "gpt-oss:20b",
-  statusModel({ quietStartup: true }, "gpt-oss:20b", KEPT));
-// A default is a provider and an id together, and the harness writes the pair.
-// One provider's model is not another's, however alike the two names read.
-check("and a same-named model under another provider is not the one saved",
-  "session only · /model  gpt-oss:20b",
-  statusModel({ quietStartup: true, defaultProvider: "openrouter", defaultModel: "gpt-oss:20b" }, "gpt-oss:20b"));
-delete process.env.LM_MODEL;
+
+// The row says what the session is on and nothing about what the next launch
+// will open on, because the chat now opens on this: there is nothing left to
+// warn about, and a mark drawn on every frame to say so would be noise.
+check("the status row carries the model and nothing beside it", "gpt-oss:20b",
+  chatOn({ quietStartup: true }, { provider: "ollama", id: "gpt-oss:20b" }).statusModel());
+check("and says the same where the file already remembers that model", "gpt-oss:20b",
+  chatOn({ quietStartup: true, defaultProvider: "ollama", defaultModel: "gpt-oss:20b" },
+    { provider: "ollama", id: "gpt-oss:20b" }).statusModel());
+
+const picked = chatOn({ quietStartup: true }, { provider: "ollama", id: "phi3:mini" });
+check("the chat listens for both of the choices the harness announces and saves neither of",
+  ["model_select", "session_shutdown", "session_start", "thinking_level_select"],
+  Object.keys(picked.handlers).sort());
+picked.fire("model_select", { type: "model_select", model: { provider: "ollama", id: "gpt-oss:20b" }, source: "set" });
+const afterModel = await settled((settings) => settings.defaultModel !== undefined);
+check("a model change is remembered as the model the next launch opens on", "gpt-oss:20b",
+  afterModel.defaultModel);
+check("under the provider serving it, which is the other half of what names a model", "ollama",
+  afterModel.defaultProvider);
+
+// A level names no model, so it is remembered under the model in force. The
+// harness prefers that entry over its own global default at every launch, which
+// is what makes the level come back with the model rather than with the chat.
+const onGpt = chatOn({ quietStartup: true, defaultProvider: "ollama", defaultModel: "gpt-oss:20b" },
+  { provider: "ollama", id: "gpt-oss:20b" });
+onGpt.fire("thinking_level_select", { type: "thinking_level_select", level: "high", previousLevel: "low" });
+const afterLevel = await settled((settings) => settings.modelThinkingLevels !== undefined);
+check("a thinking level is remembered under the model it belongs to", "high",
+  afterLevel.modelThinkingLevels?.["ollama/gpt-oss:20b"]);
+check("and under that model alone", ["ollama/gpt-oss:20b"], Object.keys(afterLevel.modelThinkingLevels ?? {}));
+check("rather than as the default the harness would then apply to every model", false,
+  "defaultThinkingLevel" in afterLevel);
+
+const onPhi = chatOn({ ...afterLevel, quietStartup: true }, { provider: "ollama", id: "phi3:mini" });
+onPhi.fire("thinking_level_select", { type: "thinking_level_select", level: "off", previousLevel: "high" });
+const afterBoth = await settled((settings) => settings.modelThinkingLevels?.["ollama/phi3:mini"] !== undefined);
+check("a second model's level is remembered beside the first and not over it", "high|off",
+  `${afterBoth.modelThinkingLevels?.["ollama/gpt-oss:20b"]}|${afterBoth.modelThinkingLevels?.["ollama/phi3:mini"]}`);
+
+// Both halves of a choice have to be there to be worth writing: a settings file
+// asked to remember half of one is a file naming a model nothing can resolve.
+const asked: string[] = [];
+const recorder = {
+  setDefaultModelAndProvider: (provider: string, model: string) => asked.push(`model ${provider}/${model}`),
+  setModelThinkingLevel: (provider: string, model: string, level: string) =>
+    asked.push(`level ${provider}/${model}=${level}`),
+};
+rememberModel(recorder, undefined);
+rememberThinkingLevel(recorder, { provider: "ollama", id: "gpt-oss:20b" }, undefined);
+rememberThinkingLevel(recorder, undefined, "high");
+check("a change naming no model, or no level, is not remembered", [], asked);
+rememberModel(recorder, { provider: "ollama", id: "gpt-oss:20b" });
+rememberThinkingLevel(recorder, { provider: "ollama", id: "gpt-oss:20b" }, "high");
+check("and one naming both is", ["model ollama/gpt-oss:20b", "level ollama/gpt-oss:20b=high"], asked);
+
 delete process.env.PI_CODING_AGENT_DIR;
 
 rmSync(work, { recursive: true, force: true });

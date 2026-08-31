@@ -23,27 +23,18 @@ operator to type and the harness spells the naming and the choosing as two diffe
 
 The chat is the harness's own interactive mode, driven through its entry point with an inline
 extension that registers the local provider from `LM_OLLAMA`, `LM_MODEL` and `LM_CTX`, and every
-verb in the registry beside it. The chat offers every model ollama has, and opens on the one the
-operator saved inside it, falling back to `LM_MODEL` when they have saved none. A model chosen
-through `/model` and kept with Ctrl+S is an explicit choice, and `findInitialModel` in the
-harness reads it from the settings file whenever no `--model` reaches `main()` ahead of it, so
-`bin/lm` hands the flag over only when there is nothing saved to overrule. A choice made any other
-way lasts the session and no longer, so the status row marks a model that will not come back:
-`session only · /model` sits ahead of the name. It names the route rather than the keystroke,
-because the keystroke does nothing at the prompt where the row is read: the only key dispatch there
-is for shortcuts an extension registered, and this one registers none. Ctrl+S works inside the
-`/model` dialog, which the operator opens by typing `/model` or with Ctrl+L, and that dialog draws
-`Enter to select · Ctrl+S to set as default · Esc to cancel` itself, so the keystroke is taught
-where it works. The mark leads rather than follows so the name keeps the columns it had: the slot
-is flush with the right of the row, so a mark after the name would shift the name every time a
-choice was kept or made. A model that will come back carries nothing, because that is what the
-operator expects to have, and it is the saved choice where there is one and `LM_MODEL` where there
-is none. Which of the two a model is cannot be learned from the harness's model-change event, which
-it withholds whenever the model chosen is the one already in force: saving the model the session is
-already on, the commonest save there is, is announced to nobody. So the row derives its own answer
-as it draws, and reads the settings file again only when that file's own modification time or size
-has moved. What it compares is a provider and a model together, which is how the harness saves a
-default, because one provider's model is not another's however alike the two names read. The list
+verb in the registry beside it. The chat offers every model ollama has, and opens on the one it
+was last on. Choosing a model is the whole of keeping it: the chat writes the choice where
+`findInitialModel` in the harness reads it back, on the harness's own model-change event, and there
+is nothing to press and nothing on the screen about it. What it writes is a provider and a model
+together, because that is how the harness resolves a default, and one provider's model is not
+another's however alike the two names read. `bin/lm` hands `--provider` and `--model` to the harness
+only where there is nothing remembered, since a flag reaching `main()` overrules the memory on every
+launch. The exception is `LM_MODEL`, which names the verb's model and is the one way to aim a single
+launch elsewhere: set in the environment it is handed over and wins for that launch, and unset it
+leaves the memory to decide. So the status row carries the model name and nothing beside it. The
+harness withholds its model-change event whenever the model chosen is the one already in force, and
+that costs nothing here, because a model that did not change has nothing to remember. The list
 itself:
 the extension hands the harness a `refreshModels` function, which the harness calls in the
 background once at startup and again whenever `/model` opens, and which reads the names from
@@ -85,10 +76,14 @@ reasoning on this model than the one below. That level is a seed and not a flag:
 every level the harness has saved, both its global default and the per-model one, and `bin/lm` has
 resolved no model when it builds its flags, so it cannot know which per-model entry a launch would
 land on. It writes `low` into the harness's settings as the global default when none is saved there
-and hands no `--thinking` over at all. So a level chosen through `/thinking` and kept survives every
-later launch, and the order that decides one is the harness's own: the level saved for the model in
-force, then the global default. A card that claims no thinking is clamped to `off` whatever is
-saved. A verb is batch and asks for `none` unless `LM_THINK` says otherwise.
+and hands no `--thinking` over at all. A level chosen through `/thinking` is remembered for the
+model it was chosen under, because that is the level the operator will expect from that model rather
+than from the chat. The harness announces the change and saves nothing, so the chat writes it, under
+the model in force at the moment it changed, and the order that decides a level is then the
+harness's own: the level remembered for the model, then the global default the seed wrote, then the
+harness's `medium`. The seed can therefore never overrule a remembered level; it is what a model
+nothing is remembered about opens at. A card that claims no thinking is clamped to `off` whatever is
+remembered. A verb is batch and asks for `none` unless `LM_THINK` says otherwise.
 The second status row shows the level the session is at, and shows nothing for a model that has no
 level to report.
 
@@ -135,9 +130,10 @@ The one thing this leaves for the operator is `npm ci`, which reinstalls from th
 the harness back to the version the lock names. The next launch installs the newest in range again.
 
 The chat keeps its settings, its credentials and its session history in the harness's own
-directory under the home directory, outside this repository, and writes there as you use it. Three
-of those settings it writes itself, once each and silently, because a message about a setting you
-did not ask for is the noise it removes: the harness lists every resource it loaded on each launch
+directory under the home directory, outside this repository, and writes there as you use it. The
+model and the level above are written there whenever you change one. Three further settings it
+writes itself, once each and silently, because a message about a setting you did not ask for is the
+noise it removes: the harness lists every resource it loaded on each launch
 unless `quietStartup` is set and there is no flag for it, the thinking level above is the second,
 and the version the harness compares its own release notes against is the third. A value already
 there is left alone in all three. The last is written only on the launch that installed a new

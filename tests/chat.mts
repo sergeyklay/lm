@@ -238,37 +238,42 @@ check("a name outside the set is not a caller", "cli", logged().slice(-1)[0].cal
 
 rmSync(callerWork, { recursive: true, force: true });
 
-// What the chat opens on. `LM_MODEL` is the verb's model and the chat's default,
-// and a model the operator saved inside the chat is their explicit choice: the
-// harness reads it for itself when no --model is handed to it, so handing one
-// would overrule that choice on every launch.
+// What the chat opens on. The chat remembers the model it was last on, and the
+// harness reads that memory for itself when no --model is handed to it, so
+// handing one over would overrule the memory on every launch. `LM_MODEL` names
+// the verb's model and is the one way to aim a single launch elsewhere, so it is
+// handed over whenever it is set.
 const agentDir = mkdtempSync(join(tmpdir(), "lm-agent-"));
 const settingsAt = (settings: Record<string, unknown>) => {
   writeFileSync(join(agentDir, "settings.json"), JSON.stringify(settings));
   return SettingsManager.create(process.cwd(), agentDir);
 };
 
+const REMEMBERED = { defaultProvider: "ollama", defaultModel: "gpt-oss:20b" };
 process.env.LM_MODEL = "phi3:mini";
-check("with no saved choice the chat opens on LM_MODEL",
+check("with nothing remembered the chat opens on LM_MODEL",
   ["--provider", "ollama", "--model", "phi3:mini"],
   initialSelection(settingsAt({})));
-check("a saved choice is left to the harness to read",
-  [],
-  initialSelection(settingsAt({ defaultProvider: "ollama", defaultModel: "gpt-oss:20b" })));
-check("and half a saved choice is no choice",
+check("and LM_MODEL set in the environment wins over what is remembered",
+  ["--provider", "ollama", "--model", "phi3:mini"],
+  initialSelection(settingsAt(REMEMBERED)));
+check("and half a remembered choice is no choice",
   ["--provider", "ollama", "--model", "phi3:mini"],
   initialSelection(settingsAt({ defaultModel: "gpt-oss:20b" })));
 delete process.env.LM_MODEL;
+check("unset, a remembered model is left to the harness to read",
+  [],
+  initialSelection(settingsAt(REMEMBERED)));
 check("with neither, the model this project ships with opens it",
   ["--provider", "ollama", "--model", "qwen3.8:27b"],
   initialSelection(settingsAt({})));
 
-// The thinking level is the same choice one layer down, and the flag has no
+// The thinking level a model with nothing remembered opens at. The flag has no
 // gate to put it behind: `--thinking` beats the harness's global default and the
 // per-model level alike, and `bin/lm` has resolved no model yet, so it cannot
 // know which per-model entry a launch would land on. The level is seeded into
-// the harness's own settings instead and resolved there. What it does to the
-// request is `tests/chat-request.mts`.
+// the harness's own settings instead, where the level remembered for a model
+// outranks it. What it does to the request is `tests/chat-request.mts`.
 const savedLevel = () => JSON.parse(readFileSync(join(agentDir, "settings.json"), "utf8")).defaultThinkingLevel;
 
 check("no launch hands the harness a thinking level", false,
@@ -278,7 +283,7 @@ check("no launch hands the harness a thinking level", false,
 const seeded = settingsAt({});
 seedThinkingLevel(seeded);
 await seeded.flush();
-check("the level a chat opens on is seeded into the settings instead", "low", savedLevel());
+check("the level a model with nothing remembered opens at is seeded instead", "low", savedLevel());
 const chosen = settingsAt({ defaultThinkingLevel: "high" });
 seedThinkingLevel(chosen);
 await chosen.flush();
