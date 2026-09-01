@@ -57,6 +57,12 @@ named() { # ts clean repo verb n
   for ((i = 0; i < $5; i++)); do rec "$1" "$2" "$3" | jq -c --arg v "$4" '.verb = $v' >> "$LM_LOG"; done
 }
 
+# One record that ended at a given code. The outcome columns count the exit and
+# not the answer, so what varies here is the code alone.
+ended() { # ts repo exit
+  rec "$1" true "$2" | jq -c --argjson e "$3" '.exit = $e' >> "$LM_LOG"
+}
+
 # n clean runs and n-clean retried ones, all at one timestamp.
 period() { # ts total clean
   local i
@@ -115,6 +121,28 @@ teardown
 setup
 period "$BEFORE" 14 14
 check "a perfect share at the minimum bounds nothing away" "100% ≤100%" "$("$STATS" 2>&1 | clean)"
+teardown
+
+# 8 is the one non-zero code that leaves work standing in the repository, so the
+# table counts it apart from the codes that leave the tree as they found it. A
+# partial delivery folded into `failed` is one the operator is not told he has.
+setup
+ended "$BEFORE" "$REPO" 0
+ended "$BEFORE" "$REPO" 1
+ended "$BEFORE" "$REPO" 7
+ended "$BEFORE" "$REPO" 8
+out=$("$STATS" 2>&1)
+check "a partial delivery is counted apart from a failure" "4 1 0 1 1" \
+  "$(awk '/^stub /{print $2, $4, $5, $6, $7}' <<<"$out")"
+check "and the column has a name of its own" "1" "$(awk 'NR == 1 && /partial/{print 1}' <<<"$out")"
+teardown
+
+# A column that disappears when nothing landed in it reads as a feature nobody
+# built, so the zero is printed.
+setup
+ended "$BEFORE" "$REPO" 1
+check "a log with no partial run prints the column as a zero" "1 0 1 0" \
+  "$("$STATS" 2>&1 | awk '/^stub /{print $2, $5, $6, $7}')"
 teardown
 
 # The question the table cannot answer: how the clean share moved between two
