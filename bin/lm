@@ -115,7 +115,13 @@ Options:
   --                            treat everything after it as text, dashes and all
   --list                        every verb and workflow with its description, tab-separated
   --which <text>                name the verb or workflow that serves a request
+  --skill <path>                load one more skill, from a file or a directory
+  --no-skills, -ns              load no skills at all this session
   -h, --help                    print this help
+
+Skills:
+  .agents/skills                the repository's own, read up to its root
+  ~/.agents/skills              yours, in every repository, behind the repository's
 
 Environment:
   LM_OLLAMA                     where ollama listens (http://127.0.0.1:11434)
@@ -200,7 +206,7 @@ const { providerConfig } = await import("../src/provider.mts");
 const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts");
 const { initialSelection, seedThinkingLevel } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
-const { installChrome, silenceStartup, silenceChangelog } = await import("../src/chrome.mts");
+const { installChrome, silenceStartup, silenceChangelog, trustProject } = await import("../src/chrome.mts");
 
 // Redirecting either stream is enough to open a session with no dialog, and only
 // one of the two ways in was asked for. The flag is read here because this is
@@ -233,6 +239,7 @@ await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))]
       // Nothing here is news to the operator: this is the program they ran.
       hidden: true,
       factory: (pi) => {
+        trustProject(pi);
         pi.registerProvider("ollama", { ...providerConfig(), ...(models ? { models } : {}), refreshModels: catalogue });
         registerVerbs(pi, files, printFlag);
         installChrome(pi, updated);

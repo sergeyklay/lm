@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { CustomEditor, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { CustomEditor, ProjectTrustStore, SettingsManager, getAgentDir } from "@earendil-works/pi-coding-agent";
 
 // The mark is block glyphs coloured from the theme rather than from RGB: a
 // terminal without truecolor gets the theme's own approximation instead of a
@@ -145,6 +145,43 @@ export function silenceChangelog(
   } catch {
     // The chat opens either way.
   }
+}
+
+// The harness asks before it reads what a project keeps under `.pi` or
+// `.agents/skills`, and a session with no dialog has nobody to ask: it takes the
+// question as unanswered and drops the whole project tier without saying so, so
+// `lm -p` in a repository with skills in it would silently be a chat with fewer
+// than the chat has. The person who typed the command is standing in the
+// directory, so this answers for them. A decision they already recorded through
+// the harness is left to stand, whichever way it went, and `--no-approve` is
+// read before any of this and refuses the project outright.
+export function trustProject(pi: any): void {
+  pi.on("project_trust", (event: any) => {
+    try {
+      if (new ProjectTrustStore(getAgentDir()).get(event?.cwd ?? process.cwd()) !== null) {
+        return { trusted: "undecided" };
+      }
+    } catch {
+      // A store that cannot be read has recorded nothing.
+    }
+    return { trusted: "yes" };
+  });
+}
+
+// What the session found, counted off the commands the harness registers one per
+// loaded skill. Both tiers are named whatever they came to, because a tier that
+// loaded nothing and a tier that was never looked at read alike when the zero is
+// left out. The third is only there when `--skill` put it there, and it carries
+// the harness's own word for that group.
+export function skillsLine(commands: Iterable<{ source?: string; sourceInfo?: { scope?: string } }>): string {
+  const count = { project: 0, user: 0, temporary: 0 };
+  for (const command of commands) {
+    if (command.source !== "skill") continue;
+    const scope = command.sourceInfo?.scope;
+    if (scope === "project" || scope === "user" || scope === "temporary") count[scope] += 1;
+  }
+  const named = count.temporary > 0 ? `, ${count.temporary} path` : "";
+  return `skills: ${count.project} project, ${count.user} user${named}`;
 }
 
 // A model is the pair, never the id alone: the harness resolves a remembered
@@ -522,6 +559,9 @@ export function installChrome(pi: any, updated?: string): void {
     // with a word claiming something is wrong. Only the launch is announced,
     // because the same event fires again for a reload that installed nothing.
     if (updated && event?.reason === "startup") ctx.ui.notify(`harness updated to ${updated}`, "info");
+    // Read off what already loaded, so a line that fails to render costs the
+    // screen a number and the session nothing.
+    if (event?.reason === "startup") ctx.ui.notify(skillsLine(pi.getCommands()), "info");
     const autoCompact = compactionEnabled(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
       ink = {

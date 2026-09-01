@@ -9,7 +9,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { headerLines, footerLines, DoubleEscapeEditor, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, ownTitle, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, DoubleEscapeEditor, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, ownTitle, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, skillsLine, trustProject, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -57,12 +57,15 @@ check("both rows carry the mark", true, header.every((l) => l.includes("█")));
 // is what the screen says on every frame; an update happened once, so it goes
 // out as the harness's own system notice instead. `session_start` fires again
 // for a reload, which installed nothing and must not be told it did.
-function openChat(updated: string | undefined, reason: string = "startup") {
+function openChat(updated: string | undefined, reason: string = "startup", commands: any[] = []) {
   const notices: Array<[string, unknown]> = [];
   let rows: string[] = [];
   let editorFactory: ((tui: any, editorTheme: any, keybindings: any) => any) | undefined;
   const handlers: Record<string, (event: any, ctx: any) => void> = {};
-  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } }, updated);
+  installChrome({
+    on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; },
+    getCommands: () => commands,
+  }, updated);
   handlers.session_start({ type: "session_start", reason }, {
     hasUI: true,
     cwd: ROOT,
@@ -76,18 +79,79 @@ function openChat(updated: string | undefined, reason: string = "startup") {
       setEditorComponent: (factory: any) => { editorFactory = factory; },
     },
   });
-  return { notices, rows, editorFactory };
+  return { notices, rows, editorFactory, said: (prefix: string) => notices.filter(([m]) => m.startsWith(prefix)) };
 }
 
 const opened = openChat("0.84.4");
-check("a launch that updated the harness says so through the harness's own notice", 1, opened.notices.length);
-check("naming the version it moved to", "harness updated to 0.84.4", String(opened.notices[0]?.[0]));
-check("without telling the operator to restart", false, /restart|Run |update the/.test(String(opened.notices[0]?.[0])));
-check("at the level that prints it bare, claiming nothing is wrong", "info", String(opened.notices[0]?.[1]));
+check("a launch that updated the harness says so through the harness's own notice", 1, opened.said("harness updated").length);
+check("naming the version it moved to", "harness updated to 0.84.4", String(opened.said("harness updated")[0]?.[0]));
+check("without telling the operator to restart", false, /restart|Run |update the/.test(String(opened.said("harness updated")[0]?.[0])));
+check("at the level that prints it bare, claiming nothing is wrong", "info", String(opened.said("harness updated")[0]?.[1]));
 check("and the header stays the two rows it always was", 2, opened.rows.length);
 check("saying nothing about the harness itself", false, /harness/.test(plain(opened.rows.join("\n"))));
-check("a launch that moved nothing says nothing", 0, openChat(undefined).notices.length);
-check("and a reload, which installed nothing, does not repeat the notice", 0, openChat("0.84.4", "reload").notices.length);
+check("a launch that moved nothing says nothing about the harness", 0, openChat(undefined).said("harness updated").length);
+check("and a reload, which installed nothing, does not repeat the notice", 0, openChat("0.84.4", "reload").said("harness updated").length);
+
+// What the operator put in the two directories, counted off the commands the
+// harness registers one per loaded skill. Both tiers are named at every count,
+// because a tier left out of the line and a tier that was never read look the
+// same on the screen, and the whole point of the line is to tell those apart.
+const skill = (name: string, scope: string) => ({ name: `skill:${name}`, source: "skill", sourceInfo: { scope } });
+check("the line names both tiers and what each held",
+  "skills: 2 project, 3 user",
+  skillsLine([skill("a", "project"), skill("b", "project"), skill("c", "user"), skill("d", "user"), skill("e", "user")]));
+check("a tier that held nothing is a zero rather than a word left out",
+  "skills: 0 project, 1 user", skillsLine([skill("c", "user")]));
+check("and a session that found none still says so", "skills: 0 project, 0 user", skillsLine([]));
+// `--skill` is a path the operator typed in the command they just ran, so it is
+// a third group under the harness's own name for it, and only when there is one.
+check("a path named on the command line is a group of its own",
+  "skills: 1 project, 0 user, 2 path",
+  skillsLine([skill("a", "project"), skill("t", "temporary"), skill("u", "temporary")]));
+// The commands are every kind the harness registers, and a prompt template is
+// not a skill however much its record looks like one.
+check("and nothing but a skill is counted",
+  "skills: 0 project, 0 user",
+  skillsLine([{ name: "x", source: "prompt", sourceInfo: { scope: "project" } },
+              { name: "y", source: "extension", sourceInfo: { scope: "user" } }]));
+
+const loaded = openChat(undefined, "startup", [skill("a", "project"), skill("c", "user"), skill("d", "user")]);
+check("the launch says what it loaded, through the same notice", 1, loaded.said("skills:").length);
+check("naming each tier and its count", "skills: 1 project, 2 user", String(loaded.said("skills:")[0]?.[0]));
+check("at the level that claims nothing is wrong", "info", String(loaded.said("skills:")[0]?.[1]));
+check("a launch that found none says so rather than saying nothing",
+  "skills: 0 project, 0 user", String(openChat(undefined).said("skills:")[0]?.[0]));
+check("and a reload, which is the same session, does not repeat it",
+  0, openChat(undefined, "reload", [skill("a", "project")]).said("skills:").length);
+
+// The harness asks before it reads a project's own resources, and answers of its
+// own for a session with no dialog: `ask`, its default, drops them. This answers
+// for the operator standing in the directory, and stands aside for a decision
+// they recorded through the harness themselves.
+function trustAnswers(agentDir: string, cwd: string) {
+  const handlers: Array<(event: any) => any> = [];
+  trustProject({ on: (name: string, fn: (event: any) => any) => { if (name === "project_trust") handlers.push(fn); } });
+  const was = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  try { return handlers.map((fn) => fn({ type: "project_trust", cwd })); }
+  finally { if (was === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = was; }
+}
+const trustDir = mkdtempSync(join(tmpdir(), "lm-trust-"));
+const trustCwd = join(trustDir, "project");
+mkdirSync(trustCwd);
+check("one handler answers the trust question and nothing else does",
+  1, trustAnswers(trustDir, trustCwd).length);
+check("with nothing recorded, the project is trusted rather than dropped",
+  [{ trusted: "yes" }], trustAnswers(trustDir, trustCwd));
+check("and nothing is written where the harness keeps its own answers",
+  false, existsSync(join(trustDir, "trust.json")));
+writeFileSync(join(trustDir, "trust.json"), JSON.stringify({ [trustCwd]: false }));
+check("a refusal the operator recorded is left to stand",
+  [{ trusted: "undecided" }], trustAnswers(trustDir, trustCwd));
+writeFileSync(join(trustDir, "trust.json"), JSON.stringify({ [trustCwd]: true }));
+check("and so is an approval, which the harness reads back for itself",
+  [{ trusted: "undecided" }], trustAnswers(trustDir, trustCwd));
+rmSync(trustDir, { recursive: true, force: true });
 
 // The press the harness spends on nothing. With text in the editor and no answer
 // in flight every branch of its own escape chain declines, so the second press
@@ -352,7 +416,7 @@ check("recording the same version again does not touch the file", recorded, stat
 function chatOn(saved: Record<string, unknown>, model: { provider: string; id: string } | undefined) {
   writeFileSync(settingsFile, JSON.stringify(saved));
   const handlers: Record<string, (event: any, ctx: any) => void> = {};
-  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } });
+  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; }, getCommands: () => [] });
   let render: (width: number) => string[] = () => [];
   const ctx = {
     hasUI: true,
@@ -635,7 +699,7 @@ check("and wherever it is drawn it bounds every row to the terminal it was drawn
 // width a render callback is handed is out of scope by then.
 function quitWithColumns(columns: number | undefined): string {
   const handlers: Record<string, (event: any, ctx: any) => void> = {};
-  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; } });
+  installChrome({ on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; }, getCommands: () => [] });
   const out = process.stdout as any;
   const [reported, wrote] = [out.columns, out.write];
   const written: string[] = [];

@@ -1,7 +1,7 @@
 // node tests/cli.mts
 
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -49,6 +49,15 @@ check("--resume is named as taking an identifier and not needing one",
 // dialog writes, so both spellings belong in the help that documents them.
 check("-p is named in Usage in both spellings, with the text it may carry",
   true, /^  lm -p, --print \[text\] +answer once and exit, without the chat$/m.test(help.out));
+// Skills load by default and in every mode, which is this program's own doing
+// rather than the harness's, so the switch that turns them off is this program's
+// help to carry, and the two directories they come from with it.
+check("--no-skills is named in the options, in both spellings",
+  true, /^  --no-skills, -ns +load no skills at all this session$/m.test(help.out));
+check("and the flag that names one path of its own is beside it",
+  true, /^  --skill <path> +\S/m.test(help.out));
+check("and the two directories they are read from are named",
+  true, /^Skills:\n  \.agents\/skills +\S.*\n  ~\/\.agents\/skills +\S/m.test(help.out));
 
 // A name in the first position claims the help flag, and what comes back is
 // generated from what the file declares: no tool file answers --help itself.
@@ -149,6 +158,77 @@ check("everything after -- reaches the chat as the words that were typed",
   ["--resume", "zzzmarker"], [...new Set(asked.map((m) => m[1]))]);
 rmSync(textDir, { recursive: true, force: true });
 rmSync(agentDir, { recursive: true, force: true });
+
+// `.agents/skills` in a repository and `~/.agents/skills` at home are the two
+// directories the convention names. The harness reads both, and gates the first
+// on a trust question a session with no dialog has nobody to put, so without an
+// answer of lm's own the whole project tier disappears in exactly the modes a
+// script runs in. Each mode below is asked what it actually loaded, by a probe
+// extension that reads it off the harness and closes the session where it opens:
+// the endpoint points nowhere and nothing here asks a model anything.
+const skillRoot = mkdtempSync(join(tmpdir(), "lm-skills-"));
+const skillProbe = join(skillRoot, "probe.mjs");
+const skillOut = join(skillRoot, "loaded.json");
+const skillHome = join(skillRoot, "home");
+const skillRepo = join(skillRoot, "repo");
+
+function plantSkill(dir: string, name: string) {
+  mkdirSync(join(dir, name), { recursive: true });
+  writeFileSync(join(dir, name, "SKILL.md"),
+    `---\nname: ${name}\ndescription: A fixture skill, which does nothing at all.\n---\n\nNothing.\n`);
+}
+plantSkill(join(skillRepo, ".agents", "skills"), "fixproject");
+plantSkill(join(skillHome, ".agents", "skills"), "fixuser");
+plantSkill(join(skillRoot, "named"), "fixpath");
+mkdirSync(join(skillRoot, "agent"), { recursive: true });
+spawnSync("git", ["init", "-q", "."], { cwd: skillRepo });
+writeFileSync(skillProbe, [
+  'import { writeFileSync } from "node:fs";',
+  "export default function (pi) {",
+  '  pi.on("session_start", (_event, ctx) => {',
+  '    const skills = pi.getCommands().filter((c) => c.source === "skill");',
+  `    writeFileSync(${JSON.stringify(skillOut)}, JSON.stringify(skills.map((c) => [c.name, c.sourceInfo?.scope])));`,
+  "    ctx.shutdown();",
+  "  });",
+  "}",
+].join("\n"));
+
+// The interpreter rather than the shebang: the fixture home is not the
+// operator's, and a version manager that reads its file out of $HOME finds
+// nothing there and refuses to run anything at all.
+function loadedSkills(args: string[]): string[] {
+  rmSync(skillOut, { force: true });
+  spawnSync(process.execPath, [LM, ...args, "-e", skillProbe], {
+    cwd: skillRepo, stdio: "ignore",
+    env: { ...process.env, LM_LOG: "", PI_OFFLINE: "1", LM_OLLAMA: "http://127.0.0.1:1",
+      HOME: skillHome, PI_CODING_AGENT_DIR: join(skillRoot, "agent") },
+  });
+  const loaded: Array<[string, string]> = existsSync(skillOut) ? JSON.parse(readFileSync(skillOut, "utf8")) : [];
+  return loaded.map(([name, scope]) => `${name} ${scope}`).sort();
+}
+
+const BOTH_TIERS = ["skill:fixproject project", "skill:fixuser user"];
+check("a launch naming no mode loads both tiers", BOTH_TIERS, loadedSkills([]));
+check("and -p loads both, where the harness's own default drops the project's",
+  BOTH_TIERS, loadedSkills(["-p"]));
+check("and --mode json loads both", BOTH_TIERS, loadedSkills(["--mode", "json"]));
+check("and --mode rpc loads both", BOTH_TIERS, loadedSkills(["--mode", "rpc"]));
+// The control the cases above need: they read what the session loaded rather
+// than what the fixture holds, so switching the loading off has to empty them.
+check("--no-skills loads none of them", [], loadedSkills(["-p", "--no-skills"]));
+check("and -ns is the same word", [], loadedSkills(["-p", "-ns"]));
+check("and it empties the chat's own mode too", [], loadedSkills(["--no-skills"]));
+// The harness's own refusal is still a refusal: it is read before any of this
+// and drops the project's half while leaving the operator's own alone.
+check("--no-approve drops the project tier and keeps the user's",
+  ["skill:fixuser user"], loadedSkills(["-p", "--no-approve"]));
+// A path named on the command line is neither tier, and the harness keeps it
+// through the flag that drops the two.
+check("--skill loads one more, from a path of its own",
+  [...BOTH_TIERS, "skill:fixpath temporary"].sort(), loadedSkills(["-p", "--skill", join(skillRoot, "named")]));
+check("and it survives --no-skills, which is the harness's own word on it",
+  ["skill:fixpath temporary"], loadedSkills(["-p", "--no-skills", "--skill", join(skillRoot, "named")]));
+rmSync(skillRoot, { recursive: true, force: true });
 
 const stats = spawnSync(LM, ["stats"], { encoding: "utf8", cwd: ROOT });
 check("stats reaches the run log", true, /^verb\s+runs\s+clean/m.test(stats.stdout ?? ""));
