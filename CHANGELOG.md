@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The terminal's window title now opens with this project's name: `lm - <directory>`, and `lm - <session name> - <directory>` once the session has one, so a tab you are not looking at says which project it belongs to. Only the leading word is replaced, and it is replaced on every title the chat paints rather than set once at the start of a session, because the harness repaints the title after every handler that could set one: a title set on the way in would be painted over on the way in, never mind on the next switch. So it holds at launch, after a `/new` and after a `/reload`, and the session name and the directory the harness composed beside it are left exactly where it put them. Before, the title read `π - <directory>`, the harness's own name rather than the name of the thing you are running.
 
+### Fixed
+
+- A mistyped `LM_TOOLS` is refused instead of crashing. A value naming no directory, or naming a file rather than one, now reads `lm: LM_TOOLS names <path>, which is not a directory.` and exits 2 from `lm --list`, `lm --which`, `lm --help`, a verb and the chat alike, and the chat refuses before it spends anything on the launch's own update check. A registry that is genuinely empty keeps its silence and its 0, because a registry holding nothing and one that cannot be read are not the same input. `lm stats` is unchanged: it reads the log rather than the registry, and already said under its table that it had no registry to check the names against. Before, `lm --help` and a verb each printed a `node:fs` stack trace and exited 1, and `lm --list` printed nothing and exited 0 as though the registry were empty.
+
 ## [0.3.0] - 2026-08-31
 
 ### Added
