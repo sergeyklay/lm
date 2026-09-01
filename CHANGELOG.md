@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The terminal's window title now opens with this project's name: `lm - <directory>`, and `lm - <session name> - <directory>` once the session has one, so a tab you are not looking at says which project it belongs to. Only the leading word is replaced, and it is replaced on every title the chat paints rather than set once at the start of a session, because the harness repaints the title after every handler that could set one: a title set on the way in would be painted over on the way in, never mind on the next switch. So it holds at launch, after a `/new` and after a `/reload`, and the session name and the directory the harness composed beside it are left exactly where it put them. Before, the title read `π - <directory>`, the harness's own name rather than the name of the thing you are running.
+
 ## [0.3.0] - 2026-08-31
 
 ### Added
+
+- A second Esc inside half a second clears the editor, so a draft you have decided against is gone with a double tap while a single press still interrupts an answer in flight. It fires only when there is text to clear and the autocomplete is closed, so the completion list keeps the key while it is open, and the window disarms the moment the editor is cleared, so the next press is an abort again rather than a second clear. A double tap works under `tmux`, which delivers both presses at once. Before, the second press was spent on another abort and the text stayed where it was.
 
 - The chat remembers the model you chose and the thinking level you chose for it, with nothing to press and nothing new on the screen. Pick a model with `/model` and the next launch opens on it; set a level with `/thinking` and that level comes back with that model, while another model keeps its own. Nothing is announced and no keystroke is involved: choosing is the act, and a chat that has to be told to remember is one you have to remember to tell. A model nothing has been chosen for yet opens at `low`, which is one notch below what the harness would pick on its own. `LM_MODEL` still names the model a verb asks, and now also overrides the chat for one launch when you set it in the environment, so `LM_MODEL=phi3:mini lm` opens there once without disturbing what the chat remembers. Before, the chat opened on `LM_MODEL` however many times you had picked another model, and a level you chose was gone by the next launch.
 
