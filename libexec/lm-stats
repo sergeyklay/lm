@@ -177,7 +177,10 @@ echo
 # its denominator, and a --which run the model failed is in neither number.
 echo "requests --which found no verb for:"
 jq -s -r "${SCOPE[@]}" "map(select(.verb == \"--which\" and $RUN))"'
-  | "  \(map(select(.which == "none")) | length) of \(length)"' "$LM_LOG"
+  | (map(select(.which == null)) | length) as $unanswered
+  | map(select(.which != null))
+  | "  \(map(select(.which == "none")) | length) of \(length)"
+    + (if $unanswered == 0 then "" else ", \($unanswered) unanswered" end)' "$LM_LOG"
 
 echo
 echo "validator violations:"

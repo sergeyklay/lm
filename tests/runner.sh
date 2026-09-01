@@ -271,7 +271,7 @@ teardown
 # A --which run reaches the log whichever way it answers, because the signal is a
 # share: refusals alone are a numerator without a denominator. The record names
 # no verb, so lm-stats keeps it out of the verb table and counts it on its own.
-setup "$(say '{"tool":"stub"}')" "$(say '{"tool":"none"}')"
+setup "$(say '{"tool":"stub"}')" "$(say '{"tool":"none"}')" "$(say "")"
 lm --which "exercise the runner" >/dev/null 2>&1
 lm --which "brew me a coffee"    >/dev/null 2>&1
 check "both --which runs are logged"  "2"        "$(wc -l < "$work/log.jsonl")"
@@ -289,6 +289,12 @@ check "lm-stats reports the share"  "1 of 2" "$(share)"
 mkdir "$work/empty"
 LM_TOOLS="$work/empty" lm --which "brew me a coffee" >/dev/null 2>&1
 check "an empty registry leaves the share alone" "1 of 2" "$(share)"
+# The other non-answer: the catalogue was weighed and no verdict came back, so it
+# leaves the share alone too. What it does not do is disappear off the block.
+lm --which "a request the model drops" >/dev/null 2>&1; rc=$?
+check "a dropped --which run exits 5"      "5"    "$rc"
+check "and its record names no verb"       "null" "$(jq -r '.which' "$work/log.jsonl" | tail -1)"
+check "the share holds and names the drop" "1 of 2, 1 unanswered" "$(share)"
 teardown
 
 # A verb run carries the field too, empty: one shape, so nothing has to know

@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `lm changelog` accepts the entries it exists to accept when the verb is a copy living in a project's own `tools/`. Its check reads the published contract out of `lm`'s own `docs/tools.md` to tell a function a tool author writes against from one that is internal, and it now finds that page through `LM_INSTALL` rather than guessing at it from the tool file's location. Before, a copy outside the installation derived the tree from its own path, landed on the project it had been copied into, found no `docs/tools.md` there and reported `collect`, `schema`, `validate`, `render` and `apply` — five of the six names the contract publishes — as internal to the source, refusing exactly the drafts the check exists to accept, while the installation's own copy stayed silent on all five. A private helper is still named as one, in both copies, which is the one verdict that was right all along.
 
+- `lm stats` no longer counts a `lm --which` request the model dropped as one that found a verb. The block under the table takes its denominator from the requests the model actually answered, and names any it did not beside them: `2 of 7, 1 unanswered`, with that clause absent when nothing was dropped. A `--which` run whose reply comes back empty exits 5 and records no verb, and it is no more a verdict on your catalogue than a request weighed against an empty registry is — that one already left the share alone, and this one now does too. Before, such a run sat in the denominator and never in the numerator, so the share read lower than the catalogue had earned, and lower the more often the model dropped an answer.
+
 ## [0.3.0] - 2026-08-31
 
 ### Added
