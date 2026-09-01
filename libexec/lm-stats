@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# lm-stats: read the run log that lm appends to. No model, no registry.
+# lm-stats: read the run log that lm appends to, and the registry, so a name the
+# log carries can be told from a verb this project has. No model, no network.
 # Dry runs are excluded from the rates and kept in the violation histogram.
 
 set -euo pipefail
@@ -29,12 +30,34 @@ while [ $# -gt 0 ]; do
   shift
 done
 REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
-SCOPE=(--arg repo "$REPO" --argjson all "$ALL")
+
+# Resolved as bin/lm resolves it, and the two must not disagree: LM_TOOLS when it
+# names anything, else the tools/ of the tree you are in, and never the
+# installation's own.
+TOOLS=${LM_TOOLS:-}
+if [ -z "$TOOLS" ]; then
+  TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=
+  [ -z "$TOP" ] || [ ! -d "$TOP/tools" ] || TOOLS=$TOP/tools
+fi
+# A registry nothing can list is not a registry holding nothing. The reader that
+# could not look says so, rather than reporting every verb as one nobody has.
+CHECKED=0
+KNOWN='[]'
+if [ -n "$TOOLS" ] && [ -d "$TOOLS" ]; then
+  CHECKED=1
+  KNOWN=$(for f in "$TOOLS"/*.sh; do if [ -e "$f" ]; then basename "$f" .sh; fi; done \
+          | jq -R . | jq -sc .)
+fi
+
+SCOPE=(--arg repo "$REPO" --argjson all "$ALL" --argjson known "$KNOWN" --argjson checked "$CHECKED")
 MINE='($all == 1 or .repo == $repo)'
 RUN="((.dry | not) and .calls > 0 and $MINE)"
 # --which is a run and not a verb: its refusal exits 2, which the verb table
 # would count as a failure. It gets its own line, below the table.
 VERBRUN="($RUN and .verb != \"--which\")"
+# The name is a verb of this project or it is not, and a table that hid the second
+# kind would report a smaller log than the one it read.
+HELD='def held: .verb as $v | $checked == 0 or ($known | index($v) != null);'
 
 [ "$(jq -s "${SCOPE[@]}" "map(select($MINE)) | length" "$LM_LOG")" -gt 0 ] || {
   echo "lm-stats: nothing logged for $REPO; --all reads every repository" >&2; exit 2; }
@@ -49,19 +72,41 @@ VERBRUN="($RUN and .verb != \"--which\")"
 # and a figure every sample confirms is not a figure. Derived in docs/verbs.md.
 CLEAN_N=14
 printf '%-10s %5s %7s %9s %8s %7s %8s %9s\n' verb runs clean declined retried failed "avg ms" "avg model"
-jq -s -r "${SCOPE[@]}" "
-  map(select($VERBRUN)) | group_by(.verb)[] |"'
-  [ .[0].verb, length,
+jq -s -r "${SCOPE[@]}" "$HELD
+  map(select($VERBRUN)) |"'
+  def cols: [ length,
     (map(select(.calls == 1 and .exit == 0)) | length),
     (map(select(.exit == 7)) | length),
     (map(select(.calls == 2)) | length),
     (map(select(.exit != 0 and .exit != 7)) | length),
     (map(.ms) | add / length | floor),
     (map(select(.total_duration != null) | .total_duration)
-     | if length == 0 then null else (add / length / 1000000 | floor) end) ] | @tsv' "$LM_LOG" \
+     | if length == 0 then null else (add / length / 1000000 | floor) end) ];
+  . as $runs
+  | ($runs | map(select(held)) | group_by(.verb)[] | [.[0].verb] + cols),
+    ($runs | map(select(held | not)) | select(length > 0) | ["(unknown)"] + cols)
+  | @tsv' "$LM_LOG" \
 | awk -F'\t' -v min="$CLEAN_N" '{printf "%-10s %5d %7s %9d %8d %7d %8d %9s\n",
     $1, $2, ($2 < min ? "n<" min : sprintf("%d%%", 100*$3/$2)),
     $4, $5, $6, $7, ($8 == "" ? "-" : $8)}'
+
+# A row that vanished is a defect and a row nobody can read is another, so the
+# names the table put under (unknown) are printed, and a reader who could not
+# look at a registry at all is told that instead.
+UNKNOWN=$(jq -s -r "${SCOPE[@]}" "$HELD
+  map(select($VERBRUN))"' | map(select(held | not) | .verb) | unique | join(", ")' "$LM_LOG")
+[ -z "$UNKNOWN" ] || {
+  echo
+  echo "names $TOOLS does not hold, counted as (unknown):"
+  echo "  $UNKNOWN"
+  [ "$ALL" = 0 ] || echo "  --all reads every repository, and another project's verb is not in this one"
+}
+[ "$CHECKED" = 1 ] || {
+  echo
+  echo "no registry, so no verb name was checked against one:"
+  if [ -n "$TOOLS" ]; then echo "  LM_TOOLS names $TOOLS, which is not a directory"
+  else echo "  no tools/ in the tree you are in, and LM_TOOLS names none"; fi
+}
 
 # The table reads the log as one heap, and every record carries a ts nothing else
 # here reads. Splitting at a date is what turns the clean column into a question
@@ -71,13 +116,16 @@ jq -s -r "${SCOPE[@]}" "
 echo
 echo "first answer clean, split at $SINCE:"
 printf '%-10s %8s %5s %8s %5s\n' verb before n since n
-jq -s -r "${SCOPE[@]}" --arg since "$SINCE" "
-  map(select($VERBRUN)) | group_by(.verb)[] |"'
-  [ .[0].verb,
-    (map(select(.ts < $since)) | length),
+jq -s -r "${SCOPE[@]}" --arg since "$SINCE" "$HELD
+  map(select($VERBRUN)) |"'
+  def cols: [ (map(select(.ts < $since)) | length),
     (map(select(.ts < $since and .calls == 1 and .exit == 0)) | length),
     (map(select(.ts >= $since)) | length),
-    (map(select(.ts >= $since and .calls == 1 and .exit == 0)) | length) ] | @tsv' "$LM_LOG" \
+    (map(select(.ts >= $since and .calls == 1 and .exit == 0)) | length) ];
+  . as $runs
+  | ($runs | map(select(held)) | group_by(.verb)[] | [.[0].verb] + cols),
+    ($runs | map(select(held | not)) | select(length > 0) | ["(unknown)"] + cols)
+  | @tsv' "$LM_LOG" \
 | awk -F'\t' -v min="$CLEAN_N" '{printf "%-10s %8s %5d %8s %5d\n",
     $1, ($2 < min ? "n<" min : sprintf("%d%%", 100*$3/$2)), $2,
         ($4 < min ? "n<" min : sprintf("%d%%", 100*$5/$4)), $4}'
