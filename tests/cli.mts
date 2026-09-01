@@ -45,6 +45,10 @@ check("a workflow is not named in Usage", false, /^  lm ship /m.test(help.out));
 // a flag that reopens the chat the closing block named and one that offers a list.
 check("--resume is named as taking an identifier and not needing one",
   true, /^  lm --resume \[id\] +\S/m.test(help.out));
+// `lm` reads this one itself: typing it silences the line a session with no
+// dialog writes, so both spellings belong in the help that documents them.
+check("-p is named in Usage in both spellings, with the text it may carry",
+  true, /^  lm -p, --print \[text\] +answer once and exit, without the chat$/m.test(help.out));
 
 // A name in the first position claims the help flag, and what comes back is
 // generated from what the file declares: no tool file answers --help itself.

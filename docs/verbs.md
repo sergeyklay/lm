@@ -83,7 +83,7 @@ Set `LM_LOG` to an empty string to keep a run out of the log entirely: `LM_LOG= 
 
 ## Exit codes
 
-A workflow stops on any of these. 7 is the one that is not a failure: it is you saying no.
+A workflow stops on any of these. 7 is the one that is not a failure: it is you saying no, or a run with no way to ask you.
 
 | Code | Meaning |
 | --- | --- |
@@ -92,7 +92,7 @@ A workflow stops on any of these. 7 is the one that is not a failure: it is you 
 | 3 | the verb has nothing to work on |
 | 4 | the validator rejected two answers |
 | 5 | the model returned nothing usable: empty content, or an answer cut off by the token budget |
-| 7 | you declined the confirmation |
+| 7 | you declined the confirmation, or there was no dialog to put it to you |
 | 8 | part of the work landed and the rest did not; what landed stands, and re-running takes the rest |
 
 From `lm commit` 1 most often means a hook rejected the commit, and the hook's own code is not recoverable: `git commit` reports 1 whatever the hook exited with, so what the hook printed is the only thing that says why.
@@ -101,7 +101,7 @@ From `lm commit` 1 most often means a hook rejected the commit, and the hook's o
 
 Under `--yes` the confirmation is not asked, so a whole series of commits lands without anyone seeing the grouping first. That is what an unattended run asks for, and it is a larger unseen act than one commit was.
 
-Inside the chat a verb has no exit status to hand anyone, so the tool result says the same thing in words: a refused confirmation reads `Declined. Nothing was applied.` and any other failure names its code.
+Inside the chat a verb has no exit status to hand anyone, so the tool result says the same thing in words: a refused confirmation reads `Declined. Nothing was applied.` and any other failure names its code. A session the harness opened in print mode has no dialog to put the question to, so the closure standing in for it refuses on your behalf and the verb exits 7 having asked nobody. That run is not reported as a refusal: `lm` writes a line to stderr naming the verb and the question it could not ask you, and the tool result says the question was never asked. Redirecting either stdin or stdout is enough to open a session that way, so `lm chat | tee log.txt` reaches it; typing `-p` or `--print` names the mode, and the line is not printed for a mode you chose. The run record cannot tell the two readings of 7 apart.
 
 A verb called from inside the chat is a request the model may fulfil another way, and the codes above are what it reports when it does call one. The chat hands the model a shell beside the verbs, so it can stage the tree, write the commit and push it without reaching a verb at all, and then the confirmation you answer, the validator, the message shaped after the ones already in the log and the run record are bypassed together while the log still shows a verb run. Asked plainly to commit, the model went past the refusal in four of six sessions measured on 2026-08-27, each in a repository of its own: `HEAD` moved to a subject no validator had seen while every record those sessions wrote read exit 7 or 3, so the log says you declined and the repository has a new commit. In the other two it took the refusal at its word, said so, and offered you the `git commit` line to run yourself - which is the same capability used the other way and not a guarantee of anything. This is why `lm stats` counts the work that went through a verb rather than the work that was done.
 

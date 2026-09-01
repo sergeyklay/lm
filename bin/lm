@@ -105,6 +105,7 @@ Usage:
   lm <verb> [options] [text]      run one verb${workflowUsage}
   lm --continue                   reopen the last chat where it left off
   lm --resume [id]                reopen a past chat, or pick one from a list
+  lm -p, --print [text]           answer once and exit, without the chat
   lm stats [--all]                what the run log says about this repository
   lm stats --since <date>         the same, split into before and since that date${verbRows}${workflowRows}${detail}
 
@@ -201,6 +202,13 @@ const { initialSelection, seedThinkingLevel } = await import("../src/selection.m
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup, silenceChangelog } = await import("../src/chrome.mts");
 
+// Redirecting either stream is enough to open a session with no dialog, and only
+// one of the two ways in was asked for. The flag is read here because this is
+// where argv is, and the way the harness itself reads it: everything after a
+// bare `--` is a message, so a `-p` there is text.
+const flags = argv.slice(0, argv.indexOf("--") === -1 ? undefined : argv.indexOf("--"));
+const printFlag = flags.includes("-p") || flags.includes("--print");
+
 silenceStartup();
 
 const settings = SettingsManager.create(process.cwd());
@@ -226,7 +234,7 @@ await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))]
       hidden: true,
       factory: (pi) => {
         pi.registerProvider("ollama", { ...providerConfig(), ...(models ? { models } : {}), refreshModels: catalogue });
-        registerVerbs(pi, files);
+        registerVerbs(pi, files, printFlag);
         installChrome(pi, updated);
       },
     },
