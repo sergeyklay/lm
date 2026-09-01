@@ -259,6 +259,40 @@ check("and dispatch sees only what the variable names", 2, pinnedRun.code);
 check("saying so of a name the project does ship",
   true, pinnedRun.err.includes("no such tool 'commit'"));
 
+// A registry that cannot be read is not a registry holding nothing, and the
+// difference is the one variable this project asks the operator to set. Every
+// entry point refuses it in the same words, and the shell runner is one of them
+// because `--list` is its answer and dispatch is the Node runner's.
+const missing = join(scratch, "no-such-registry");
+const REFUSAL = `lm: LM_TOOLS names ${missing}, which is not a directory.\n`;
+for (const [name, args] of [
+  ["--list", ["--list"]],
+  ["--which", ["--which", "write a commit message"]],
+  ["--help", ["--help"]],
+  ["a verb", ["commit", "--dry-run"]],
+] as [string, string[]][]) {
+  const bad = runIn(shadowDir, args, { LM_TOOLS: missing });
+  check(`an LM_TOOLS naming no directory is refused by ${name}`, REFUSAL, bad.err);
+  check(`and ${name} exits 2 rather than crashing`, 2, bad.code);
+  check(`and ${name} prints no artefact`, "", bad.out);
+}
+// The path is what is wrong, not the flag, so a path that is there and is not a
+// directory is the same refusal.
+const file = runIn(shadowDir, ["--help"], { LM_TOOLS: join(shadowDir, "tools", "commit.sh") });
+check("and a path that is a file rather than a directory reads the same",
+  `lm: LM_TOOLS names ${join(shadowDir, "tools", "commit.sh")}, which is not a directory.\n`, file.err);
+check("and a file exits 2 as well", 2, file.code);
+// The two runners resolve the registry apart, so both have to hold the check.
+const badDirect = runIn(shadowDir, ["--list"], { LM_TOOLS: missing }, join(ROOT, "libexec/lm-verb"));
+check("and the shell runner refuses it in the same words", REFUSAL, badDirect.err);
+check("and the shell runner exits 2 as well", 2, badDirect.code);
+// A registry that is genuinely empty is the case the silence belongs to, and it
+// keeps it: the refusal above is what tells the two inputs apart.
+const emptyDir = project("empty-registry", { "keep.txt": "" });
+const empty = runIn(emptyDir, ["--list"]);
+check("a registry that holds nothing still says nothing", "", empty.out + empty.err);
+check("and still exits 0", 0, empty.code);
+
 // This repository is a project like any other, and its tools/ is what it gets.
 check("the installation's own repository is served by its own tools/",
   SHIPPED, listed(runIn(ROOT, ["--list"]).out));
