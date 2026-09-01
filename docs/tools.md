@@ -30,6 +30,42 @@ A tool refuses with `return 3` when there is nothing to work on, and `apply()` r
 
 When `collect()` needs something the machine running the tests may not have, put the call behind a function so a fixture can replace it. `tools/issue.sh` reads the repository's labels through `_labels()` for that reason, and the three `issue` cases, which `ls tests/golden/*/*/env` names, define their own `_labels()` in `env`, so `gh` is never reached and the enum the case exists to pin is still built. Stubbing the seam beats skipping the case: a skipped case leaves the verb's most interesting path untested and says so only in passing.
 
+## Adding a workflow
+
+A registry holds two kinds of file, and one declaration tells them apart. A file that declares `verbs` is a **workflow**: it names a sequence of verbs the registry already holds and defines the work around them, and `lm` reads that declaration to decide how the file runs, on the command line and inside the chat alike. A file that does not declare it is a **verb**, run directly, and everything above is about that kind. Adding a workflow is adding a file to the same `tools/` directory, and nothing else changes.
+
+```bash
+name="ship"
+description="Commit the working tree and open a pull request"
+verbs="commit pr"           # the sequence. Declaring it is what makes this a workflow.
+flags="--here --no-stage"   # optional, and reaches the verbs as well as the steps
+
+prepare()       { :; }      # once, before the first verb
+before_commit() { :; }      # before each named verb
+after_commit()  { :; }      # after it succeeded
+failed_commit() { :; }      # after it did not
+```
+
+A workflow defines no `collect`, `schema`, `validate`, `render` or `apply`: the verbs it names have those already, and each one is run exactly as `lm <verb>` runs it, model call and confirmation included. What the workflow file holds instead is up to four steps, named for the verbs in `verbs`: `prepare` once at the start, and then `before_<verb>`, `after_<verb>` and `failed_<verb>` around each verb in turn. Those four names are the whole set; nothing else in the file is called by the runner.
+
+Every step is optional, and a step nobody wrote is a no-op rather than a `command not found`: the runner asks `declare -F` for the function before calling it and treats its absence as success. So the smallest workflow is the four declarations above and no functions at all, and a file adds a step only when it has work for that step to do.
+
+`verbs` is a space-separated list of names resolved against the registry the workflow itself was read from. A name the registry does not hold is refused with exit 2 when the sequence reaches it, naming the workflow and the verb.
+
+The order is `prepare`, then for each verb `before_<verb>`, the verb, `after_<verb>`. A verb that fails runs `failed_<verb>` instead of `after_<verb>` and stops the workflow, which exits with the verb's own code; whatever `failed_<verb>` returns is discarded, because it is the cleanup and not the outcome. Any other step returning non-zero stops the workflow there with that code, so `prepare` refusing with 2 outside a git repository is how a workflow declines the whole sequence. A step's standard output and standard error reach the human as the verbs' do.
+
+Flags reach a step the way they reach a tool: the runner checks the command line against the workflow's own `flags` and turns `--here` into `LM_HERE=1`, so a step reads its own flag and nothing parses twice. That check is against the workflow's declaration alone, so a flag one of its verbs declares has to be declared by the workflow too if the operator is to be allowed to type it: `ship` declares `--no-stage` because `commit` does. Text after `--` is text, and reaches every verb in the sequence.
+
+`--dry-run` stops a verb before `apply()`, and a workflow's steps are its `apply`, so `--dry-run` runs none of them. The runner says so on standard error, because the rehearsal is then thinner than the run: each verb rehearses the repository as it stands rather than as `prepare` would have left it, and a verb refusing for want of what `prepare` does otherwise reads as the workflow being broken.
+
+`confirm` and `ask` are not available in a step, for the same reason they are not available in the four read-only phases: a step that calls one is stopped there and the run exits 1 naming the function. The consent a workflow needs is the consent its verbs already ask for, in their own `apply`.
+
+`LM_WORKFLOW` names the run, and is the same value in every step of it: one per `lm ship` on the command line, one per invocation inside the chat. A step cannot use `$$` for that, because each step is its own bash process.
+
+`lm --help` lists the two kinds under headings of their own, and `lm <name> --help` prints the sequence under `Runs in order:`. Neither is written by the file; both are generated from what it declares.
+
+The file is shell function definitions rather than a declarative schema because what a sequence needs around it is work and not a set of fields. `ship` refuses outside a git repository, opens a branch named from `LM_WORKFLOW` before the commit exists, switches back and deletes that branch when the operator declines, leaves it in place when commits landed on it anyway, and renames it afterwards from the subject the model just wrote, falling back to a short SHA when that name collides. A schema expressing those would be a language, and the next thing nobody enumerated would cost a change to whatever parses it. That is the same regression as a thirtieth tool costing more than the third, arriving through the parser rather than through the index.
+
 ## Tests
 
 ```bash
