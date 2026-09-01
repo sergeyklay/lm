@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `lm stats` counts a partial delivery in a column of its own, `partial`, beside `failed`. Exit 8 is the one non-zero code that leaves work standing in the repository — `lm commit` landing some of its commits and stopping on a hook rejection — and folded in with the codes that leave the tree exactly as they found it, it was a delivery you were not told you had. Every other non-zero code stays in `failed`, a run you declined stays in `declined`, and a verb that has never exited 8 prints a zero rather than nothing.
+
 ### Changed
 
 - The `clean` column of `lm stats` prints the share with the one-sided 95% upper bound on it, `68% ≤76%`, in the table and in the `--since` split alike. The share on its own could not say whether the sample it came from settles the question it is read against: manual edits staying under one in five is the number, and 68% and 78% are both under it while only the bound says whether the runs behind them exclude it — `≤76%` does and `≤91%` does not. Nothing is stored for the bound; it is computed from the two counts already in the row, and a verb under the fourteen-run minimum still prints `n<14` and no bound, because there is no share to bound.
