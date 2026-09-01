@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `clean` column of `lm stats` prints the share with the one-sided 95% upper bound on it, `68% ≤76%`, in the table and in the `--since` split alike. The share on its own could not say whether the sample it came from settles the question it is read against: manual edits staying under one in five is the number, and 68% and 78% are both under it while only the bound says whether the runs behind them exclude it — `≤76%` does and `≤91%` does not. Nothing is stored for the bound; it is computed from the two counts already in the row, and a verb under the fourteen-run minimum still prints `n<14` and no bound, because there is no share to bound.
+
 - The terminal's window title now opens with this project's name: `lm - <directory>`, and `lm - <session name> - <directory>` once the session has one, so a tab you are not looking at says which project it belongs to. Only the leading word is replaced, and it is replaced on every title the chat paints rather than set once at the start of a session, because the harness repaints the title after every handler that could set one: a title set on the way in would be painted over on the way in, never mind on the next switch. So it holds at launch, after a `/new` and after a `/reload`, and the session name and the directory the harness composed beside it are left exactly where it put them. Before, the title read `π - <directory>`, the harness's own name rather than the name of the thing you are running.
 
 ### Fixed
