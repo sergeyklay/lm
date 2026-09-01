@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # libexec/lm-stats over a log written by hand. The reader calls no model and keeps
 # no state, so the log is its whole input and a case here is a log and a reading.
-# What these cover is the two axes every record carries that the table never reads:
-# the clean column split at a date, and which caller the run came from.
+# What these cover is the two axes every record carries that the table never reads,
+# the clean column split at a date and which caller the run came from, and the one
+# thing the reader takes from outside the log: whether the registry holds the name
+# a record carries.
 
 set -uo pipefail
 ROOT=$(dirname "$(readlink -f "$0")")/..
@@ -35,8 +37,25 @@ setup() {
   git init -q -b main .
   REPO=$(basename "$work")
   LM_LOG=$work/log.jsonl; export LM_LOG; : > "$LM_LOG"
+  # The registry lm-stats reads is the operator's if the case does not say, and a
+  # case that asks whether a name was checked would then read their tools/.
+  unset LM_TOOLS
 }
 teardown() { cd /; rm -rf "$work"; }
+
+# Only the names in it are read, so a tool file needs no contents to be one.
+tools() { # name...
+  local n
+  mkdir -p "$work/tools"
+  for n in "$@"; do : > "$work/tools/$n.sh"; done
+}
+
+# rec writes every record under one name, and a case about the registry is about
+# which name.
+named() { # ts clean repo verb n
+  local i
+  for ((i = 0; i < $5; i++)); do rec "$1" "$2" "$3" | jq -c --arg v "$4" '.verb = $v' >> "$LM_LOG"; done
+}
 
 # n clean runs and n-clean retried ones, all at one timestamp.
 period() { # ts total clean
@@ -48,6 +67,14 @@ period() { # ts total clean
 # before n since n, read out of the split block alone: the verb's own row appears
 # in the table above it too.
 row() { sed -n '/^first answer clean/,/^$/p' | awk '/^stub /{print $2, $3, $4, $5}'; }
+
+# The verb column of each table, in the order it is printed: which rows exist is
+# the whole question a registry check answers.
+verbs() { awk 'NR == 1 { next } /^$/ { exit } { print $1 }' | paste -sd' ' -; }
+split_verbs() { sed -n '/^first answer clean/,/^$/p' \
+  | awk 'NR <= 2 { next } NF == 0 { exit } { print $1 }' | paste -sd' ' -; }
+runs() { awk -v n="$1" '$1 == n { print $2; exit }'; }
+collapsed() { sed -n '/counted as (unknown):/{n;s/^ *//;p;}'; }
 
 BEFORE=2026-08-25T09:00:00+02:00
 SINCE=2026-08-27T09:00:00+02:00
@@ -188,6 +215,97 @@ setup
 out=$(LM_LOG='' "$STATS" --since "$CUT" 2>&1); rc=$?
 check "an empty LM_LOG is refused"    "2" "$rc"
 check "and named as empty, not as a path" "1" "$(grep -c 'LM_LOG is empty' <<<"$out")"
+teardown
+
+# The log carries a name, and only the registry says whether that name is a verb
+# of this project. What it holds keeps its own row, and everything else is one row
+# rather than none: a run that vanished off the table is a run the reader is not
+# told about.
+setup
+tools changelog commit
+named "$BEFORE" true "$REPO" commit    3
+named "$BEFORE" true "$REPO" changelog 2
+named "$BEFORE" true "$REPO" accepts   2
+named "$BEFORE" true "$REPO" rejects   4
+out=$("$STATS" 2>&1)
+check "what the registry holds keeps its own row" "changelog commit (unknown)" "$(verbs <<<"$out")"
+check "and the collapsed row carries every run it took" "6" "$(runs '(unknown)' <<<"$out")"
+check "and the names it took are printed rather than dropped" \
+  "accepts, rejects" "$(collapsed <<<"$out")"
+check "and the registry it was read against is named" \
+  "1" "$(grep -c "^names $work/tools does not hold, counted as (unknown):\$" <<<"$out")"
+teardown
+
+# The same log with nothing to check it against. A reader that could not look must
+# not report every name as one nobody has, so it collapses nothing and says why.
+setup
+named "$BEFORE" true "$REPO" commit  3
+named "$BEFORE" true "$REPO" accepts 2
+out=$("$STATS" 2>&1)
+check "with no registry every name keeps its row" "accepts commit" "$(verbs <<<"$out")"
+check "and the reader says it could not look" \
+  "1" "$(grep -c '^no registry, so no verb name was checked against one:$' <<<"$out")"
+check "and says which of the two ways it could not" \
+  "1" "$(grep -c '^  no tools/ in the tree you are in, and LM_TOOLS names none$' <<<"$out")"
+teardown
+
+# A registry named and not there is the other way, and it is not a registry holding
+# nothing: the path is named back because it is the thing to fix.
+setup
+tools commit
+named "$BEFORE" true "$REPO" commit 3
+out=$(LM_TOOLS=$work/gone "$STATS" 2>&1)
+check "a registry that is not a directory is not one that holds nothing" \
+  "commit" "$(verbs <<<"$out")"
+check "and the path is named back" \
+  "1" "$(grep -c "^  LM_TOOLS names $work/gone, which is not a directory\$" <<<"$out")"
+teardown
+
+# LM_TOOLS is the registry when it names one, as it is for a verb: the tools/ of
+# the tree you are standing in loses to it rather than joining it.
+setup
+tools commit
+mkdir "$work/elsewhere"; : > "$work/elsewhere/accepts.sh"
+named "$BEFORE" true "$REPO" commit  3
+named "$BEFORE" true "$REPO" accepts 2
+check "LM_TOOLS is the registry, not the tree's own tools/" \
+  "accepts (unknown)" "$(LM_TOOLS=$work/elsewhere "$STATS" 2>&1 | verbs)"
+check "and without it the tree's own tools/ is" \
+  "commit (unknown)" "$("$STATS" 2>&1 | verbs)"
+teardown
+
+# The registry holds verbs and workflows, and the table asks only whether it holds
+# the name. A file that declares itself a workflow is a name it holds like any
+# other, so nothing here sources a tool file to find out.
+setup
+tools ship
+printf 'name="ship"\ndescription="d"\nverbs="commit pr"\n' > "$work/tools/ship.sh"
+named "$BEFORE" true "$REPO" ship 3
+check "a file declaring itself a workflow is a name the registry holds" \
+  "ship" "$("$STATS" 2>&1 | verbs)"
+teardown
+
+# --all reads repositories this registry does not answer for, so the screen says so
+# rather than filing another project's verb under a fixture's row in silence.
+setup
+tools commit
+named "$BEFORE" true "$REPO" commit  3
+named "$BEFORE" true "$REPO" accepts 2
+check "--all says another project's verb is not in this registry" \
+  "1" "$(grep -c "another project's verb" <<<"$("$STATS" --all 2>&1)")"
+check "and one repository's own table does not" \
+  "0" "$(grep -c "another project's verb" <<<"$("$STATS" 2>&1)")"
+teardown
+
+# The split is a verb table too, so a name the table collapses cannot reappear
+# under it.
+setup
+tools commit
+named "$BEFORE" true "$REPO" commit  3
+named "$BEFORE" true "$REPO" accepts 2
+named "$SINCE"  true "$REPO" accepts 1
+check "the split collapses the names the table above it collapsed" \
+  "commit (unknown)" "$("$STATS" --since "$CUT" 2>&1 | split_verbs)"
 teardown
 
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
