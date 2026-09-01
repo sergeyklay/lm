@@ -48,6 +48,7 @@ node tests/chat-request.mts       # what the chat asks the model for, off the wi
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
 node tests/catalogue.mts          # which models the chat offers, what each declares, and the deadline the launch reads them under
 LM_LIVE=1 node tests/verb-live.mts  # the retry, the budget, a verb inside the chat and the shell beside it, on the real model
+LM_ROUTING=1 node tests/routing.mts <model>...  # not a suite: the routing comparison of the knowledge base, three channels over tests/routing.json at four catalogue sizes, one row per model named
 ```
 
 `golden.sh` builds a fixture repository per case and pins what the verb does around the model: the prompt `collect` writes, the shape `schema` asks for, the violations `validate` reports and the artefact `render` assembles. `--update` rewrites the expectations; read the diff before committing them.

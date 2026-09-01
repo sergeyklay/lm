@@ -1,0 +1,510 @@
+{
+  "note": "Inputs of the routing comparison in section 2.1 of the knowledge base. Data, not a script: the harness that reads it is disposable, these rows are not. A model is given a row by running tests/routing.mts against this file.",
+  "selection": "For each task and each catalogue size n, the catalogue holds the task's own answer plus n-1 distractors drawn from the other 59, and is then ordered, both by a mulberry32 stream seeded from the task id, the size and the salt below. So the correct tool is always present, every point of the sweep has its own catalogue, and no point's prompt is a prefix extension of another's.",
+  "seed": 20260901,
+  "sizes": [
+    3,
+    10,
+    30,
+    60
+  ],
+  "tools": [
+    {
+      "name": "commit_message",
+      "description": "Write a Conventional Commits message for the changes staged in git",
+      "params": {
+        "scope": "string"
+      }
+    },
+    {
+      "name": "changelog_entry",
+      "description": "Draft an entry under Unreleased in CHANGELOG.md for the work on this branch",
+      "params": {
+        "branch": "string"
+      }
+    },
+    {
+      "name": "release_notes",
+      "description": "Assemble release notes for a tag from the commits in its range",
+      "params": {
+        "tag": "string"
+      }
+    },
+    {
+      "name": "tag_release",
+      "description": "Create an annotated git tag naming a version",
+      "params": {
+        "version": "string"
+      }
+    },
+    {
+      "name": "open_pull_request",
+      "description": "Open a pull request from the current branch against the default branch",
+      "params": {
+        "title": "string"
+      }
+    },
+    {
+      "name": "review_pull_request",
+      "description": "Post a code review with comments on an open pull request",
+      "params": {
+        "number": "integer"
+      }
+    },
+    {
+      "name": "merge_branch",
+      "description": "Merge one branch into another",
+      "params": {
+        "source": "string",
+        "target": "string"
+      }
+    },
+    {
+      "name": "rebase_branch",
+      "description": "Rebase the current branch onto another branch",
+      "params": {
+        "onto": "string"
+      }
+    },
+    {
+      "name": "cherry_pick_commit",
+      "description": "Apply a single commit from another branch onto this one",
+      "params": {
+        "sha": "string"
+      }
+    },
+    {
+      "name": "revert_commit",
+      "description": "Create a commit that undoes an earlier commit",
+      "params": {
+        "sha": "string"
+      }
+    },
+    {
+      "name": "resolve_conflict",
+      "description": "Resolve the merge conflict markers left in a file",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "blame_line",
+      "description": "Report which commit last changed a given line of a file",
+      "params": {
+        "path": "string",
+        "line": "integer"
+      }
+    },
+    {
+      "name": "bisect_regression",
+      "description": "Find the commit that introduced a failure by bisecting a range",
+      "params": {
+        "good": "string",
+        "bad": "string"
+      }
+    },
+    {
+      "name": "stash_changes",
+      "description": "Put the uncommitted changes aside without committing them",
+      "params": {
+        "message": "string"
+      }
+    },
+    {
+      "name": "read_file",
+      "description": "Return the contents of a file",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "write_file",
+      "description": "Replace the contents of a file",
+      "params": {
+        "path": "string",
+        "content": "string"
+      }
+    },
+    {
+      "name": "append_file",
+      "description": "Add lines to the end of a file",
+      "params": {
+        "path": "string",
+        "content": "string"
+      }
+    },
+    {
+      "name": "delete_file",
+      "description": "Remove a file from the working tree",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "move_file",
+      "description": "Move or rename a file on disk",
+      "params": {
+        "source": "string",
+        "target": "string"
+      }
+    },
+    {
+      "name": "rename_symbol",
+      "description": "Rename a symbol across the codebase and update every reference to it",
+      "params": {
+        "old": "string",
+        "new": "string"
+      }
+    },
+    {
+      "name": "extract_function",
+      "description": "Turn a selected block of code into a named function",
+      "params": {
+        "path": "string",
+        "name": "string"
+      }
+    },
+    {
+      "name": "inline_variable",
+      "description": "Replace a variable with its value at each use and remove it",
+      "params": {
+        "path": "string",
+        "name": "string"
+      }
+    },
+    {
+      "name": "format_code",
+      "description": "Reformat source files to the project's style, changing no behaviour",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "lint_code",
+      "description": "Report style and correctness warnings without changing any file",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "fix_build_error",
+      "description": "Repair a compile error using the compiler's own message as the oracle",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "type_check",
+      "description": "Run the static type checker over the project and report its findings",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "run_tests",
+      "description": "Run the test suite and report which cases failed",
+      "params": {
+        "pattern": "string"
+      }
+    },
+    {
+      "name": "run_build",
+      "description": "Compile the project and report whether the build succeeded",
+      "params": {
+        "target": "string"
+      }
+    },
+    {
+      "name": "generate_test",
+      "description": "Write a new test case exercising a named function",
+      "params": {
+        "function": "string"
+      }
+    },
+    {
+      "name": "measure_coverage",
+      "description": "Report which lines of a file the test suite never executes",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "profile_runtime",
+      "description": "Sample where wall clock time goes during a run",
+      "params": {
+        "command": "string"
+      }
+    },
+    {
+      "name": "benchmark_function",
+      "description": "Time one function over repeated calls and report the distribution",
+      "params": {
+        "function": "string"
+      }
+    },
+    {
+      "name": "search_code",
+      "description": "Find occurrences of a text pattern across the repository",
+      "params": {
+        "pattern": "string"
+      }
+    },
+    {
+      "name": "find_definition",
+      "description": "Locate the file and line where a symbol is defined",
+      "params": {
+        "symbol": "string"
+      }
+    },
+    {
+      "name": "list_references",
+      "description": "List every place a symbol is used, resolved by the language server",
+      "params": {
+        "symbol": "string"
+      }
+    },
+    {
+      "name": "explain_snippet",
+      "description": "Describe in prose what a block of code does",
+      "params": {
+        "path": "string"
+      }
+    },
+    {
+      "name": "summarize_diff",
+      "description": "Summarise what a diff changes, file by file",
+      "params": {
+        "range": "string"
+      }
+    },
+    {
+      "name": "write_docstring",
+      "description": "Write API documentation for a function from its signature and body",
+      "params": {
+        "function": "string"
+      }
+    },
+    {
+      "name": "update_readme",
+      "description": "Bring the README into line with what the code now does",
+      "params": {
+        "section": "string"
+      }
+    },
+    {
+      "name": "translate_comment",
+      "description": "Translate the comments in a file into another language",
+      "params": {
+        "path": "string",
+        "language": "string"
+      }
+    },
+    {
+      "name": "deploy_service",
+      "description": "Deploy a named version of a service to an environment",
+      "params": {
+        "service": "string",
+        "version": "string"
+      }
+    },
+    {
+      "name": "rollback_deploy",
+      "description": "Return a service to the release it was running before the last deploy",
+      "params": {
+        "service": "string"
+      }
+    },
+    {
+      "name": "scale_service",
+      "description": "Change how many replicas a service runs",
+      "params": {
+        "service": "string",
+        "replicas": "integer"
+      }
+    },
+    {
+      "name": "restart_service",
+      "description": "Restart a running service without changing its version",
+      "params": {
+        "service": "string"
+      }
+    },
+    {
+      "name": "tail_logs",
+      "description": "Stream the log output of a running service",
+      "params": {
+        "service": "string"
+      }
+    },
+    {
+      "name": "query_metrics",
+      "description": "Query a time series out of the metrics store",
+      "params": {
+        "metric": "string",
+        "window": "string"
+      }
+    },
+    {
+      "name": "create_alert",
+      "description": "Create a monitoring alert that fires on a metric threshold",
+      "params": {
+        "metric": "string",
+        "threshold": "number"
+      }
+    },
+    {
+      "name": "page_oncall",
+      "description": "Page the engineer currently on call",
+      "params": {
+        "reason": "string"
+      }
+    },
+    {
+      "name": "query_database",
+      "description": "Run a read-only SQL query against an application database",
+      "params": {
+        "sql": "string"
+      }
+    },
+    {
+      "name": "migrate_database",
+      "description": "Apply the pending schema migrations to a database",
+      "params": {
+        "database": "string"
+      }
+    },
+    {
+      "name": "seed_database",
+      "description": "Load fixture rows into a database for development",
+      "params": {
+        "database": "string"
+      }
+    },
+    {
+      "name": "backup_database",
+      "description": "Take a snapshot of a database and store it",
+      "params": {
+        "database": "string"
+      }
+    },
+    {
+      "name": "rotate_secret",
+      "description": "Replace a stored credential with a freshly generated one",
+      "params": {
+        "name": "string"
+      }
+    },
+    {
+      "name": "grant_access",
+      "description": "Give a principal permission on a resource",
+      "params": {
+        "principal": "string",
+        "resource": "string"
+      }
+    },
+    {
+      "name": "scan_dependencies",
+      "description": "Report which declared dependencies carry known vulnerabilities",
+      "params": {
+        "manifest": "string"
+      }
+    },
+    {
+      "name": "upgrade_dependency",
+      "description": "Move one declared dependency to a newer version",
+      "params": {
+        "package": "string",
+        "version": "string"
+      }
+    },
+    {
+      "name": "lock_dependencies",
+      "description": "Regenerate the dependency lock file from the manifest",
+      "params": {
+        "manifest": "string"
+      }
+    },
+    {
+      "name": "publish_package",
+      "description": "Publish the package to its registry",
+      "params": {
+        "registry": "string"
+      }
+    },
+    {
+      "name": "build_container",
+      "description": "Build a container image from the Dockerfile",
+      "params": {
+        "tag": "string"
+      }
+    },
+    {
+      "name": "trigger_pipeline",
+      "description": "Start a run of the CI pipeline",
+      "params": {
+        "pipeline": "string"
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "build",
+      "request": "The build fails with `cannot find symbol: Logger` in src/App.java. Make it compile again.",
+      "answer": "fix_build_error"
+    },
+    {
+      "id": "commit",
+      "request": "I have staged my changes and need a Conventional Commits subject and body describing them.",
+      "answer": "commit_message"
+    },
+    {
+      "id": "changelog",
+      "request": "Everything that landed on this branch should be written up under Unreleased in CHANGELOG.md.",
+      "answer": "changelog_entry"
+    },
+    {
+      "id": "rename",
+      "request": "The class Cfg should be called Config everywhere in the codebase, references included.",
+      "answer": "rename_symbol"
+    },
+    {
+      "id": "deploy",
+      "request": "Put version 2.4.0 of the checkout service onto the staging environment.",
+      "answer": "deploy_service"
+    },
+    {
+      "id": "sql",
+      "request": "How many orders were placed yesterday? Read it out of the orders table.",
+      "answer": "query_database"
+    },
+    {
+      "id": "bisect",
+      "request": "Something broke between v1.2 and v1.3 and I need the commit that introduced it.",
+      "answer": "bisect_regression"
+    },
+    {
+      "id": "coverage",
+      "request": "Tell me which lines of parser.py the test suite never executes.",
+      "answer": "measure_coverage"
+    },
+    {
+      "id": "scale",
+      "request": "The payments service runs three replicas and needs nine before the sale starts.",
+      "answer": "scale_service"
+    },
+    {
+      "id": "cve",
+      "request": "A CVE was published for a package we depend on. Which of our declared dependencies are affected?",
+      "answer": "scan_dependencies"
+    }
+  ],
+  "code_task": {
+    "id": "config",
+    "request": "Read config.yaml, set debug to false, write the file back, and rebuild the project.",
+    "answer_order": [
+      "read_file",
+      "write_file",
+      "run_build"
+    ]
+  }
+}
