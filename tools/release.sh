@@ -1,5 +1,5 @@
 name="release"
-description="Cut a release: pick the next version, date the pending changelog section, commit and tag it"
+description="Cut a release: pick the next version, date the pending changelog section, commit, tag and push it"
 
 _current() { jq -r '.version // empty' package.json 2>/dev/null; }
 

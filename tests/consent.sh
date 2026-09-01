@@ -184,5 +184,19 @@ check "and the unasked question answered an empty line" "APPLIED[]" "$got"
 unset_got=$(bash -c 'unset LM_YES; sed -i "1d" "$1"; bash "$1"' _ "$work/unattended.sh" </dev/null 2>&1); unset_rc=$?
 check "and without it the same run still refuses"        "7" "$unset_rc"
 
+# The last thing the operator reads before a run leaves their machine. `release`
+# has always asked "Cut and push $v?"; `pr` asked "Create PR?" while pushing the
+# branch ahead of the pull request, so the screen that took the consent did not
+# mention the half that publishes. Both sides are read out of the tool file, so a
+# verb that grows a push later is checked too rather than these two alone.
+pushers=$(grep -l 'git push' "$ROOT"/tools/*.sh)
+check "there is a verb that pushes to find"   "yes" "$([ -n "$pushers" ] && echo yes || echo no)"
+for f in $pushers; do
+  v=$(basename "$f" .sh)
+  asked=$(sed -n 's/^ *confirm "\(.*\)".*/\1/p' "$f")
+  check "$v names the push in what it asks"   "yes" \
+    "$(grep -qi push <<<"$asked" && echo yes || echo no)"
+done
+
 [ "$fail" -eq 0 ] || { echo "FAILED"; exit 1; }
 echo "all cases passed"

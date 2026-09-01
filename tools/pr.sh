@@ -1,5 +1,5 @@
 name="pr"
-description="Generate a pull request description from the commits ahead of the default branch"
+description="Push the branch and create a pull request describing the commits ahead of the default branch"
 
 # slug<TAB>heading for the shallowest heading level of the PR template, in file
 # order. Empty when the repository has no template, which selects the plain
@@ -149,7 +149,7 @@ render() {
 apply() {
   local j
   j=$(cat)
-  confirm "Create PR? [y/N]"
+  confirm "Push the branch and create the PR? [y/N]"
 
   git push -u origin HEAD
   gh pr create --title "$(jq -r '.title' <<<"$j")" --body "$(_render_body "$j")"

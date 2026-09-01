@@ -506,5 +506,64 @@
       "write_file",
       "run_build"
     ]
+  },
+  "collision": {
+    "note": "Inputs of the collision check, not of the sweep above. One catalogue of the six tool files this repository ships, put through the channel the chat routes on: src/chat.mts registers one function per file, carrying the file's own description and the two parameters below, and reads the choice out of message.tool_calls. The two catalogues are the descriptions before and after they were widened to name what apply() performs, and both are put in the same arrangements: position in the catalogue is a variable of its own, so the descriptions are the only thing that differs between the two calls of a pair, and a row is three arrangements rather than one arrangement's luck. A model is given a row by running tests/collision.mts against it.",
+    "seed": 20260902,
+    "arrangements": 3,
+    "params": {
+      "text": "string",
+      "dry_run": "boolean"
+    },
+    "requests": [
+      {
+        "id": "changelog",
+        "request": "Everything that landed on this branch should be written up under Unreleased before I forget.",
+        "answer": "changelog"
+      },
+      {
+        "id": "commit",
+        "request": "I have a working tree full of unrelated edits; split them into a few commits with proper messages.",
+        "answer": "commit"
+      },
+      {
+        "id": "issue",
+        "request": "The parser drops the last row of a CSV. File that on GitHub with the right labels.",
+        "answer": "issue"
+      },
+      {
+        "id": "pr",
+        "request": "Push this branch and get a pull request opened against main describing what is on it.",
+        "answer": "pr"
+      },
+      {
+        "id": "release",
+        "request": "Time to cut 0.3.0: bump the version, date the changelog section and tag it.",
+        "answer": "release"
+      },
+      {
+        "id": "both",
+        "request": "Commit what is in my working tree and open a pull request for it.",
+        "answer": "ship"
+      }
+    ],
+    "catalogues": {
+      "before": {
+        "changelog": "Draft CHANGELOG.md entries under [Unreleased] from the index, the working tree or free text",
+        "commit": "Split the uncommitted changes into logical commits, each with a Conventional Commits message",
+        "issue": "Draft and create a GitHub issue, picking labels from the repository taxonomy",
+        "pr": "Generate a pull request description from the commits ahead of the default branch",
+        "release": "Cut a release: pick the next version, date the pending changelog section, commit and tag it",
+        "ship": "Commit the working tree and open a pull request"
+      },
+      "after": {
+        "changelog": "Write entries under [Unreleased] into CHANGELOG.md from the index, the working tree or free text",
+        "commit": "Split the uncommitted changes into logical commits, each with a Conventional Commits message",
+        "issue": "Draft and create a GitHub issue, picking labels from the repository taxonomy",
+        "pr": "Push the branch and create a pull request describing the commits ahead of the default branch",
+        "release": "Cut a release: pick the next version, date the pending changelog section, commit, tag and push it",
+        "ship": "Commit the working tree and open a pull request"
+      }
+    }
   }
 }
