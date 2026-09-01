@@ -89,7 +89,7 @@ CLEAN_AWK='
 # partial is its own column rather than a share of failed, because 8 is the one
 # non-zero code that leaves work standing in the repository and the operator
 # reads the table rather than the log. docs/verbs.md carries what each code means.
-printf '%-10s %5s %10s %8s %8s %7s %7s %8s %9s\n' verb runs clean declined retried failed partial "avg ms" "avg model"
+printf '%-10s %5s %10s %8s %8s %7s %7s %6s %8s %9s\n' verb runs clean declined retried failed partial moved "avg ms" "avg model"
 jq -s -r "${SCOPE[@]}" "$HELD
   map(select($VERBRUN)) |"'
   def cols: [ length,
@@ -98,6 +98,7 @@ jq -s -r "${SCOPE[@]}" "$HELD
     (map(select(.calls == 2)) | length),
     (map(select(.exit != 0 and .exit != 7 and .exit != 8)) | length),
     (map(select(.exit == 8)) | length),
+    (map(select(.head_moved)) | length),
     (map(.ms) | add / length | floor),
     (map(select(.total_duration != null) | .total_duration)
      | if length == 0 then null else (add / length / 1000000 | floor) end) ];
@@ -105,8 +106,8 @@ jq -s -r "${SCOPE[@]}" "$HELD
   | ($runs | map(select(held)) | group_by(.verb)[] | [.[0].verb] + cols),
     ($runs | map(select(held | not)) | select(length > 0) | ["(unknown)"] + cols)
   | @tsv' "$LM_LOG" \
-| awk -F'\t' -v min="$CLEAN_N" "$CLEAN_AWK"'{printf "%-10s %5d %s %8d %8d %7d %7d %8d %9s\n",
-    $1, $2, cell($3, $2), $4, $5, $6, $7, $8, ($9 == "" ? "-" : $9)}'
+| awk -F'\t' -v min="$CLEAN_N" "$CLEAN_AWK"'{printf "%-10s %5d %s %8d %8d %7d %7d %6d %8d %9s\n",
+    $1, $2, cell($3, $2), $4, $5, $6, $7, $8, $9, ($10 == "" ? "-" : $10)}'
 
 # A row that vanished is a defect and a row nobody can read is another, so the
 # names the table put under (unknown) are printed, and a reader who could not
@@ -147,11 +148,6 @@ jq -s -r "${SCOPE[@]}" --arg since "$SINCE" "$HELD
 | awk -F'\t' -v min="$CLEAN_N" "$CLEAN_AWK"'{printf "%-10s %s %5d %s %5d\n",
     $1, cell($3, $2), $2, cell($5, $4), $4}'
 }
-
-echo
-echo "commits created by lm commit:"
-jq -s -r "${SCOPE[@]}" "map(select(.verb == \"commit\" and $RUN))"'
-  | "  \(map(select(.head_moved)) | length) of \(length)"' "$LM_LOG"
 
 echo
 # A record written before bin/lm carried the field has no workflow and counts as

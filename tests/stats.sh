@@ -145,6 +145,51 @@ check "a log with no partial run prints the column as a zero" "1 0 1 0" \
   "$("$STATS" 2>&1 | awk '/^stub /{print $2, $5, $6, $7}')"
 teardown
 
+# record() writes head_moved for every run, so the runs that landed a commit are
+# a column of the table like the codes above and not one verb's own heading. A
+# heading naming a verb reads 0 of 0 in every project that does not have it.
+landed() { # ts repo verb n
+  local i
+  for ((i = 0; i < $4; i++)); do
+    rec "$1" true "$2" | jq -c --arg v "$3" '.verb = $v | .head_moved = true' >> "$LM_LOG"
+  done
+}
+
+setup
+tools commit pr
+named  "$BEFORE" true "$REPO" commit 2
+landed "$BEFORE" "$REPO" commit 3
+named  "$BEFORE" true "$REPO" pr 4
+out=$("$STATS" 2>&1)
+check "the moved column counts the runs that moved HEAD" "5 3" \
+  "$(awk '/^commit /{print $2, $8}' <<<"$out")"
+check "and a verb that moved none reads a zero, not a blank" "4 0" \
+  "$(awk '/^pr /{print $2, $8}' <<<"$out")"
+check "and the column is named where the row prints it" "8" \
+  "$(awk 'NR == 1 { for (i = 1; i <= NF; i++) if ($i == "moved") print i }' <<<"$out")"
+teardown
+
+# The whole point of the column: a project whose registry has no such verb is not
+# told about one. Nothing else the reader prints names a verb.
+setup
+tools pr
+landed "$BEFORE" "$REPO" pr 1
+out=$("$STATS" 2>&1)
+check "a project without that verb is shown no heading for it" "0" "$(grep -c commit <<<"$out")"
+check "and its own run that moved HEAD is counted in its row" "1" \
+  "$(awk '/^pr /{print $8}' <<<"$out")"
+teardown
+
+# The window prints a block of its own and leaves the table reading the heap, so
+# the moved figure counts both periods whether or not a date was given.
+setup
+tools commit
+landed "$BEFORE" "$REPO" commit 2
+landed "$SINCE"  "$REPO" commit 3
+check "the window leaves the moved column over the whole log" "5" \
+  "$("$STATS" --since "$CUT" 2>&1 | awk '/^commit /{print $8; exit}')"
+teardown
+
 # The question the table cannot answer: how the clean share moved between two
 # dates. Both periods here carry the sample the column needs, so both are read.
 setup
