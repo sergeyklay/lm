@@ -71,7 +71,22 @@ HELD='def held: .verb as $v | $checked == 0 or ($known | index($v) != null);'
 # needs: under fourteen runs no outcome can put the edit share below one in five,
 # and a figure every sample confirms is not a figure. Derived in docs/verbs.md.
 CLEAN_N=14
-printf '%-10s %5s %7s %9s %8s %7s %8s %9s\n' verb runs clean declined retried failed "avg ms" "avg model"
+# The clean cell is a share and the one-sided 95% upper bound on it, because the
+# share alone cannot say whether the sample excludes the threshold it is read
+# against. Both tables that print the share share this, so it is written once.
+# The bound sits in the format string rather than in an argument, and the padding
+# is counted off the digits, so no field width has to measure a character that is
+# not one byte wide. docs/verbs.md carries how the pair is read.
+CLEAN_AWK='
+  function upper(k, n,   p, d, z) { z = 1.6449; p = k / n; d = 1 + z*z/n
+    return 100 * ((p + z*z/(2*n))/d + z*sqrt(p*(1-p)/n + z*z/(4*n*n))/d) }
+  function cell(k, n,   s, b, w) {
+    if (n < min) return sprintf("%10s", "n<" min)
+    s = sprintf("%d", 100*k/n); b = sprintf("%.0f", upper(k, n))
+    w = 10 - (length(s) + length(b) + 4)
+    return sprintf("%*s%s%% \342\211\244%s%%", w, "", s, b) }
+'
+printf '%-10s %5s %10s %9s %8s %7s %8s %9s\n' verb runs clean declined retried failed "avg ms" "avg model"
 jq -s -r "${SCOPE[@]}" "$HELD
   map(select($VERBRUN)) |"'
   def cols: [ length,
@@ -86,9 +101,8 @@ jq -s -r "${SCOPE[@]}" "$HELD
   | ($runs | map(select(held)) | group_by(.verb)[] | [.[0].verb] + cols),
     ($runs | map(select(held | not)) | select(length > 0) | ["(unknown)"] + cols)
   | @tsv' "$LM_LOG" \
-| awk -F'\t' -v min="$CLEAN_N" '{printf "%-10s %5d %7s %9d %8d %7d %8d %9s\n",
-    $1, $2, ($2 < min ? "n<" min : sprintf("%d%%", 100*$3/$2)),
-    $4, $5, $6, $7, ($8 == "" ? "-" : $8)}'
+| awk -F'\t' -v min="$CLEAN_N" "$CLEAN_AWK"'{printf "%-10s %5d %s %9d %8d %7d %8d %9s\n",
+    $1, $2, cell($3, $2), $4, $5, $6, $7, ($8 == "" ? "-" : $8)}'
 
 # A row that vanished is a defect and a row nobody can read is another, so the
 # names the table put under (unknown) are printed, and a reader who could not
@@ -115,7 +129,7 @@ UNKNOWN=$(jq -s -r "${SCOPE[@]}" "$HELD
 [ -z "$SINCE" ] || {
 echo
 echo "first answer clean, split at $SINCE:"
-printf '%-10s %8s %5s %8s %5s\n' verb before n since n
+printf '%-10s %10s %5s %10s %5s\n' verb before n since n
 jq -s -r "${SCOPE[@]}" --arg since "$SINCE" "$HELD
   map(select($VERBRUN)) |"'
   def cols: [ (map(select(.ts < $since)) | length),
@@ -126,9 +140,8 @@ jq -s -r "${SCOPE[@]}" --arg since "$SINCE" "$HELD
   | ($runs | map(select(held)) | group_by(.verb)[] | [.[0].verb] + cols),
     ($runs | map(select(held | not)) | select(length > 0) | ["(unknown)"] + cols)
   | @tsv' "$LM_LOG" \
-| awk -F'\t' -v min="$CLEAN_N" '{printf "%-10s %8s %5d %8s %5d\n",
-    $1, ($2 < min ? "n<" min : sprintf("%d%%", 100*$3/$2)), $2,
-        ($4 < min ? "n<" min : sprintf("%d%%", 100*$5/$4)), $4}'
+| awk -F'\t' -v min="$CLEAN_N" "$CLEAN_AWK"'{printf "%-10s %s %5d %s %5d\n",
+    $1, cell($3, $2), $2, cell($5, $4), $4}'
 }
 
 echo

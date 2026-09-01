@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # libexec/lm-stats over a log written by hand. The reader calls no model and keeps
 # no state, so the log is its whole input and a case here is a log and a reading.
-# What these cover is the two axes every record carries that the table never reads,
-# the clean column split at a date and which caller the run came from, and the one
-# thing the reader takes from outside the log: whether the registry holds the name
-# a record carries.
+# What these cover is the clean column's own reading, the two axes every record
+# carries that the table never reads - the clean column split at a date and which
+# caller the run came from - and the one thing the reader takes from outside the
+# log: whether the registry holds the name a record carries.
 
 set -uo pipefail
 ROOT=$(dirname "$(readlink -f "$0")")/..
@@ -65,8 +65,14 @@ period() { # ts total clean
 }
 
 # before n since n, read out of the split block alone: the verb's own row appears
-# in the table above it too.
-row() { sed -n '/^first answer clean/,/^$/p' | awk '/^stub /{print $2, $3, $4, $5}'; }
+# in the table above it too. The whole row after the verb is normalised rather
+# than read by field, because a clean cell is one word or three.
+row() { sed -n '/^first answer clean/,/^$/p' \
+  | awk '/^stub /{ $1 = ""; sub(/^ +/, ""); print }'; }
+
+# The clean cell of the table above, which is either the withheld sample or the
+# share with its bound.
+clean() { sed -n 's/^stub  *[0-9][0-9]*  *\(n<14\|[0-9]*% \xe2\x89\xa4[0-9]*%\).*/\1/p'; }
 
 # The verb column of each table, in the order it is printed: which rows exist is
 # the whole question a registry check answers.
@@ -80,6 +86,37 @@ BEFORE=2026-08-25T09:00:00+02:00
 SINCE=2026-08-27T09:00:00+02:00
 CUT=2026-08-26
 
+# The clean column is the one figure read against a threshold, and a share cannot
+# say whether the sample it came from excludes that threshold. The cell carries
+# the one-sided 95% upper bound beside the share, so the reading is on the screen
+# rather than in a calculation nobody runs.
+setup
+period "$BEFORE" 14 11
+check "a share above the minimum carries its bound" "78% ≤91%" "$("$STATS" 2>&1 | clean)"
+teardown
+
+# The pair is worth printing because its halves can disagree: eleven of fourteen
+# sits below four in five and leaves it standing, while twenty of thirty puts it
+# away. A column printing the share alone reads the same in both.
+setup
+period "$BEFORE" 30 20
+check "and a sample that excludes the threshold says so" "66% ≤79%" "$("$STATS" 2>&1 | clean)"
+teardown
+
+# Under the minimum there is no share to bound, and the withheld sample is the
+# whole cell.
+setup
+period "$BEFORE" 13 13
+check "under the minimum the cell withholds both" "n<14" "$("$STATS" 2>&1 | clean)"
+teardown
+
+# A verb nothing has been edited on is the case the bound exists for: the share
+# is perfect and the sample still admits every threshold there is.
+setup
+period "$BEFORE" 14 14
+check "a perfect share at the minimum bounds nothing away" "100% ≤100%" "$("$STATS" 2>&1 | clean)"
+teardown
+
 # The question the table cannot answer: how the clean share moved between two
 # dates. Both periods here carry the sample the column needs, so both are read.
 setup
@@ -87,8 +124,8 @@ period "$BEFORE" 15 12
 period "$SINCE"  15 9
 out=$("$STATS" --since "$CUT" 2>&1)
 check "the split names its date"      "1" "$(grep -c "split at $CUT" <<<"$out")"
-check "and reads both periods"        "80% 15 60% 15" "$(row <<<"$out")"
-check "the table still reads the heap" "70%" "$(awk '/^stub /{print $3}' <<<"$out" | head -1)"
+check "and reads both periods"        "80% ≤92% 15 60% ≤78% 15" "$(row <<<"$out")"
+check "the table still reads the heap" "70% ≤82%" "$(clean <<<"$out" | head -1)"
 teardown
 
 # The same fifteen-and-fifteen with one record's ts moved across the cut. Both
@@ -96,7 +133,7 @@ teardown
 setup
 period "$BEFORE" 14 11
 period "$SINCE"  16 10
-check "moving one run moves both shares" "78% 14 62% 16" "$("$STATS" --since "$CUT" 2>&1 | row)"
+check "moving one run moves both shares" "78% ≤91% 14 62% ≤79% 16" "$("$STATS" --since "$CUT" 2>&1 | row)"
 teardown
 
 # A period reads its own share against its own sample, so one side can be read
@@ -104,14 +141,14 @@ teardown
 setup
 period "$BEFORE" 13 13
 period "$SINCE"  14 14
-check "a period under the minimum withholds" "n<14 13 100% 14" "$("$STATS" --since "$CUT" 2>&1 | row)"
+check "a period under the minimum withholds" "n<14 13 100% ≤100% 14" "$("$STATS" --since "$CUT" 2>&1 | row)"
 teardown
 
 # A period with nothing in it is the same case as a period below the minimum, and
 # it is the one that would divide by zero if the minimum were not read first.
 setup
 period "$SINCE" 14 14
-check "an empty period is withheld, not divided" "n<14 0 100% 14" "$("$STATS" --since "$CUT" 2>&1 | row)"
+check "an empty period is withheld, not divided" "n<14 0 100% ≤100% 14" "$("$STATS" --since "$CUT" 2>&1 | row)"
 teardown
 
 # One log spans every repository, so the split counts the tree it runs in. A run
@@ -119,8 +156,8 @@ teardown
 setup
 period "$BEFORE" 14 14
 rec "$SINCE" true other >> "$LM_LOG"
-check "another repository is out of both periods" "100% 14 n<14 0" "$("$STATS" --since "$CUT" 2>&1 | row)"
-check "and --all takes it in"                     "100% 14 n<14 1" "$("$STATS" --all --since "$CUT" 2>&1 | row)"
+check "another repository is out of both periods" "100% ≤100% 14 n<14 0" "$("$STATS" --since "$CUT" 2>&1 | row)"
+check "and --all takes it in"                     "100% ≤100% 14 n<14 1" "$("$STATS" --all --since "$CUT" 2>&1 | row)"
 teardown
 
 # A value that is not a date would split every run to one side and read as a
@@ -145,7 +182,7 @@ period "$BEFORE" 8 8
 for ((i = 0; i < 7; i++)); do rec "$SINCE" true "$REPO" | jq -c '. + {caller:"chat"}' >> "$LM_LOG"; done
 out=$("$STATS" 2>&1)
 check "a log written across the field's arrival is one population" "15" "$(awk '/^stub /{print $2}' <<<"$out")"
-check "and the share is read over all of it"                       "100%" "$(awk '/^stub /{print $3}' <<<"$out")"
+check "and the share is read over all of it"                       "100% ≤100%" "$(clean <<<"$out")"
 teardown
 
 # The block that reads that axis, over a log holding all three shapes at once: a
