@@ -9,6 +9,13 @@ set -euo pipefail
 : "${LM_MAX_TOKENS:=3000}"
 : "${LM_LOG=$HOME/.lm/runs.jsonl}"     # one JSON object per run; empty disables
 
+# Where lm itself is installed, for a tool that needs the tree lm ships rather than
+# the repository it is working on. Only a runner can answer it: a tool file's own
+# path is the project's tools/ wherever it was copied to. src/registry.mts is the
+# twin, and docs/tools.md is where both are published.
+LM_INSTALL=$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")
+export LM_INSTALL
+
 TOP=$(git rev-parse --show-toplevel 2>/dev/null || true)
 
 # LM_TOOLS names the whole registry. Otherwise it is the tools/ of the repository

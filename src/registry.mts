@@ -1,6 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Where lm itself is installed, for a tool that needs the tree lm ships rather than
+// the repository it is working on. Only a runner can answer it: a tool file's own
+// path is the project's tools/ wherever it was copied to. libexec/lm-verb is the
+// twin, and docs/tools.md is where both are published.
+const INSTALL = join(dirname(fileURLToPath(import.meta.url)), "..");
+const toolEnv = (env?: Record<string, string>) => ({ ...process.env, ...env, LM_INSTALL: INSTALL });
 
 export type ToolMeta = { name: string; description: string; flags: string[]; verbs: string[] };
 export type Result = { stdout: string; stderr: string; status: number };
@@ -80,7 +88,7 @@ function bash(script: string, argv: string[], opts: Opts = {}): Result {
     input: opts.stdin ?? "",
     encoding: "utf8",
     cwd: opts.cwd,
-    env: { ...process.env, ...opts.env },
+    env: toolEnv(opts.env),
     maxBuffer: 64 * 1024 * 1024,
   });
   if (r.error) throw r.error;
@@ -128,7 +136,7 @@ export function apply(file: string, opts: Opts = {}, yes = false): number {
     input: opts.stdin ?? "",
     stdio: ["pipe", "inherit", "inherit"],
     cwd: opts.cwd,
-    env: { ...process.env, ...opts.env },
+    env: toolEnv(opts.env),
   });
   if (r.error) throw r.error;
   return r.status ?? 1;
@@ -142,7 +150,7 @@ export function applyAsk(file: string, opts: Opts, ask: Ask): Promise<{ status: 
   return new Promise((resolve, reject) => {
     const child = spawn("bash", ["-euo", "pipefail", "-c", BRIDGE + SOURCE, "bash", file, "apply"], {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      env: toolEnv(opts.env),
       stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
     });
     child.stdin!.end(opts.stdin ?? "");

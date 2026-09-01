@@ -25,8 +25,11 @@ export GOLDEN="$ROOT/golden"
 UPDATE=0; [ "${1:-}" = "--update" ] && UPDATE=1
 
 # The runner defines confirm() for the tools; apply() is never called here, but
-# sourcing must not fail on a name the tool expects its runner to provide.
+# sourcing must not fail on a name the tool expects its runner to provide. The
+# runner also names its own installation, which is what `changelog` reads the
+# published contract out of, and each case runs from a fixture repository instead.
 confirm() { :; }
+LM_INSTALL=$(dirname "$ROOT"); export LM_INSTALL
 
 fail=0
 for setup in "$GOLDEN"/*/*/setup.sh; do

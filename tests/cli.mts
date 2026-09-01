@@ -247,6 +247,24 @@ const named = (label: string) =>
 check("and both runners name the same registry",
   listed(only.out), [...named("verbs"), ...named("workflows")].sort());
 
+// A tool that needs lm's own tree is asking the runner where lm is installed, and
+// the file it is asking from sits in the project's tools/ rather than there. Each
+// runner resolves it for itself, so a tool answered by one and not the other is
+// the same drift the registry group above catches. The declaration is read at
+// source time, so the answer comes back in the description each runner prints:
+// the listing is the shell runner's and the help is the Node runner's.
+const installDir = project("install", {
+  "probe.sh": 'name="probe"\ndescription="lm is installed at ${LM_INSTALL:-nowhere}"\ncollect() { :; }\n',
+});
+const shellSaid = runIn(installDir, ["--list"], {}, join(ROOT, "libexec/lm-verb"));
+check("the shell runner tells a tool where lm is installed",
+  `probe\tlm is installed at ${ROOT}`, shellSaid.out.trim());
+const nodeSaid = runIn(installDir, ["probe", "--help"]);
+// The description is wrapped as a paragraph there, so the wrap is undone rather
+// than the case being pinned to a path short enough not to trigger it.
+check("and the Node runner answers with the same directory",
+  `lm is installed at ${ROOT}`, nodeSaid.out.split("\n\nUsage:")[0].split(/\s+/).join(" "));
+
 // Outside a repository there is no `git rev-parse --show-toplevel` to read, so
 // there is no registry at all.
 const loose = mkdtempSync(join(tmpdir(), "lm-loose-"));

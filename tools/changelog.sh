@@ -107,8 +107,9 @@ schema() {
 validate() {
   local j n i catg bullet tok _root
   # The contract and the source both live in lm's own tree, not in the repository
-  # the verb is drafting for, so the root comes from where the registry was found.
-  _root=$(dirname "${LM_TOOLS:-$(dirname "${BASH_SOURCE[0]}")}")
+  # the verb is drafting for and not beside a copy of this file, so the root is the
+  # one the runner names. Unnamed, there is no tree to read and nothing is judged.
+  _root=${LM_INSTALL:-}
   j=$(cat)
 
   jq -e . >/dev/null 2>&1 <<<"$j" || { echo "output is not valid JSON"; return 0; }
