@@ -16,6 +16,7 @@ TOP=$(git rev-parse --show-toplevel 2>/dev/null || true)
 # tools/ of its own. bin/lm resolves this for itself, and tests/cli.mts is what
 # requires the two to answer alike.
 if [ -n "${LM_TOOLS:-}" ]; then
+  [ -d "$LM_TOOLS" ] || { echo "lm: LM_TOOLS names $LM_TOOLS, which is not a directory." >&2; exit 2; }
   DIR=$LM_TOOLS
 elif [ -n "$TOP" ] && [ -d "$TOP/tools" ]; then
   DIR="$TOP/tools"

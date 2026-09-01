@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 
 // The harness advertises its own updates on a banner above the prompt, and this
 // program installs them itself instead. The variable is the switch its own
@@ -18,7 +18,16 @@ const argv = process.argv.slice(2);
 // tools/ of its own. libexec/lm-verb resolves this for itself, and tests/cli.mts
 // is what requires the two to answer alike.
 function registry() {
-  if (process.env.LM_TOOLS) return process.env.LM_TOOLS;
+  const named = process.env.LM_TOOLS;
+  if (named) {
+    // A registry nothing can list is not a registry holding nothing, so the path
+    // is checked here rather than at the readdir every entry point reaches.
+    if (!statSync(named, { throwIfNoEntry: false })?.isDirectory()) {
+      process.stderr.write(`lm: LM_TOOLS names ${named}, which is not a directory.\n`);
+      process.exit(2);
+    }
+    return named;
+  }
   const top = (spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout ?? "").trim();
   const project = top && join(top, "tools");
   return project && existsSync(project) ? project : undefined;
@@ -174,6 +183,11 @@ if (argv.length > 0 && argv[0] !== "chat" && !argv[0].startsWith("-")) {
   process.exit((await runVerb(file, argv.slice(1))).code);
 }
 
+// Read before the launch spends anything, so a mistyped LM_TOOLS is refused
+// rather than paid for with an update check and a catalogue read first.
+const { list } = await import("../src/registry.mts");
+const files = list(registry());
+
 // Before the harness is imported, so the session opens on whatever this
 // installed and no module is replaced under a running chat. `PI_OFFLINE` is the
 // harness's own switch and is honoured here as `catalogue()` honours it.
@@ -186,7 +200,6 @@ const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts"
 const { initialSelection, seedThinkingLevel } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup, silenceChangelog } = await import("../src/chrome.mts");
-const { list } = await import("../src/registry.mts");
 
 silenceStartup();
 
@@ -194,7 +207,6 @@ const settings = SettingsManager.create(process.cwd());
 seedThinkingLevel(settings);
 silenceChangelog(settings, updated);
 const selection = initialSelection(settings);
-const files = list(registry());
 
 // The catalogue is read once before the session opens, not only at the refresh
 // the harness runs after it: a session keeps the model object it opened on, so a
