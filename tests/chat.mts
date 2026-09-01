@@ -110,10 +110,10 @@ await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
 type Shown = { label: string; message: string };
 // The chat is entered through the registration, not around it: a case that
 // called runVerb directly would leave every line of src/chat.mts unrun.
-async function throughTheChat(dir: string, ui: any) {
+async function throughTheChat(dir: string, ui: any, printFlag = false) {
   const shown: Shown[] = [];
   const tools: any[] = [];
-  registerVerbs({ registerTool: (t: any) => tools.push(t) }, list(dir));
+  registerVerbs({ registerTool: (t: any) => tools.push(t) }, list(dir), printFlag);
   const ctx = {
     hasUI: ui !== undefined,
     ui: {
@@ -154,6 +154,40 @@ check("and the human read the artefact before declining it, not only before appr
   ["one line of answer\n\nwrite it? [y/N]"], no.shown.map((s) => s.message));
 check("and the chat reports the refusal in words, having no exit status",
   true, /Declined\. Nothing was applied\./.test(no.text));
+
+// The session with no dialog at all, which is what redirecting either stream
+// gets: `throughTheChat` reads `hasUI` off whether a `ui` was passed, so passing
+// none is that session. The person is the one who has to be told, so the line is
+// read off stderr rather than out of the tool result, which reaches the model.
+async function overStderr(run: () => Promise<{ text: string }>) {
+  const was = process.stderr.write;
+  let caught = "";
+  (process.stderr as any).write = (s: any) => { caught += s; return true; };
+  try { return { ran: await run(), caught }; }
+  finally { (process.stderr as any).write = was; }
+}
+
+const NO_UI = await overStderr(() => throughTheChat(dialogTools, undefined));
+check("a session with no dialog says on stderr which question it could not put",
+  "lm: speaks could not ask you 'write it? [y/N]': this session is not interactive."
+  + " Nothing was applied.\n", NO_UI.caught);
+check("and nothing reached the side effect", "false", String(existsSync(applied)));
+check("and nobody is told they declined a question that was never put to them",
+  false, /Declined\./.test(NO_UI.ran.text));
+check("and the model is told the question was never asked instead",
+  true, /the question was never asked/.test(NO_UI.ran.text));
+check("and the line the person read is not in what the model reads",
+  false, /could not ask you/.test(NO_UI.ran.text));
+
+// Typing the flag names the mode, and a diagnostic on the case the person chose
+// is the noise `AGENTS.md` forbids. What the model reads does not change with it.
+const TYPED = await overStderr(() => throughTheChat(dialogTools, undefined, true));
+check("a session that typed -p named the mode and is told nothing", "", TYPED.caught);
+check("and the model is still told the question was never asked",
+  true, /the question was never asked/.test(TYPED.ran.text));
+// Whatever these two did is theirs: the cases below read the same path for the
+// side effect, and a leftover here would answer for them.
+rmSync(applied, { force: true });
 
 // A body that asks twice and is refused on the first must receive no answer to
 // the second. The channel tolerates being answered after it closes, so a

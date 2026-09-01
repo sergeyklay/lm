@@ -19,14 +19,19 @@ const PARAMETERS = {
 
 // 7 is the human saying no, and a chat has no exit status to carry it, so the
 // tool result says it in words. Anything else non-zero is a failure the model
-// should not paper over.
-function outcome(code: number): string {
+// should not paper over. A session with no dialog exits 7 too, and the two
+// readings must not be reported alike: nobody declined a question nobody was put.
+function outcome(code: number, unasked: boolean): string {
   if (code === 0) return "";
-  if (code === 7) return "Declined. Nothing was applied.";
+  if (code === 7) {
+    return unasked
+      ? "Nothing was applied: this session is not interactive, so the question was never asked."
+      : "Declined. Nothing was applied.";
+  }
   return `The verb failed with exit ${code}.`;
 }
 
-export function registerVerbs(pi: any, files: string[]): string[] {
+export function registerVerbs(pi: any, files: string[], printFlag = false): string[] {
   const registered: string[] = [];
   // The index is the directory listing here as everywhere else, so a fifth tool
   // file is offered in the next session with no file edited. What a file is is
@@ -49,6 +54,20 @@ export function registerVerbs(pi: any, files: string[]): string[] {
         if (params?.text) argv.push("--", String(params.text));
 
         let said = "";
+        // Said here rather than at startup, because only here is it known that a
+        // verb asked and there is no dialog. Stderr rather than `io.err`, which
+        // appends into `said`: that is the tool result, and it reaches the model
+        // and never the person. Typing -p named the mode and is not news.
+        let unasked = false;
+        const noDialog = <T>(label: string, question: string, answer: T): Promise<T> => {
+          unasked = true;
+          if (!printFlag) {
+            process.stderr.write(
+              `lm: ${label} could not ask you '${question}': this session is not interactive.`
+              + " Nothing was applied.\n");
+          }
+          return Promise.resolve(answer);
+        };
         // Built per label rather than once, because the two dialogs a delivery
         // shows are its verbs' own and each says which verb is asking.
         const io: IoFor = (label) => ({
@@ -61,11 +80,12 @@ export function registerVerbs(pi: any, files: string[]): string[] {
             confirm: (question) =>
               ctx.hasUI
                 ? ctx.ui.confirm(label, `${said.trim()}\n\n${question}`.trim())
-                : Promise.resolve(false),
+                : noDialog(label, question, false),
             // undefined is no answer, which the bridge turns into a refusal.
-            // Without a dialog to show there is no answer to be had.
+            // `issue` reaches this before it reaches a confirmation, so a verb
+            // that asks first would otherwise have nothing to say.
             input: (question) =>
-              ctx.hasUI ? ctx.ui.input(label, question) : Promise.resolve(undefined),
+              ctx.hasUI ? ctx.ui.input(label, question) : noDialog(label, question, undefined),
           },
         });
 
@@ -78,7 +98,7 @@ export function registerVerbs(pi: any, files: string[]): string[] {
           ? await runWorkflow(file, files, argv, `${info.name}-${process.pid}-${++runs}`, io, env)
           : await runVerb(file, argv, env, io(info.name));
 
-        const text = [said.trim(), outcome(result.code)].filter((p) => p.length > 0).join("\n\n");
+        const text = [said.trim(), outcome(result.code, unasked)].filter((p) => p.length > 0).join("\n\n");
         return {
           content: [{ type: "text", text: text || `The verb produced nothing and exited ${result.code}.` }],
           details: undefined,
