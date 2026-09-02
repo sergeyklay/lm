@@ -188,14 +188,16 @@ export function skillsLine(commands: Iterable<{ source?: string; sourceInfo?: { 
 // configured server whose tools are missing and a machine with no servers
 // configured read alike when the zero is left out. Every server that could not
 // be asked is named with what it said, because that is the only place the
-// operator learns of it.
+// operator learns of it, and the clause naming the command that acts on it is
+// the surprising case: a launch where everything answered has nothing to fix.
 export function mcpLine(
   found: { servers: number; tools: number },
   trouble: Iterable<{ server: string; reason: string }> = [],
 ): string {
   const many = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   const named = [...trouble].map((t) => `; ${t.server}: ${t.reason}`).join("");
-  return `mcp: ${many(found.servers, "server")}, ${many(found.tools, "tool")}${named}`;
+  const fix = named ? "; /mcp to retry or disable" : "";
+  return `mcp: ${many(found.servers, "server")}, ${many(found.tools, "tool")}${named}${fix}`;
 }
 
 // A model is the pair, never the id alone: the harness resolves a remembered

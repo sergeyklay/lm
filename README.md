@@ -45,7 +45,7 @@ Adding a verb changes no existing file. The index is the directory listing, so a
 - [What this repository ships](docs/instruments.md): what each verb does, and `ship`.
 - [Running a verb](docs/verbs.md): the flags every verb takes, the run log `lm stats` reads, configuration and exit codes.
 - [Adding a tool](docs/tools.md): the registry contract, and the tests that pin it.
-- [MCP servers in the chat](docs/mcp.md): where a server is declared, what the launch says, and what the model is offered.
+- [MCP servers in the chat](docs/mcp.md): where a server is declared, what the launch says, what the model is offered, and what `/mcp` does about a server that will not answer.
 - [The runner](docs/runner.md): how a verb reaches the model, and how the chat reaches a verb.
 
 ## Why "lm"

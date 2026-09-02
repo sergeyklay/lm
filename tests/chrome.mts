@@ -133,10 +133,10 @@ check("one of each is singular", "mcp: 1 server, 1 tool", mcpLine({ servers: 1, 
 check("and a machine with none configured says so rather than saying nothing",
   "mcp: 0 servers, 0 tools", mcpLine({ servers: 0, tools: 0 }));
 check("a server that would not answer is named with what it did",
-  "mcp: 1 server, 2 tools; atlassian: answered 401",
+  "mcp: 1 server, 2 tools; atlassian: answered 401; /mcp to retry or disable",
   mcpLine({ servers: 1, tools: 2 }, [{ server: "atlassian", reason: "answered 401" }]));
 check("and every one of them is, not the first",
-  "mcp: 0 servers, 0 tools; dead: ECONNREFUSED; mute: did not answer in time",
+  "mcp: 0 servers, 0 tools; dead: ECONNREFUSED; mute: did not answer in time; /mcp to retry or disable",
   mcpLine({ servers: 0, tools: 0 }, [
     { server: "dead", reason: "ECONNREFUSED" },
     { server: "mute", reason: "did not answer in time" },
@@ -145,7 +145,7 @@ check("and every one of them is, not the first",
 const withServers = openChat(undefined, "startup", [], { servers: 1, tools: 2, trouble: [{ server: "dead", reason: "ECONNREFUSED" }] });
 check("the launch says what it reached, through the same notice", 1, withServers.said("mcp:").length);
 check("naming the counts and the server it could not reach",
-  "mcp: 1 server, 2 tools; dead: ECONNREFUSED", String(withServers.said("mcp:")[0]?.[0]));
+  "mcp: 1 server, 2 tools; dead: ECONNREFUSED; /mcp to retry or disable", String(withServers.said("mcp:")[0]?.[0]));
 check("at the level that claims nothing is wrong", "info", String(withServers.said("mcp:")[0]?.[1]));
 check("a launch with no servers configured says so rather than saying nothing",
   "mcp: 0 servers, 0 tools", String(openChat(undefined).said("mcp:")[0]?.[0]));

@@ -60,8 +60,10 @@ check("and the two directories they are read from are named",
   true, /^Skills:\n  \.agents\/skills +\S.*\n  ~\/\.agents\/skills +\S/m.test(help.out));
 // An MCP server is configured in a file this program never writes, so the help
 // is where the operator learns which files it reads and which of them wins.
-check("and the three files an MCP server is declared in are named, in the order that decides",
-  true, /^MCP servers:\n  \.mcp\.json +\S.*\n  ~\/\.claude\.json +\S.*\n  ~\/\.gemini\/settings\.json +\S/m.test(help.out));
+check("and the four files an MCP server is declared in are named, in the order that decides",
+  true, /^MCP servers:\n  \.mcp\.json +\S.*\n  ~\/\.lm\/\.mcp\.json +\S.*\n  ~\/\.claude\.json +\S.*\n  ~\/\.gemini\/settings\.json +\S/m.test(help.out));
+check("and so is the command that acts on one of them",
+  true, /^  \/mcp +\S/m.test(help.out));
 
 // A name in the first position claims the help flag, and what comes back is
 // generated from what the file declares: no tool file answers --help itself.

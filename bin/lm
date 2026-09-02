@@ -125,9 +125,11 @@ Skills:
   ~/.agents/skills              yours, in every repository, behind the repository's
 
 MCP servers:
-  .mcp.json                     the repository's own, ahead of the two below
-  ~/.claude.json                yours, in every repository
+  .mcp.json                     the repository's own, ahead of the three below
+  ~/.lm/.mcp.json               yours, written for lm
+  ~/.claude.json                yours, borrowed from another agent
   ~/.gemini/settings.json       the same, behind the one above
+  /mcp                          in the chat: what answered, and what to do about one that did not
 
 Environment:
   LM_OLLAMA                     where ollama listens (http://127.0.0.1:11434)
@@ -213,7 +215,8 @@ const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts"
 const { initialSelection, seedThinkingLevel } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup, silenceChangelog, trustProject } = await import("../src/chrome.mts");
-const { configPaths, readServers, discover, registerServers, MCP_DEADLINE_MS } = await import("../src/mcp.mts");
+const { configPaths, readServers, discover, registerServers, registerConsole, readDisabled, statePath, MCP_DEADLINE_MS } =
+  await import("../src/mcp.mts");
 
 // Redirecting either stream is enough to open a session with no dialog, and only
 // one of the two ways in was asked for. The flag is read here because this is
@@ -237,14 +240,21 @@ const selection = initialSelection(settings);
 // The servers the operator already configured for the agent this replaces, read
 // here for the same reason and awaited beside the catalogue rather than after
 // it, so the launch waits on the slower of the two and not on both.
-const declared = readServers(configPaths(process.cwd(), homedir()));
+const mcpPaths = configPaths(process.cwd(), homedir());
+const declared = readServers(mcpPaths);
+
+// A server the operator switched off through `/mcp` is not asked and is not
+// counted as trouble. It is still declared, so `/mcp` still lists it: a switch
+// with no way back is a switch nobody touches.
+const mcpState = statePath(homedir());
+const disabled = new Set(readDisabled(mcpState));
 
 const [models, found] = await Promise.all([
   catalogue({
     allowNetwork: process.env.PI_OFFLINE === undefined,
     signal: AbortSignal.timeout(CATALOGUE_DEADLINE_MS),
   }),
-  discover(declared.servers, {
+  discover(declared.servers.filter((s) => !disabled.has(s.name)), {
     allowNetwork: process.env.PI_OFFLINE === undefined,
     signal: AbortSignal.timeout(MCP_DEADLINE_MS),
   }),
@@ -261,6 +271,18 @@ await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))]
         pi.registerProvider("ollama", { ...providerConfig(), ...(models ? { models } : {}), refreshModels: catalogue });
         const verbs = registerVerbs(pi, files, printFlag);
         const remote = registerServers(pi, found.served, verbs);
+        registerConsole(pi, {
+          pi,
+          servers: declared.servers,
+          skipped: declared.skipped,
+          found,
+          taken: new Set([...verbs, ...remote.registered]),
+          registered: new Set(remote.registered),
+          disabled,
+          paths: mcpPaths,
+          state: mcpState,
+          allowNetwork: process.env.PI_OFFLINE === undefined,
+        });
         installChrome(pi, updated, {
           servers: found.served.length,
           tools: remote.registered.length,
