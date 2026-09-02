@@ -2,7 +2,7 @@
 
 **A coding agent that never leaves your machine.**
 
-A chat against a model on your own hardware, this repository's own verbs available inside it, and every run recorded in a log you can read. No account and no API key, and nothing you type or stage is sent anywhere: `issue` and `pr` reach GitHub because publishing is what they are for, and nothing else leaves the machine.
+A chat against a model on your own hardware, this repository's own verbs available inside it, and every run recorded in a log you can read. No account and no API key, and nothing you type or stage is sent anywhere: `issue` and `pr` reach GitHub because publishing is what they are for, an [MCP server](docs/mcp.md) is reached only because you configured one, and nothing else leaves the machine.
 
 `lm` does not make a local model as good as a hosted one. What it does is give the model a job small enough to be reliable: each verb collects its input from the repository, asks the model once under a JSON schema, validates the answer, shows it to you, and only then applies it.
 
@@ -45,6 +45,7 @@ Adding a verb changes no existing file. The index is the directory listing, so a
 - [What this repository ships](docs/instruments.md): what each verb does, and `ship`.
 - [Running a verb](docs/verbs.md): the flags every verb takes, the run log `lm stats` reads, configuration and exit codes.
 - [Adding a tool](docs/tools.md): the registry contract, and the tests that pin it.
+- [MCP servers in the chat](docs/mcp.md): where a server is declared, what the launch says, and what the model is offered.
 - [The runner](docs/runner.md): how a verb reaches the model, and how the chat reaches a verb.
 
 ## Why "lm"

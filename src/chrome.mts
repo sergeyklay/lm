@@ -184,6 +184,20 @@ export function skillsLine(commands: Iterable<{ source?: string; sourceInfo?: { 
   return `skills: ${count.project} project, ${count.user} user${named}`;
 }
 
+// What the session reached, in the same voice and for the same reason: a
+// configured server whose tools are missing and a machine with no servers
+// configured read alike when the zero is left out. Every server that could not
+// be asked is named with what it said, because that is the only place the
+// operator learns of it.
+export function mcpLine(
+  found: { servers: number; tools: number },
+  trouble: Iterable<{ server: string; reason: string }> = [],
+): string {
+  const many = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const named = [...trouble].map((t) => `; ${t.server}: ${t.reason}`).join("");
+  return `mcp: ${many(found.servers, "server")}, ${many(found.tools, "tool")}${named}`;
+}
+
 // A model is the pair, never the id alone: the harness resolves a remembered
 // choice by provider and id together, and one provider's model is not another's
 // however alike the two names read.
@@ -503,7 +517,11 @@ export class DoubleEscapeEditor extends CustomEditor {
 
 // Everything this project draws on the chat's screen. Without a terminal there
 // is nothing to draw on.
-export function installChrome(pi: any, updated?: string): void {
+export function installChrome(
+  pi: any,
+  updated?: string,
+  mcp: { servers: number; tools: number; trouble?: { server: string; reason: string }[] } = { servers: 0, tools: 0 },
+): void {
   // The closing block is written after the harness has stopped the TUI, where
   // the theme a header or footer callback is handed is out of scope. The header
   // callback keeps what the block draws with for then. A launch that draws
@@ -562,6 +580,7 @@ export function installChrome(pi: any, updated?: string): void {
     // Read off what already loaded, so a line that fails to render costs the
     // screen a number and the session nothing.
     if (event?.reason === "startup") ctx.ui.notify(skillsLine(pi.getCommands()), "info");
+    if (event?.reason === "startup") ctx.ui.notify(mcpLine(mcp, mcp.trouble), "info");
     const autoCompact = compactionEnabled(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
       ink = {

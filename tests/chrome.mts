@@ -9,7 +9,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { headerLines, footerLines, DoubleEscapeEditor, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, ownTitle, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, skillsLine, trustProject, type SessionLocation, type Sitting } from "../src/chrome.mts";
+import { headerLines, footerLines, DoubleEscapeEditor, threeSlots, shortenCwd, formatTokens, formatDuration, summarize, summaryBlock, visibleWidth, version, dropHarnessResume, ownTitle, installChrome, silenceChangelog, rememberModel, rememberThinkingLevel, skillsLine, mcpLine, trustProject, type SessionLocation, type Sitting } from "../src/chrome.mts";
 import { pickTarget, updateHarness } from "../src/update.mts";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
@@ -57,7 +57,7 @@ check("both rows carry the mark", true, header.every((l) => l.includes("█")));
 // is what the screen says on every frame; an update happened once, so it goes
 // out as the harness's own system notice instead. `session_start` fires again
 // for a reload, which installed nothing and must not be told it did.
-function openChat(updated: string | undefined, reason: string = "startup", commands: any[] = []) {
+function openChat(updated: string | undefined, reason: string = "startup", commands: any[] = [], mcp?: any) {
   const notices: Array<[string, unknown]> = [];
   let rows: string[] = [];
   let editorFactory: ((tui: any, editorTheme: any, keybindings: any) => any) | undefined;
@@ -65,7 +65,7 @@ function openChat(updated: string | undefined, reason: string = "startup", comma
   installChrome({
     on: (name: string, fn: (event: any, ctx: any) => void) => { handlers[name] = fn; },
     getCommands: () => commands,
-  }, updated);
+  }, updated, mcp);
   handlers.session_start({ type: "session_start", reason }, {
     hasUI: true,
     cwd: ROOT,
@@ -123,6 +123,34 @@ check("a launch that found none says so rather than saying nothing",
   "skills: 0 project, 0 user", String(openChat(undefined).said("skills:")[0]?.[0]));
 check("and a reload, which is the same session, does not repeat it",
   0, openChat(undefined, "reload", [skill("a", "project")]).said("skills:").length);
+
+// The servers the operator configured, on the same terms: a count that is
+// always there, and every server that could not be asked named with what it did,
+// because the launch is the only place that is said.
+check("the line names what answered and what it offered",
+  "mcp: 2 servers, 7 tools", mcpLine({ servers: 2, tools: 7 }));
+check("one of each is singular", "mcp: 1 server, 1 tool", mcpLine({ servers: 1, tools: 1 }));
+check("and a machine with none configured says so rather than saying nothing",
+  "mcp: 0 servers, 0 tools", mcpLine({ servers: 0, tools: 0 }));
+check("a server that would not answer is named with what it did",
+  "mcp: 1 server, 2 tools; atlassian: answered 401",
+  mcpLine({ servers: 1, tools: 2 }, [{ server: "atlassian", reason: "answered 401" }]));
+check("and every one of them is, not the first",
+  "mcp: 0 servers, 0 tools; dead: ECONNREFUSED; mute: did not answer in time",
+  mcpLine({ servers: 0, tools: 0 }, [
+    { server: "dead", reason: "ECONNREFUSED" },
+    { server: "mute", reason: "did not answer in time" },
+  ]));
+
+const withServers = openChat(undefined, "startup", [], { servers: 1, tools: 2, trouble: [{ server: "dead", reason: "ECONNREFUSED" }] });
+check("the launch says what it reached, through the same notice", 1, withServers.said("mcp:").length);
+check("naming the counts and the server it could not reach",
+  "mcp: 1 server, 2 tools; dead: ECONNREFUSED", String(withServers.said("mcp:")[0]?.[0]));
+check("at the level that claims nothing is wrong", "info", String(withServers.said("mcp:")[0]?.[1]));
+check("a launch with no servers configured says so rather than saying nothing",
+  "mcp: 0 servers, 0 tools", String(openChat(undefined).said("mcp:")[0]?.[0]));
+check("and a reload, which is the same session, does not repeat that either",
+  0, openChat(undefined, "reload", [], { servers: 1, tools: 2 }).said("mcp:").length);
 
 // The harness asks before it reads a project's own resources, and answers of its
 // own for a session with no dialog: `ask`, its default, drops them. This answers

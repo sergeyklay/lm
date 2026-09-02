@@ -92,6 +92,7 @@ node tests/request.mts            # what the Node runner asks the model for, off
 node tests/chat-request.mts       # what the chat asks the model for, off the wire
 node tests/window.mts             # what the declared window buys, off the harness's own compaction
 node tests/catalogue.mts          # which models the chat offers, what each declares, and the deadline the launch reads them under
+node tests/mcp.mts                # which MCP servers the chat reaches, what it does with one that will not answer, and the names it gives their tools
 LM_LIVE=1 node tests/verb-live.mts  # the retry, the budget, a verb inside the chat and the shell beside it, on the real model
 LM_ROUTING=1 node tests/routing.mts <model>...  # not a suite: the routing comparison of the knowledge base, three channels over tests/routing.json at four catalogue sizes, one row per model named
 LM_ROUTING=1 node tests/collision.mts <model>...  # not a suite: whether widening a description toward its own act takes a sibling's traffic, over the six shipped descriptions and the `collision` block of tests/routing.json, one row per catalogue per arrangement

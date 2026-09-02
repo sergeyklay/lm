@@ -2,6 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { existsSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 
 // The harness advertises its own updates on a banner above the prompt, and this
 // program installs them itself instead. The variable is the switch its own
@@ -123,6 +124,11 @@ Skills:
   .agents/skills                the repository's own, read up to its root
   ~/.agents/skills              yours, in every repository, behind the repository's
 
+MCP servers:
+  .mcp.json                     the repository's own, ahead of the two below
+  ~/.claude.json                yours, in every repository
+  ~/.gemini/settings.json       the same, behind the one above
+
 Environment:
   LM_OLLAMA                     where ollama listens (http://127.0.0.1:11434)
   LM_MODEL                      the model a verb asks, and the chat's default (qwen3.8:27b)
@@ -207,6 +213,7 @@ const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts"
 const { initialSelection, seedThinkingLevel } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup, silenceChangelog, trustProject } = await import("../src/chrome.mts");
+const { configPaths, readServers, discover, registerServers, MCP_DEADLINE_MS } = await import("../src/mcp.mts");
 
 // Redirecting either stream is enough to open a session with no dialog, and only
 // one of the two ways in was asked for. The flag is read here because this is
@@ -227,10 +234,21 @@ const selection = initialSelection(settings);
 // model declared from its own card only by the refresh would be a model the
 // operator's own session never sees. `PI_OFFLINE` is the harness's own switch and
 // is honoured here as `catalogue()` honours it.
-const models = await catalogue({
-  allowNetwork: process.env.PI_OFFLINE === undefined,
-  signal: AbortSignal.timeout(CATALOGUE_DEADLINE_MS),
-});
+// The servers the operator already configured for the agent this replaces, read
+// here for the same reason and awaited beside the catalogue rather than after
+// it, so the launch waits on the slower of the two and not on both.
+const declared = readServers(configPaths(process.cwd(), homedir()));
+
+const [models, found] = await Promise.all([
+  catalogue({
+    allowNetwork: process.env.PI_OFFLINE === undefined,
+    signal: AbortSignal.timeout(CATALOGUE_DEADLINE_MS),
+  }),
+  discover(declared.servers, {
+    allowNetwork: process.env.PI_OFFLINE === undefined,
+    signal: AbortSignal.timeout(MCP_DEADLINE_MS),
+  }),
+]);
 
 await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))], {
   extensionFactories: [
@@ -241,8 +259,13 @@ await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))]
       factory: (pi) => {
         trustProject(pi);
         pi.registerProvider("ollama", { ...providerConfig(), ...(models ? { models } : {}), refreshModels: catalogue });
-        registerVerbs(pi, files, printFlag);
-        installChrome(pi, updated);
+        const verbs = registerVerbs(pi, files, printFlag);
+        const remote = registerServers(pi, found.served, verbs);
+        installChrome(pi, updated, {
+          servers: found.served.length,
+          tools: remote.registered.length,
+          trouble: [...declared.skipped, ...found.trouble, ...remote.trouble],
+        });
       },
     },
   ],
