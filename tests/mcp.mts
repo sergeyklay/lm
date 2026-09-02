@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  configPaths, readServers, discover, registerServers, registerConsole, toolName, readDisabled, statePath,
+  configPaths, readServers, discover, registerServers, registerConsole, toolName, readDisabled, statePath, fold,
 } from "../src/mcp.mts";
 
 let fail = 0;
@@ -251,91 +251,238 @@ async function launch() {
   return { pi, commands, tools, found };
 }
 
-// The command without a terminal: every selector records the block it was drawn
-// with and the rows under it, and answers with the next scripted keystroke.
-function drive(commands: Map<string, any>, choices: (string | undefined)[]) {
-  const drawn: { title: string; options: string[] }[] = [];
-  const said: string[] = [];
-  const ctx = {
+// The screen without a terminal. The harness hands the factory a TUI, a theme,
+// the keybindings and the callback that closes it; each is answered here by the
+// least that satisfies the contract, and the theme answers in markers so a
+// rendered line can be read back for weight and for colour.
+const KEYS: Record<string, string> = {
+  "tui.select.up": "\x1b[A",
+  "tui.select.down": "\x1b[B",
+  "tui.select.confirm": "\r",
+  "tui.select.cancel": "\x1b",
+};
+const BOUND: Record<string, string> = { "tui.select.confirm": "enter", "tui.select.cancel": "escape" };
+const keys = {
+  matches: (data: string, binding: string) => data === KEYS[binding],
+  getKeys: (binding: string) => [BOUND[binding] ?? binding],
+};
+const mark = { fg: (colour: string, text: string) => `<${colour}>${text}</>`, bold: (text: string) => `<b>${text}</b>` };
+
+async function screen(commands: Map<string, any>) {
+  let drawn: any;
+  const closed = { yes: false, notices: [] as string[] };
+  await commands.get("mcp").handler("", {
     hasUI: true,
     ui: {
-      select: async (title: string, options: string[]) => (drawn.push({ title, options }), choices.shift()),
-      notify: (message: string) => said.push(message),
+      custom: async (factory: any) =>
+        (drawn = factory({ requestRender() {} }, mark, keys, () => (closed.yes = true))),
+      notify: (message: string) => closed.notices.push(message),
     },
-  };
-  return { drawn, said, run: () => commands.get("mcp").handler("", ctx) };
+  });
+  return { s: drawn, closed };
+}
+
+const press = (s: any, binding: string) => s.handleInput(KEYS[binding]);
+// The frame is a rule, a blank, the body, a blank, the hints, a blank, a rule.
+const body = (s: any, width = 76): string[] => s.render(width).slice(2, -4);
+const plain = (line: string) => line.replace(/<\/?[a-z]*>/g, "");
+const acts = (s: any): string[] =>
+  body(s).filter((l) => /^ *(<accent>→ <\/>)?<(accent|text)>(Reconnect|Disable|Enable|Back)</.test(l));
+const standing = (s: any): string =>
+  plain(body(s).find((l) => l.startsWith(" <accent>→ ")) ?? "").trim().replace(/^→ /, "").split(/ {2,}/)[0];
+// A press starts the ask and returns; the screen says it is asking until it is
+// not, which is the only thing this has to wait on.
+async function settle(s: any) {
+  for (let i = 0; i < 400 && body(s).some((l) => plain(l).includes("Asking ")); i++) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
 }
 
 const first = await launch();
-const listing = drive(first.commands, [undefined]);
-await listing.run();
-check("the list says how many servers there are, the way the launch line does",
-  "Manage MCP servers\n4 servers", listing.drawn[0].title);
+const listing = await screen(first.commands);
+check("the screen opens on the list, counting the servers the way the launch line does",
+  [" <b>Manage MCP servers</b>", " <dim>4 servers</>", ""], body(listing.s).slice(0, 3));
 check("and groups them under the file that declared each, in the order the chain reads them",
   [
-    `  ${join(home, ".lm", ".mcp.json")}`,
-    "paper · ECONNREFUSED",
-    "own · connected · 2 tools",
-    `  ${join(home, ".claude.json")}`,
-    "local · not an HTTP server",
-    `  ${join(home, ".gemini", "settings.json")}`,
-    "stream · connected · 2 tools",
+    ` <dim>${join(home, ".lm", ".mcp.json")}</>`,
+    " <accent>→ </><accent>paper </>  <error>ECONNREFUSED</>",
+    "   <text>own   </>  <success>connected</><dim> · 2 tools</>",
+    ` <dim>${join(home, ".claude.json")}</>`,
+    "   <text>local </>  <error>not an HTTP server</>",
+    ` <dim>${join(home, ".gemini", "settings.json")}</>`,
+    "   <text>stream</>  <success>connected</><dim> · 2 tools</>",
   ],
-  listing.drawn[0].options);
+  body(listing.s).slice(3));
 
-const detail = drive(first.commands, ["paper · ECONNREFUSED", undefined, undefined]);
-await detail.run();
-check("selecting one shows the whole of what the server said, which the launch line had no room for",
+// The complaint the screen was rebuilt for: the heading sat to the right of the
+// servers, took the cursor, and answered Enter.
+check("a heading sits to the left of the servers under it, not indented past them",
+  [1, 3], [plain(body(listing.s)[3]).search(/\S/), plain(body(listing.s)[5]).search(/\S/)]);
+check("and is dimmer than every server row",
+  [true, false, false],
+  [3, 4, 5].map((i) => body(listing.s)[i].startsWith(" <dim>")));
+
+// Four servers and three headings. Pressing down past the end of the list walks
+// every row the cursor may stand on, and a heading is not one of them.
+const walked: string[] = [];
+for (let i = 0; i < 6; i++) {
+  walked.push(standing(listing.s));
+  press(listing.s, "tui.select.down");
+}
+check("the cursor stands on servers only, and never on a heading",
+  ["paper", "own", "local", "stream", "stream", "stream"], walked);
+
+// The heading between two groups is passed over rather than stood on, so the
+// last server of one file is one press from the first server of the next.
+for (let i = 0; i < 6; i++) press(listing.s, "tui.select.up");
+press(listing.s, "tui.select.down");
+check("and one press carries it from the first server of a file to the last", "own", standing(listing.s));
+press(listing.s, "tui.select.down");
+check("and the next press crosses to the file below, passing the heading between them",
+  "local", standing(listing.s));
+
+// Escape is what the harness's own selectors close on, and closing is what the
+// callback the factory was handed is for.
+press(listing.s, "tui.select.cancel");
+check("and escape closes the screen", true, listing.closed.yes);
+
+// ---- The panel one server opens. -------------------------------------------
+const opened = await screen(first.commands);
+press(opened.s, "tui.select.confirm");
+check("opening a server shows the whole of what it said, which the launch line had no room for",
   [
-    "paper",
+    " <b>paper</b>",
     "",
-    "Status   ECONNREFUSED",
-    "URL      http://127.0.0.1:2/lm",
-    `Config   ${join(home, ".lm", ".mcp.json")}`,
-    "Headers  none",
+    " <b>Status</b>   <error>ECONNREFUSED</>",
+    " <b>URL</b>      <text>http://127.0.0.1:2/lm</>",
+    ` <b>Config</b>   <text>${join(home, ".lm", ".mcp.json")}</>`,
+    " <b>Headers</b>  <text>none</>",
     "",
-    "connect ECONNREFUSED 127.0.0.1:2",
-  ].join("\n"),
-  detail.drawn[1]?.title);
-check("and offers the two things lm can actually do about it",
-  ["Reconnect", "Disable", "Back"], detail.drawn[1]?.options);
+    " <dim>connect ECONNREFUSED 127.0.0.1:2</>",
+  ],
+  body(opened.s).slice(0, 8));
+// The weight is the label's alone, wherever a mutant might put it: the whole of
+// the line past the label has to come back with no bold in it at all.
+const past = (line: string) => line.slice(line.indexOf("</b>") + 4);
+check("with the weight on the labels and never on the values",
+  [true, false],
+  [body(opened.s)[2].startsWith(" <b>Status</b>"), /<b>/.test(past(body(opened.s)[2]))]);
+check("and offers the two things lm can actually do about it, and the way back",
+  [" <accent>→ </><accent>Reconnect</>", "   <text>Disable</>", "   <text>Back</>"], acts(opened.s));
+
 // A header value is an API key. Its name, and whether it was filled in, is the
 // whole of what this screen may say about one.
-const headers = drive(first.commands, ["own · connected · 2 tools", undefined, undefined]);
-await headers.run();
-check("a header is named, and said to be filled in", true, headers.drawn[1]?.title.includes("Headers  x-token (set)"));
-check("and its value is never drawn", false, headers.drawn[1]?.title.includes("opaque") ?? true);
+const headers = await screen(first.commands);
+press(headers.s, "tui.select.down");
+press(headers.s, "tui.select.confirm");
+check("a header is named, and said to be filled in",
+  true, body(headers.s).join("\n").includes("x-token (set)"));
+check("and its value is never drawn", false, body(headers.s).join("\n").includes("opaque"));
+
+// A server declared as a subprocess was never asked and cannot be, so it is not
+// offered a retry that has nothing to run.
+const stdio = await screen(first.commands);
+for (let i = 0; i < 2; i++) press(stdio.s, "tui.select.down");
+press(stdio.s, "tui.select.confirm");
+check("a server with no URL is not offered a reconnect it has no way to run",
+  [" <accent>→ </><accent>Disable</>", "   <text>Back</>"], acts(stdio.s));
+check("and its panel names no URL either", false, body(stdio.s).some((l) => plain(l).startsWith("URL")));
+
+// ---- What an act says, and where it says it. -------------------------------
+// The defect this delivery repairs: the act ran, its answer went to a notice,
+// and the harness replaced the launch line with it rather than adding a line, so
+// from the chair nothing had happened.
+const retry = await screen(first.commands);
+press(retry.s, "tui.select.confirm");
+press(retry.s, "tui.select.confirm");
+await settle(retry.s);
+check("a reconnect that fails says so, on the panel it was pressed on",
+  " <error>Asked again: paper ECONNREFUSED.</>", body(retry.s).at(-1));
+check("and the status above it is redrawn from what the ask returned",
+  " <b>Status</b>   <error>ECONNREFUSED</>", body(retry.s)[2]);
+check("and nothing goes to a notice, which is where the harness overwrites the line before it",
+  [], retry.closed.notices);
+
+const good = await screen(first.commands);
+press(good.s, "tui.select.down");
+press(good.s, "tui.select.confirm");
+press(good.s, "tui.select.confirm");
+await settle(good.s);
+check("a reconnect that works says what the model got",
+  " <success>Asked again: own answered, 2 tools.</>", body(good.s).at(-1));
+check("and reconnecting a server that already answered does not lose it to a collision with itself",
+  " <b>Status</b>   <success>connected · 2 tools</>", body(good.s)[2]);
 
 // ---- Both actions, across a restart. ---------------------------------------
 // The whole point of the switch is that it holds: a server disabled in one
 // session must not be asked in the next, and must still be listed there or
 // there is no way back.
-const off = drive(first.commands, ["own · connected · 2 tools", "Disable", undefined]);
-await off.run();
-check("disabling one says so", `mcp: own disabled, in this session and at the next launch.`, off.said[0]);
+const off = await screen(first.commands);
+press(off.s, "tui.select.down");
+press(off.s, "tui.select.confirm");
+press(off.s, "tui.select.down");
+press(off.s, "tui.select.confirm");
+check("disabling one says so where it was pressed",
+  " <dim>Disabled: own is not asked, now or at the next launch.</>", body(off.s).at(-1));
 check("and takes its tools out of the session that is running",
   ["mcp__stream__search", "mcp__stream__fetch"], first.pi.active);
 check("and writes the decision where the next launch reads it", ["own"], readDisabled(state));
 
 const second = await launch();
-const after = drive(second.commands, [undefined]);
-await after.run();
 check("the next launch does not ask it", false, second.found.served.some((s: any) => s.server.name === "own"));
 check("and offers the model none of its tools", [], second.tools.filter((t: any) => t.name.startsWith(toolName("own", ""))));
-check("but still lists it, with the state that is keeping it quiet",
-  true, after.drawn[0].options.includes("own · disabled"));
 
-const back = drive(second.commands, ["own · disabled", "Enable", undefined]);
-await back.run();
-check("enabling one asks it again there and then", "mcp: own · connected · 2 tools", back.said[0]);
+const after = await screen(second.commands);
+check("but still lists it, with the state that is keeping it quiet",
+  "   <text>own   </>  <dim>disabled</>", body(after.s).find((l) => plain(l).includes("own")));
+// A row the operator has to read the words of to tell apart is a row they skim.
+check("and the three states a server can be in are told apart by colour, not only by words",
+  ["error", "dim", "error", "success"],
+  body(after.s).slice(3).filter((l) => !l.startsWith(" <dim>")).map((l) => /> {2}<(\w+)>/.exec(l)?.[1]));
+
+const back = await screen(second.commands);
+press(back.s, "tui.select.down");
+press(back.s, "tui.select.confirm");
+check("a disabled server is offered the way back and nothing else",
+  [" <accent>→ </><accent>Enable</>", "   <text>Back</>"], acts(back.s));
+press(back.s, "tui.select.confirm");
+await settle(back.s);
+check("enabling one asks it there and then, and says what came back",
+  " <success>Enabled: own answered, 2 tools.</>", body(back.s).at(-1));
 check("and gives the model the tools it just got",
-  ["mcp__own__search", "mcp__own__fetch"], second.tools.filter((t: any) => t.name.startsWith(toolName("own", ""))).map((t: any) => t.name));
+  ["mcp__own__search", "mcp__own__fetch"],
+  second.tools.filter((t: any) => t.name.startsWith(toolName("own", ""))).map((t: any) => t.name));
 check("and the decision it reverses is gone from the file", [], readDisabled(state));
 
-const retry = drive(second.commands, ["own · connected · 2 tools", "Reconnect", undefined]);
-await retry.run();
-check("reconnecting a server that already answered does not lose it to a collision with itself",
-  "mcp: own · connected · 2 tools", retry.said[0]);
+// ---- A refusal too wide for the terminal. ----------------------------------
+// The body is capped at 2000 characters and a server may answer a rejection with
+// a paragraph. Cutting it throws away the half that names the missing scope.
+check("a value wider than the terminal is wrapped, never cut",
+  ["the scope this", "server wants is one", "nobody asked for"],
+  fold("the scope this server wants is one nobody asked for", 20));
+check("and a word longer than the terminal is broken rather than dropped",
+  ["aaaaa", "aaaaa", "aa"], fold("aaaaaaaaaaaa", 5));
+
+// The operator's own screen: a server that answers 401 with a body under it.
+writeFileSync(join(home, ".lm", ".mcp.json"), JSON.stringify({
+  mcpServers: {
+    own: { type: "http", url: json.url, headers: { "x-token": "opaque" } },
+    guarded: { httpUrl: refusing.url },
+  },
+}));
+const third = await launch();
+const refused = await screen(third.commands);
+press(refused.s, "tui.select.down");
+press(refused.s, "tui.select.confirm");
+check("every line of what a refusing server said reaches the screen, under the labels",
+  [" <b>Status</b>   <error>answered 401</>", "", " <dim>401 Unauthorized</>", " <dim>no</>"],
+  [body(refused.s)[2], body(refused.s)[6], body(refused.s)[7], body(refused.s)[8]]);
+press(refused.s, "tui.select.confirm");
+await settle(refused.s);
+check("and asking it again says the refusal came back, rather than saying nothing",
+  " <error>Asked again: guarded answered 401.</>", body(refused.s).at(-1));
+check("with no notice sent, where the harness would have overwritten the launch line",
+  [], refused.closed.notices);
 
 json.close();
 streamed.close();

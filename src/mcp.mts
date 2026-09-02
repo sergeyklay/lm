@@ -332,38 +332,89 @@ export const row = (e: Entry): string =>
 
 export const listTitle = (all: Entry[]): string => `Manage MCP servers\n${plural(all.length, "server")}`;
 
-// Grouped by the file that declared them, with the path in the heading, because
-// the first thing a server that is not working costs the operator is finding out
-// which of four files to edit. The heading is indented and the servers are not,
-// so the eye lands on the names.
-export function listRows(all: Entry[]): string[] {
-  const rows: string[] = [];
+
+// A file that declared servers, and then the servers it declared. The heading
+// is not a row: the operator cannot stand on it and there is nothing to do to a
+// file from here. It exists because the first thing a server that is not working
+// costs them is finding out which of four files to edit.
+export type Item = { heading: string } | { entry: Entry };
+
+export function listItems(all: Entry[]): Item[] {
+  const items: Item[] = [];
   let group: string | undefined;
   for (const entry of all) {
-    if (entry.config !== group) rows.push(`  ${(group = entry.config)}`);
-    rows.push(row(entry));
+    if (entry.config !== group) items.push({ heading: (group = entry.config) });
+    items.push({ entry });
   }
-  return rows;
+  return items;
 }
 
-// The one screen with room for the whole of what the server said. The startup
-// line has a clause; this has the status line and the body, which is where a
-// server names the scope that is missing or the token that expired.
-export function detailBlock(e: Entry): string {
-  const named: [string, string][] = [
-    ["Status", e.tools === undefined ? e.status : `${e.status} · ${plural(e.tools, "tool")}`],
-    ...(e.url ? ([["URL", e.url]] as [string, string][]) : []),
-    ["Config", e.config],
-    ["Headers", e.headers.length > 0 ? e.headers.join(", ") : "none"],
-  ];
-  const width = Math.max(...named.map(([n]) => n.length));
-  return [
-    e.name,
-    "",
-    ...named.map(([n, v]) => `${n.padEnd(width)}  ${v}`),
-    ...(e.detail ? ["", e.detail] : []),
-  ].join("\n");
+// The same grouping without a terminal to draw it on, which is all a session
+// with no dialog can be told.
+export const listRows = (all: Entry[]): string[] =>
+  listItems(all).map((item) => ("entry" in item ? row(item.entry) : `  ${item.heading}`));
+
+// ---- What the screen draws with --------------------------------------------
+
+// The theme's own two calls and nothing else, so a colour is asked for by the
+// name the theme knows it under and a terminal without truecolor gets that
+// theme's approximation rather than an RGB value it cannot show. A test passes a
+// marker in place of each, which is how a rendered line can be read back for
+// which spans are bold and which colour carries the state.
+export type Paint = { fg: (color: string, text: string) => string; bold: (text: string) => string };
+
+export const PLAIN: Paint = { fg: (_color, text) => text, bold: (text) => text };
+
+// What the keyboard is bound to, which is the harness's own manager: the screen
+// asks it what a keystroke means rather than comparing bytes, so a rebound key
+// works here and the hint says the key that is actually bound.
+export type Keys = { matches: (data: string, binding: string) => boolean; getKeys: (binding: string) => string[] };
+
+const UP = "tui.select.up";
+const DOWN = "tui.select.down";
+const CONFIRM = "tui.select.confirm";
+const CANCEL = "tui.select.cancel";
+
+// Three states, and the words are not the only thing that separates them: a
+// server that answered, one that refused, and one switched off must be
+// distinguishable to someone reading the column rather than the sentence.
+export const tone = (e: Entry): string => (e.disabled ? "dim" : e.status === CONNECTED ? "success" : "error");
+
+// A value wider than the terminal is wrapped, never cut: the whole of what a
+// refusing server said is the reason this screen exists, and the scope it names
+// as missing is as likely to be at the end of the line as the start.
+export function fold(text: string, width: number): string[] {
+  const room = Math.max(1, width);
+  const lines: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    let rest = paragraph;
+    do {
+      if (rest.length <= room) {
+        lines.push(rest);
+        break;
+      }
+      const space = rest.lastIndexOf(" ", room);
+      const take = space > 0 ? space : room;
+      lines.push(rest.slice(0, take));
+      rest = rest.slice(space > 0 ? take + 1 : take);
+    } while (true);
+  }
+  return lines;
 }
+
+const GUTTER = 2;
+
+// The label is what the eye scans for and the value is what it stops on, so the
+// weight goes on the label alone. A wrapped value hangs under itself rather than
+// under the label, or the second line reads as another value.
+function labelled(name: string, value: string, colour: string, paint: Paint, width: number, pad: number): string[] {
+  const head = pad + GUTTER;
+  return fold(value, width - head).map((line, i) =>
+    (i === 0 ? paint.bold(name) + " ".repeat(head - name.length) : " ".repeat(head)) + paint.fg(colour, line));
+}
+
+const hint = (keys: Keys, binding: string, what: string, paint: Paint): string =>
+  paint.fg("dim", keys.getKeys(binding).join("/")) + paint.fg("muted", ` ${what}`);
 
 // What the launch left behind, so `/mcp` can act on it rather than describe it.
 // Every field but the first three is what the command changes: a reconnect
@@ -392,9 +443,9 @@ const shown = (c: Console): Entry[] =>
 // Asked again, now, with its tools replaced rather than added to: the harness
 // keys tools by name, so the second registration under a name this server
 // already holds would be refused as a collision with itself.
-async function reconnect(c: Console, name: string): Promise<string> {
+async function reconnect(c: Console, name: string): Promise<void> {
   const server = c.servers.find((s) => s.name === name);
-  if (!server) return `mcp: ${name} declares no HTTP URL, so there is nothing to ask.`;
+  if (!server) return;
   for (const held of [...c.registered]) {
     if (held.startsWith(toolName(name, ""))) {
       c.registered.delete(held);
@@ -411,13 +462,12 @@ async function reconnect(c: Console, name: string): Promise<string> {
     c.taken.add(added);
     c.registered.add(added);
   }
-  return `mcp: ${row(shown(c).find((e) => e.name === name)!)}`;
 }
 
 // Off now and off at the next launch. The file is the half that survives; the
 // harness has no way to unregister a tool, so this session's half is done by
 // taking the names out of the active set.
-function disable(c: Console, name: string): string {
+function disable(c: Console, name: string): void {
   c.disabled.add(name);
   writeDisabled(c.state, c.disabled);
   try {
@@ -426,7 +476,224 @@ function disable(c: Console, name: string): string {
   } catch {
     // The next launch does not ask it either way.
   }
-  return `mcp: ${name} disabled, in this session and at the next launch.`;
+}
+
+// What the act did, read off the server's state after it rather than off the
+// call that made it, so an act that changed nothing says the thing that did not
+// change. The operator pressed a key and must learn what came of it.
+export const outcome = (verb: string, e: Entry): string =>
+  e.status === CONNECTED
+    ? `${verb}: ${e.name} answered, ${plural(e.tools ?? 0, "tool")}.`
+    : `${verb}: ${e.name} ${e.status}.`;
+
+// ---- The screen ------------------------------------------------------------
+
+// One component for both views, because the second is where the first's actions
+// land: a reconnect redraws the panel it was pressed on, with the status it just
+// read and a line saying what came of it. Sending that to a notice instead would
+// put it where the harness overwrites the previous one, which is how an act that
+// worked came to read as an act that did nothing.
+export class ConsoleScreen {
+  private view: "list" | "detail" = "list";
+  private cursor: number;
+  private name = "";
+  private choice = 0;
+  private note: { text: string; colour: string } | undefined;
+  private busy = false;
+
+  private readonly c: Console;
+  private readonly paint: Paint;
+  private readonly keys: Keys;
+  private readonly done: (result: undefined) => void;
+  private readonly repaint: () => void;
+
+  constructor(
+    c: Console,
+    paint: Paint,
+    keys: Keys,
+    done: (result: undefined) => void,
+    repaint: () => void = () => {},
+  ) {
+    this.c = c;
+    this.paint = paint;
+    this.keys = keys;
+    this.done = done;
+    this.repaint = repaint;
+    this.cursor = this.items().findIndex((item) => "entry" in item);
+  }
+
+  private items(): Item[] {
+    return listItems(shown(this.c));
+  }
+
+  private standing(): Entry | undefined {
+    const item = this.items()[this.cursor];
+    return item && "entry" in item ? item.entry : undefined;
+  }
+
+  // By name rather than by index, because the act the operator just took may
+  // have moved what the row says.
+  private opened(): Entry | undefined {
+    return shown(this.c).find((e) => e.name === this.name);
+  }
+
+  // A server with no URL was never asked and cannot be, so it is not offered a
+  // retry it has no way to run.
+  private actions(e: Entry): string[] {
+    if (e.disabled) return [ENABLE, BACK];
+    return e.url ? [RECONNECT, DISABLE, BACK] : [DISABLE, BACK];
+  }
+
+  invalidate(): void {
+    // Nothing is cached between renders.
+  }
+
+  render(width: number): string[] {
+    const inner = Math.max(1, width - 1);
+    const body = this.view === "list" ? this.listBody(inner) : this.detailBody(inner);
+    const rule = this.paint.fg("border", "─".repeat(Math.max(1, width)));
+    const indent = (line: string) => (line ? ` ${line}` : "");
+    return [rule, "", ...body.map(indent), "", indent(this.hints()), "", rule];
+  }
+
+  private hints(): string {
+    const back = this.view === "detail" ? "back" : "close";
+    return [
+      this.paint.fg("dim", "↑↓") + this.paint.fg("muted", " navigate"),
+      hint(this.keys, CONFIRM, "select", this.paint),
+      hint(this.keys, CANCEL, back, this.paint),
+    ].join("  ");
+  }
+
+  private listBody(width: number): string[] {
+    const items = this.items();
+    const servers = items.filter((item): item is { entry: Entry } => "entry" in item);
+    const pad = Math.max(0, ...servers.map((item) => item.entry.name.length));
+    const lines = [
+      this.paint.bold("Manage MCP servers"),
+      this.paint.fg("dim", plural(servers.length, "server")),
+      "",
+    ];
+    for (const [i, item] of items.entries()) {
+      if (!("entry" in item)) {
+        lines.push(this.paint.fg("dim", fold(item.heading, width)[0]));
+        continue;
+      }
+      const e = item.entry;
+      const here = i === this.cursor;
+      const tools = e.tools === undefined ? "" : this.paint.fg("dim", ` · ${plural(e.tools, "tool")}`);
+      lines.push(
+        (here ? this.paint.fg("accent", "→ ") : "  ") +
+          this.paint.fg(here ? "accent" : "text", e.name.padEnd(pad)) +
+          " ".repeat(GUTTER) +
+          this.paint.fg(tone(e), e.status) +
+          tools,
+      );
+    }
+    return lines;
+  }
+
+  private detailBody(width: number): string[] {
+    const e = this.opened();
+    if (!e) return [this.paint.fg("error", "This server is no longer declared.")];
+    const named: [string, string, string][] = [
+      ["Status", e.tools === undefined ? e.status : `${e.status} · ${plural(e.tools, "tool")}`, tone(e)],
+      ...(e.url ? ([["URL", e.url, "text"]] as [string, string, string][]) : []),
+      ["Config", e.config, "text"],
+      ["Headers", e.headers.length > 0 ? e.headers.join(", ") : "none", "text"],
+    ];
+    const pad = Math.max(...named.map(([label]) => label.length));
+    const lines = [this.paint.bold(e.name), ""];
+    for (const [label, value, colour] of named) {
+      lines.push(...labelled(label, value, colour, this.paint, width, pad));
+    }
+    if (e.detail) lines.push("", ...fold(e.detail, width).map((line) => this.paint.fg("dim", line)));
+    lines.push("");
+    for (const [i, action] of this.actions(e).entries()) {
+      const here = i === this.choice;
+      lines.push((here ? this.paint.fg("accent", "→ ") : "  ") + this.paint.fg(here ? "accent" : "text", action));
+    }
+    if (this.busy) lines.push("", this.paint.fg("dim", `Asking ${e.name}…`));
+    else if (this.note) {
+      lines.push("", ...fold(this.note.text, width).map((line) => this.paint.fg(this.note!.colour, line)));
+    }
+    return lines;
+  }
+
+  handleInput(data: string): void {
+    if (this.busy) return;
+    if (this.view === "list") return this.listInput(data);
+    this.detailInput(data);
+  }
+
+  private listInput(data: string): void {
+    if (this.keys.matches(data, UP)) this.step(-1);
+    else if (this.keys.matches(data, DOWN)) this.step(1);
+    else if (this.keys.matches(data, CANCEL)) this.done(undefined);
+    else if (this.keys.matches(data, CONFIRM)) {
+      const e = this.standing();
+      if (!e) return;
+      this.view = "detail";
+      this.name = e.name;
+      this.choice = 0;
+      this.note = undefined;
+    }
+  }
+
+  // The cursor lands on servers only, so the last server of one group is one
+  // press from the first server of the next and the heading between them is
+  // passed over rather than stood on.
+  private step(by: number): void {
+    const items = this.items();
+    for (let i = this.cursor + by; i >= 0 && i < items.length; i += by) {
+      if ("entry" in items[i]) {
+        this.cursor = i;
+        return;
+      }
+    }
+  }
+
+  private detailInput(data: string): void {
+    const e = this.opened();
+    if (!e) return;
+    const actions = this.actions(e);
+    if (this.keys.matches(data, UP)) this.choice = Math.max(0, this.choice - 1);
+    else if (this.keys.matches(data, DOWN)) this.choice = Math.min(actions.length - 1, this.choice + 1);
+    else if (this.keys.matches(data, CANCEL)) this.leave();
+    else if (this.keys.matches(data, CONFIRM)) void this.act(actions[this.choice], e);
+  }
+
+  private leave(): void {
+    this.view = "list";
+    this.note = undefined;
+  }
+
+  // Every act ends on the panel it was pressed on, redrawn from what the act
+  // left behind: the status above changes and the line below says so, which is
+  // two ways of seeing one press and neither of them a notice.
+  async act(action: string, e: Entry): Promise<void> {
+    if (action === BACK) return this.leave();
+    if (action === DISABLE) {
+      disable(this.c, e.name);
+      this.choice = 0;
+      this.note = { text: `Disabled: ${e.name} is not asked, now or at the next launch.`, colour: "dim" };
+      this.repaint();
+      return;
+    }
+    this.busy = true;
+    this.note = undefined;
+    this.repaint();
+    if (action === ENABLE) {
+      this.c.disabled.delete(e.name);
+      writeDisabled(this.c.state, this.c.disabled);
+    }
+    await reconnect(this.c, e.name);
+    this.busy = false;
+    this.choice = 0;
+    const now = this.opened() ?? e;
+    this.note = { text: outcome(action === ENABLE ? "Enabled" : "Asked again", now), colour: tone(now) };
+    this.repaint();
+  }
 }
 
 // Registered on the extension the way a verb is, so `/mcp` is in the same list
@@ -442,26 +709,8 @@ export function registerConsole(pi: any, c: Console): void {
         ctx.ui.notify([listTitle(all), ...listRows(all)].join("\n"), "info");
         return;
       }
-      for (;;) {
-        const all = shown(c);
-        const picked = await ctx.ui.select(listTitle(all), listRows(all));
-        if (picked === undefined) return;
-        // A heading names a file rather than a server, and selecting one is the
-        // operator arriving at the row below it.
-        const entry = all.find((e) => row(e) === picked);
-        if (!entry) continue;
-        const action = await ctx.ui.select(
-          detailBlock(entry),
-          entry.disabled ? [ENABLE, BACK] : [RECONNECT, DISABLE, BACK],
-        );
-        if (action === RECONNECT) ctx.ui.notify(await reconnect(c, entry.name), "info");
-        if (action === DISABLE) ctx.ui.notify(disable(c, entry.name), "info");
-        if (action === ENABLE) {
-          c.disabled.delete(entry.name);
-          writeDisabled(c.state, c.disabled);
-          ctx.ui.notify(await reconnect(c, entry.name), "info");
-        }
-      }
+      await ctx.ui.custom((tui: any, theme: Paint, keys: Keys, done: (result: undefined) => void) =>
+        new ConsoleScreen(c, theme, keys, done, () => tui.requestRender()));
     },
   });
 }

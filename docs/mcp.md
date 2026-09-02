@@ -32,6 +32,10 @@ All four key the object the same way, and an entry may be spelled either way:
 
 Only HTTP servers are reached. A server declared as a subprocess — `"type": "stdio"` with a `command` — is named on the startup line and not started; so is one whose URL is neither `http:` nor `https:`.
 
+### Why another agent lists more servers than this
+
+`lm` finds every HTTP server declared in one of those four files, and two kinds are outside that however many an agent beside it reports. A server your Anthropic account holds, one of the connectors Claude Code lists next to your own, is declared in no file on the machine and is fetched over OAuth, so there is nothing here to read. A server a Claude Code plugin ships is declared in a file, and as a subprocess: reaching it needs stdio transport, which `lm` does not speak. Those two account for the difference, so a server you declared yourself and cannot find in `/mcp` is a file to check rather than one of these.
+
 ## What the launch says
 
 One line, beside the skills line, on every launch:
@@ -57,35 +61,50 @@ Setting `PI_OFFLINE` asks no server anything, and each is reported `offline`. A 
 
 The line says which server is not working. `/mcp` is where you do something about it.
 
-It opens a list of every server the four files declare, grouped under the file that declared each, with the path in the heading, because the first thing a server that is not working costs you is finding out which file to edit:
+It opens a list of every server the four files declare, grouped under the file that declared each, because the first thing a server that is not working costs you is finding out which file to edit:
 
 ```
-Manage MCP servers
-2 servers
+────────────────────────────────────────────────
+ Manage MCP servers
+ 2 servers
 
-  /home/you/.claude.json
-context7 · connected · 2 tools
-  /home/you/.gemini/settings.json
-atlassian · answered 401
+ /home/you/.claude.json
+ → context7   connected · 2 tools
+ /home/you/.gemini/settings.json
+   atlassian  answered 401
+
+ ↑↓ navigate  enter select  escape/ctrl+c close
+────────────────────────────────────────────────
 ```
 
-A row is the server's name, whether it answered, and how many tools the model was given. The count is printed for every server that answered, zero included. A server that did not answer carries what it did instead, in the same words the launch line uses.
+A heading is the file, not a server. It sits to the left of the rows under it, it is drawn dimmer than they are, the cursor passes over it, and `enter` does nothing to it: one press carries you from the last server of one file to the first server of the next.
+
+A row is the server's name, whether it answered, and how many tools the model was given. The count is printed for every server that answered, zero included. A server that did not answer carries what it did instead, in the same words the launch line uses. The three states a server can be in are coloured as well as named, so answered, not answering and switched off are told apart without reading the words.
 
 Selecting one opens it:
 
 ```
-atlassian
+────────────────────────────────────────────────
+ atlassian
 
-Status   answered 401
-URL      https://mcp.atlassian.com/v1/mcp
-Config   /home/you/.gemini/settings.json
-Headers  none
+ Status   answered 401
+ URL      https://mcp.atlassian.com/v1/mcp
+ Config   /home/you/.gemini/settings.json
+ Headers  none
 
-401 Unauthorized
-{"error":"invalid_token","error_description":"Missing or invalid access token"}
+ 401 Unauthorized
+ {"error":"invalid_token","error_description":"Missing
+ or invalid access token"}
+
+ → Reconnect
+   Disable
+   Back
+
+ ↑↓ navigate  enter select  escape/ctrl+c back
+────────────────────────────────────────────────
 ```
 
-The block under the labels is the whole of what the server said, which the launch line had no room for: the status line and whatever the server put in the body, capped at 2000 characters. `Headers` names each header and says whether it was filled in. A header value is never drawn.
+The labels carry the weight and the values do not. The block under them is the whole of what the server said, which the launch line had no room for: the status line and whatever the server put in the body, capped at 2000 characters and wrapped to the terminal rather than cut, because the half that names the missing scope is as likely to be at the end of a line as the start. `Headers` names each header and says whether it was filled in. A header value is never drawn.
 
 Two things you can do:
 
@@ -93,6 +112,18 @@ Two things you can do:
 |---|---|
 | `Reconnect` | asks the server again, now, and gives the model its tools without reopening the chat |
 | `Disable` / `Enable` | stops the server being asked, in this session and at every launch after it, until you enable it again |
+
+Whichever you press, the panel says what came of it, in two places at once: the `Status` line above is redrawn from the answer that just came back, and a line under the actions says what happened.
+
+```
+ → Reconnect
+   Disable
+   Back
+
+ Asked again: atlassian answered 401.
+```
+
+It lands there rather than in the chat on purpose. A status message whose predecessor is still the last thing in the chat replaces that predecessor rather than following it, so an outcome sent to the chat would overwrite the launch line, and a reconnect that reproduced the same refusal would look, from the chair, like a key that did nothing.
 
 `Authenticate` is not there. There is no OAuth flow: a server that needs a token needs it in `headers`, which is what the detail view's `Headers` line is for.
 
