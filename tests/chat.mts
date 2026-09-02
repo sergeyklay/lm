@@ -6,7 +6,7 @@
 
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerVerbs } from "../src/chat.mts";
@@ -204,6 +204,84 @@ check("and the chat reports that refusal too", true, /Declined\. Nothing was app
 
 server.close();
 rmSync(dialogWork, { recursive: true, force: true });
+
+// ---- What the operator takes away. -----------------------------------------
+// The URL `gh pr create` prints is the whole of what `lm pr` is for, and no line
+// of `lm` names it: the tool never reads it back, and it reaches the operator by
+// the carrier alone. `tests/pr-push.sh` pins that on the command line, where the
+// stream is inherited. Here it is the other carrier, where `applyAsk` pipes the
+// body's output back and the tool result is the screen, so the two cannot drift
+// apart while only one of them is read. The verb is the shipped `tools/pr.sh`,
+// against a throwaway repository whose only remote is a bare one beside it.
+
+const PR_URL = "https://github.invalid/acme/widget/pull/42";
+const prWork = mkdtempSync(join(tmpdir(), "lm-pr-"));
+const prBin = join(prWork, "bin");
+const prRepo = join(prWork, "repo");
+const prOrigin = join(prWork, "origin.git");
+mkdirSync(prBin, { recursive: true });
+mkdirSync(prRepo, { recursive: true });
+writeFileSync(join(prBin, "gh"), `#!/usr/bin/env bash\nprintf '%s\\n' '${PR_URL}'\n`);
+chmodSync(join(prBin, "gh"), 0o755);
+
+const ident = {
+  GIT_AUTHOR_NAME: "lm", GIT_AUTHOR_EMAIL: "lm@example.invalid",
+  GIT_COMMITTER_NAME: "lm", GIT_COMMITTER_EMAIL: "lm@example.invalid",
+};
+const inRepo = (...a: string[]) =>
+  spawnSync("git", a, { cwd: prRepo, encoding: "utf8", env: { ...process.env, ...ident } });
+spawnSync("git", ["init", "-q", "--bare", prOrigin]);
+inRepo("init", "-q", "-b", "main", ".");
+inRepo("remote", "add", "origin", prOrigin);
+writeFileSync(join(prRepo, "f.txt"), "base\n");
+inRepo("add", ".");
+inRepo("commit", "-qm", "chore: seed the repository");
+inRepo("push", "-q", "origin", "main");
+inRepo("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+inRepo("checkout", "-q", "-b", "feat/widen");
+writeFileSync(join(prRepo, "f.txt"), "base\nwidened\n");
+inRepo("add", "f.txt");
+inRepo("commit", "-qm", "feat: widen the file");
+
+const prServer = createServer((req, res) => {
+  req.on("data", () => {});
+  req.on("end", () => {
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    res.end(sse("pr", JSON.stringify({
+      title: "feat: widen the file",
+      body: "Widens f.txt by one line so the pull request has something to describe.",
+    })));
+  });
+});
+await new Promise<void>((r) => prServer.listen(0, "127.0.0.1", r));
+
+const prTools: any[] = [];
+registerVerbs({ registerTool: (t: any) => prTools.push(t) }, list(TOOLS));
+const before = { cwd: process.cwd(), path: process.env.PATH, ollama: process.env.LM_OLLAMA, log: process.env.LM_LOG };
+process.chdir(prRepo);
+// An installed gh is what would otherwise answer, and it would open a real pull
+// request; the stub has to be what a bash spawned from here resolves.
+process.env.PATH = `${prBin}:${process.env.PATH}`;
+process.env.LM_OLLAMA = `http://127.0.0.1:${(prServer.address() as any).port}`;
+process.env.LM_LOG = "";
+let opened: any;
+try {
+  opened = await prTools.filter((t) => t.name === "pr")[0].execute("id", {}, undefined, undefined, {
+    hasUI: true,
+    ui: { confirm: async () => true, input: async () => undefined },
+  });
+} finally {
+  process.chdir(before.cwd);
+  process.env.PATH = before.path!;
+  if (before.ollama === undefined) delete process.env.LM_OLLAMA; else process.env.LM_OLLAMA = before.ollama;
+  if (before.log === undefined) delete process.env.LM_LOG; else process.env.LM_LOG = before.log;
+  prServer.close();
+}
+
+const handedBack = (opened.content[0].text as string).trimEnd().split("\n");
+check("the pull request's URL is the last thing the chat hands back",
+  PR_URL, handedBack[handedBack.length - 1]);
+rmSync(prWork, { recursive: true, force: true });
 
 // ---- Which caller the record names. ----------------------------------------
 // The two callers write the same fields, so a verb the chat ran for the operator

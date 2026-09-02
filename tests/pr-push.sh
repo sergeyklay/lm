@@ -3,8 +3,8 @@
 # through libexec/lm-verb against a throwaway repository whose only remote is a
 # bare repository beside it, with a recording `gh` on PATH. Both lines it runs
 # are here: the push, where it lands, what `gh pr create` is handed, that the
-# forge is never asked about a branch it has not been sent, and what a refusal
-# leaves behind.
+# forge is never asked about a branch it has not been sent, what the forge says
+# back, and what a refusal leaves behind.
 #
 # The three cases under tests/golden/pr pin the four read-only functions and
 # stub confirm away; tests/ship.sh writes a pr.sh of its own; tests/consent.sh
@@ -32,6 +32,10 @@ export BRANCH=feat/widen
 NOTPL='{"title":"feat: widen the file","body":"Widens f.txt by one line so the pull request has something to describe."}'
 TPL='{"title":"feat: widen the file","sections":{"scope":"**Type:** Feat","risk":"- **Breaking Changes:** No"}}'
 BODY='Widens f.txt by one line so the pull request has something to describe.'
+# What a real `gh pr create` prints on success, and the whole of what the run is
+# for. No line of `lm` names it: the tool never reads it back and the runner
+# inherits the stream, so the forge writes it straight onto the operator's screen.
+PR_URL='https://github.invalid/acme/widget/pull/42'
 TEMPLATE='### Scope
 
 **Type:** [Feat | Fix]
@@ -61,16 +65,18 @@ EOF
   # Records the arguments one per file, so a multi-line body comes back the way
   # it was passed, and what the remote held at the moment of the call: a pull
   # request against a branch the forge has not seen is what the order inside
-  # apply() exists to prevent, and only the call itself can report it.
+  # apply() exists to prevent, and only the call itself can report it. Then it
+  # answers the way the forge does, on stdout, so the carriage can be read.
   cat > "$work/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 i=0; for a in "$@"; do i=$((i+1)); printf '%s' "$a" > "$GH/arg.$i"; done
 printf '%s' "$i" > "$GH/argc"
 git --git-dir="$ORIGIN" rev-parse -q --verify "refs/heads/$BRANCH" > "$GH/remote" 2>/dev/null ||
   printf 'missing' > "$GH/remote"
+printf '%s\n' "$PR_URL"
 EOF
   chmod +x "$work/bin/curl" "$work/bin/gh"
-  export REPLIES="$work/replies" GH="$work/gh" PATH="$work/bin:$PATH0" \
+  export REPLIES="$work/replies" GH="$work/gh" PATH="$work/bin:$PATH0" PR_URL \
     LM_TOOLS="$ROOT/tools" LM_LOG="$work/runs.jsonl" ORIGIN="$work/origin.git"
   # A real gh sits on this machine's PATH and would open a real pull request.
   [ "$(command -v gh)" = "$work/bin/gh" ] ||
@@ -99,7 +105,7 @@ arg() { cat "$GH/arg.$1" 2>/dev/null; }
 
 # The pull request the operator approves.
 setup "$(reply "$NOTPL")" ""
-tty_lm y pr >/dev/null 2>&1; rc=$?
+out=$(tty_lm y pr 2>&1); rc=$?
 check "an approved pr exits 0"          "0" "$rc"
 check "the branch reached the remote"   "$HEAD1" \
   "$(git --git-dir="$ORIGIN" rev-parse "refs/heads/$BRANCH")"
@@ -110,6 +116,16 @@ check "with the title the model wrote"  "--title feat: widen the file" "$(arg 3)
 check "and the body render assembled"   "--body $BODY" "$(arg 5) $(arg 6)"
 check "and nothing else on the command line" "6" "$(cat "$GH/argc")"
 check "the remote already held the branch when gh was called" "$HEAD1" "$(cat "$GH/remote")"
+# The URL is the whole of what the operator takes away, and nothing in `lm` puts
+# it there: it falls through the inherited stream to the terminal. So this is the
+# case that goes red the first time an apply() reads gh's output for itself.
+#
+# The last word rather than the last line, because the terminal supplies no
+# newline of its own: with the push deleted the URL lands on the end of the
+# echoed confirmation prompt, and the URL still being what the operator reads
+# last is the property here, not which line the push left it on.
+last=$(printf '%s\n' "$out" | tail -n1)
+check "and the forge's answer is the last thing he reads" "$PR_URL" "${last##* }"
 teardown
 
 # A template turns the body into the headings the repository owns and the model
