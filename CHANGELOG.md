@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-02
+
 ### Added
 
 - `lm stats` counts a partial delivery in a column of its own, `partial`, beside `failed`. Exit 8 is the one non-zero code that leaves work standing in the repository — `lm commit` landing some of its commits and stopping on a hook rejection — and folded in with the codes that leave the tree exactly as they found it, it was a delivery you were not told you had. Every other non-zero code stays in `failed`, a run you declined stays in `declined`, and a verb that has never exited 8 prints a zero rather than nothing.
@@ -254,7 +256,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pr`, which writes a pull request description from `git log <default>..HEAD`
 - `issue`, which drafts a GitHub issue and picks its labels from the repository's own taxonomy
 
-[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/sergeyklay/lm/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sergeyklay/lm/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sergeyklay/lm/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sergeyklay/lm/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sergeyklay/lm/compare/v0.0.5...v0.1.0
