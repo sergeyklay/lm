@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   configPaths, readServers, discover, registerServers, registerConsole, toolName, readDisabled, statePath, fold,
+  survey, attach,
 } from "../src/mcp.mts";
 
 let fail = 0;
@@ -484,10 +485,56 @@ check("and asking it again says the refusal came back, rather than saying nothin
 check("with no notice sent, where the harness would have overwritten the launch line",
   [], refused.closed.notices);
 
+// ---- The subsystem switched off. -------------------------------------------
+// `--disable-mcp` is answered once, at the survey, so a launch under it has no
+// part of MCP left to configure. Every one of the five things it promises is a
+// case here, and the server it would have asked is a live one, counting what
+// reached it.
+const watched = await stub();
+const offHome = join(work, "off-home");
+mkdirSync(offHome, { recursive: true });
+writeFileSync(join(offHome, ".claude.json"), JSON.stringify({ mcpServers: { watched: { httpUrl: watched.url } } }));
+
+const surveyed = await survey(project, offHome, { signal: AbortSignal.timeout(4000) });
+check("a survey reads the files and asks what they declare",
+  ["watched"], surveyed?.found.served.map((s) => s.server.name));
+const askedWhileOn = watched.seen.length;
+
+const none = await survey(project, offHome, { off: true, signal: AbortSignal.timeout(4000) });
+check("and one switched off reads no config file, so there is no declaration to hold", undefined, none);
+check("nor asks the server the file it did not read declares", askedWhileOn, watched.seen.length);
+
+// The pi the harness hands the factory, reduced to the two registers this uses.
+function fitting() {
+  const tools: any[] = [];
+  const commands = new Map<string, any>();
+  const pi: any = {
+    registerTool: (t: any) => tools.push(t),
+    registerCommand: (name: string, options: any) => commands.set(name, options),
+  };
+  return { pi, tools, commands };
+}
+
+const on = fitting();
+const reported = attach(on.pi, surveyed, ["commit"]);
+const shut = fitting();
+const silent = attach(shut.pi, none, ["commit"]);
+
+check("a survey that found a server registers its tools",
+  ["mcp__watched__search", "mcp__watched__fetch"], on.tools.map((t) => t.name));
+check("and one switched off registers no tool", [], shut.tools.map((t) => t.name));
+check("`/mcp` is a command the chat has when MCP is running", true, on.commands.has("mcp"));
+check("and is not a command the chat has when MCP is switched off", false, shut.commands.has("mcp"));
+check("which leaves it with no command at all", [], [...shut.commands.keys()]);
+check("a running subsystem hands the startup line its counts",
+  { servers: 1, tools: 2, trouble: [] }, reported);
+check("and one switched off hands it nothing to report", undefined, silent);
+
 json.close();
 streamed.close();
 refusing.close();
 mute.close();
+watched.close();
 rmSync(work, { recursive: true, force: true });
 
 console.log(fail ? "FAILED" : "all cases passed");

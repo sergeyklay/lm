@@ -38,7 +38,7 @@ Only HTTP servers are reached. A server declared as a subprocess — `"type": "s
 
 ## What the launch says
 
-One line, beside the skills line, on every launch:
+One line, beside the skills line, on every launch that has MCP running:
 
 ```
 mcp: 1 server, 2 tools
@@ -56,6 +56,18 @@ The clause naming the command is there only when something went wrong, because a
 The chat opens either way. Every server is asked at once and the launch waits 3 seconds for all of them, so one server that is down costs the launch that wait and nothing else. `initialize` and `tools/list` against `https://mcp.context7.com/mcp` measured 745 ms on a cold connection and 225 ms warm, over five runs on 2026-09-02; re-run it by timing those two requests against your own server.
 
 Setting `PI_OFFLINE` asks no server anything, and each is reported `offline`. A server you switched off through `/mcp` is not asked either, and is not counted as trouble.
+
+## Switching MCP off
+
+`lm --disable-mcp` runs with the whole of this switched off, and switched off means absent rather than empty. None of the four files is read, so nothing is declared. No server is asked, on the network or otherwise. No tool is registered, so the model is offered the harness's own and this repository's verbs and nothing else. There is no `mcp:` line at startup, not even one saying zero: the line reports a subsystem that is running, and one you switched off yourself is not news. And `/mcp` is not a command the chat has, so typing it is an unknown command rather than a screen saying MCP is off.
+
+That is the whole difference from `PI_OFFLINE`, which switches off the asking rather than the feature. Under `PI_OFFLINE` every server you configured is still declared, still counted, and still on the startup line as `offline`, and `/mcp` still lists them so you can reconnect one without reopening the chat:
+
+```
+mcp: 0 servers, 0 tools; context7: offline; /mcp to retry or disable
+```
+
+Under `--disable-mcp` that line is not printed at all, and there is no `/mcp` to open. Nothing is remembered either way: the flag lasts the launch it was typed on, where a server disabled through `/mcp` stays disabled until you enable it.
 
 ## `/mcp`
 

@@ -522,7 +522,7 @@ export class DoubleEscapeEditor extends CustomEditor {
 export function installChrome(
   pi: any,
   updated?: string,
-  mcp: { servers: number; tools: number; trouble?: { server: string; reason: string }[] } = { servers: 0, tools: 0 },
+  mcp?: { servers: number; tools: number; trouble?: { server: string; reason: string }[] },
 ): void {
   // The closing block is written after the harness has stopped the TUI, where
   // the theme a header or footer callback is handed is out of scope. The header
@@ -589,7 +589,10 @@ export function installChrome(
       const lines = [
         updated ? `harness updated to ${updated}` : "",
         skillsLine(pi.getCommands()),
-        mcpLine(mcp, mcp.trouble),
+        // Absent rather than zeroed when the operator switched MCP off: the line
+        // reports a subsystem that is running, and one they turned off with a
+        // flag of their own has nothing to report and nothing to surprise them.
+        mcp ? mcpLine(mcp, mcp.trouble) : "",
       ].filter(Boolean);
       if (lines.length > 0) ctx.ui.notify(lines.join("\n"), "info");
     }

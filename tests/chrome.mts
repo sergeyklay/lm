@@ -53,6 +53,10 @@ check("the second row tells the operator what to type", true,
 check("and it is dim rather than loud", true, styled(header[1], "dim"));
 check("both rows carry the mark", true, header.every((l) => l.includes("█")));
 
+// A launch that surveyed the operator's servers and found none configured, which
+// is not the same thing as a launch that was told to survey nothing.
+const NONE = { servers: 0, tools: 0 };
+
 // What a launch that updated the harness says, and where it says it. The header
 // is what the screen says on every frame; an update happened once, so it goes
 // out as the harness's own system notice instead. `session_start` fires again
@@ -85,7 +89,7 @@ function openChat(updated: string | undefined, reason: string = "startup", comma
   return { notices, rows, editorFactory, said: (prefix: string) => lines().filter(([m]) => m.startsWith(prefix)) };
 }
 
-const opened = openChat("0.84.4");
+const opened = openChat("0.84.4", "startup", [], NONE);
 check("a launch that updated the harness says so through the harness's own notice", 1, opened.said("harness updated").length);
 check("naming the version it moved to", "harness updated to 0.84.4", String(opened.said("harness updated")[0]?.[0]));
 check("without telling the operator to restart", false, /restart|Run |update the/.test(String(opened.said("harness updated")[0]?.[0])));
@@ -156,9 +160,21 @@ check("naming the counts and the server it could not reach",
   "mcp: 1 server, 2 tools; dead: ECONNREFUSED; /mcp to retry or disable", String(withServers.said("mcp:")[0]?.[0]));
 check("at the level that claims nothing is wrong", "info", String(withServers.said("mcp:")[0]?.[1]));
 check("a launch with no servers configured says so rather than saying nothing",
-  "mcp: 0 servers, 0 tools", String(openChat(undefined).said("mcp:")[0]?.[0]));
+  "mcp: 0 servers, 0 tools", String(openChat(undefined, "startup", [], NONE).said("mcp:")[0]?.[0]));
 check("and a reload, which is the same session, does not repeat that either",
   0, openChat(undefined, "reload", [], { servers: 1, tools: 2 }).said("mcp:").length);
+
+// `--disable-mcp` surveys nothing, so there is nothing to report and the line is
+// absent rather than zeroed. A zero is what a running subsystem found; a launch
+// the operator switched the subsystem off in is not a surprise to them, and a
+// line saying so would be the noise this project puts on the surprising case.
+const switchedOff = openChat(undefined, "startup", [skill("a", "project")], undefined);
+check("a launch with MCP switched off says nothing about it at all",
+  0, switchedOff.said("mcp:").length);
+check("not even that it is off", false, /mcp/i.test(String(switchedOff.notices[0]?.[0])));
+check("while the rest of what the launch found still reaches the same notice",
+  "skills: 1 project, 0 user", String(switchedOff.said("skills:")[0]?.[0]));
+check("and the launch still speaks once", 1, switchedOff.notices.length);
 
 // The harness asks before it reads a project's own resources, and answers of its
 // own for a session with no dialog: `ask`, its default, drops them. This answers

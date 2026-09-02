@@ -56,14 +56,47 @@ check("--no-skills is named in the options, in both spellings",
   true, /^  --no-skills, -ns +load no skills at all this session$/m.test(help.out));
 check("and the flag that names one path of its own is beside it",
   true, /^  --skill <path> +\S/m.test(help.out));
-check("and the two directories they are read from are named",
-  true, /^Skills:\n  \.agents\/skills +\S.*\n  ~\/\.agents\/skills +\S/m.test(help.out));
-// An MCP server is configured in a file this program never writes, so the help
-// is where the operator learns which files it reads and which of them wins.
-check("and the four files an MCP server is declared in are named, in the order that decides",
-  true, /^MCP servers:\n  \.mcp\.json +\S.*\n  ~\/\.lm\/\.mcp\.json +\S.*\n  ~\/\.claude\.json +\S.*\n  ~\/\.gemini\/settings\.json +\S/m.test(help.out));
-check("and so is the command that acts on one of them",
-  true, /^  \/mcp +\S/m.test(help.out));
+// Switching MCP off is this program's own flag rather than a word passed
+// through, so the help that documents what `lm` takes is where it is named.
+check("--disable-mcp is named in the options",
+  true, /^  --disable-mcp +\S/m.test(help.out));
+
+// The help lists what can be typed on the command line and what can be set in
+// the environment, and nothing else. Where a file is looked for is `docs/`, and
+// what exists inside the chat belongs to the chat, which has a `/help` of its
+// own: a help that grows either is documentation printed at the wrong moment.
+const helpRows = help.out.split("\n").filter((l) => /^ {2}\S.* {2,}\S/.test(l)).map((l) => l.trim().split(/ {2,}/)[0]);
+check("every described row names something typeable or settable",
+  [], helpRows.filter((r) => !/^(lm\b|-|LM_)/.test(r)));
+check("and none of them is a slash command, which belongs to the chat's own /help",
+  [], helpRows.filter((r) => r.startsWith("/")));
+check("no heading documents where a file is looked for",
+  [], help.out.split("\n").filter((l) => /^(Skills|MCP servers):$/.test(l)));
+check("and no directory of the operator's is named", false, /~\//.test(help.out));
+
+// The whole launch under that flag, stopped at the harness's own version so
+// nothing reaches the model. The flag is `lm`'s own and is taken out of what
+// goes over: the harness files a `--flag` it does not know under the extension
+// flags, swallows the word after it and then refuses the session by name.
+const away = mkdtempSync(join(tmpdir(), "lm-home-"));
+const noMcp = spawnSync(LM, ["--disable-mcp", "--version"], {
+  encoding: "utf8", cwd: ROOT, input: "",
+  env: { ...process.env, HOME: away, PI_OFFLINE: "1", LM_LOG: "" },
+});
+check("a launch with MCP switched off gets through to the harness", 0, noMcp.status);
+check("with nothing said on the way", "", noMcp.stderr ?? "");
+// Forwarded, the flag would reach the harness's own parser and the session
+// would be refused by name. This is the whole launch through to the request,
+// aimed at a port nothing listens on so that what answers is the ollama that is
+// not there rather than a model.
+const printed = spawnSync(LM, ["--disable-mcp", "-p", "x"], {
+  encoding: "utf8", cwd: ROOT, input: "",
+  env: { ...process.env, HOME: away, PI_OFFLINE: "1", LM_LOG: "", LM_OLLAMA: "http://127.0.0.1:1" },
+});
+const said = `${printed.stdout ?? ""}${printed.stderr ?? ""}`;
+check("and the harness is never handed the flag to parse", false, /disable-mcp/.test(said));
+check("the launch getting as far as the ollama that is not there", true, /Connection/i.test(said));
+rmSync(away, { recursive: true, force: true });
 
 // A name in the first position claims the help flag, and what comes back is
 // generated from what the file declares: no tool file answers --help itself.

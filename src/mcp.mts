@@ -714,3 +714,71 @@ export function registerConsole(pi: any, c: Console): void {
     },
   });
 }
+
+// ---- The subsystem, or none of it ------------------------------------------
+
+// Everything a launch reads and asks about MCP: the four files, this program's
+// own state file, and one round trip to each server the operator has not
+// switched off. `off` is `--disable-mcp`, and it is answered here rather than by
+// each part below, so a launch that switched the subsystem off has no part of it
+// to configure - no file is read and no server is asked.
+export type Launch = {
+  paths: string[];
+  declared: { servers: Server[]; skipped: Trouble[] };
+  disabled: Set<string>;
+  state: string;
+  allowNetwork: boolean;
+  found: { served: Served[]; trouble: Trouble[] };
+};
+
+export async function survey(
+  cwd: string,
+  home: string,
+  options: { off?: boolean; allowNetwork?: boolean; signal?: AbortSignal } = {},
+): Promise<Launch | undefined> {
+  if (options.off) return undefined;
+  const allowNetwork = options.allowNetwork !== false;
+  const paths = configPaths(cwd, home);
+  const declared = readServers(paths);
+  // A server the operator switched off through `/mcp` is not asked and is not
+  // counted as trouble. It is still declared, so `/mcp` still lists it: a switch
+  // with no way back is a switch nobody touches.
+  const state = statePath(home);
+  const disabled = new Set(readDisabled(state));
+  const found = await discover(declared.servers.filter((s) => !disabled.has(s.name)), {
+    allowNetwork,
+    signal: options.signal ?? AbortSignal.timeout(MCP_DEADLINE_MS),
+  });
+  return { paths, declared, disabled, state, allowNetwork, found };
+}
+
+// What the session gets out of that survey: every server's tools in front of the
+// model, and `/mcp` in the command list beside `/model`. A launch that surveyed
+// nothing registers neither, and answers with nothing for the startup line to
+// report, which is why the line is absent rather than zeroed.
+export function attach(
+  pi: any,
+  launch: Launch | undefined,
+  taken: Iterable<string> = [],
+): { servers: number; tools: number; trouble: Trouble[] } | undefined {
+  if (!launch) return undefined;
+  const { paths, declared, disabled, state, allowNetwork, found } = launch;
+  const remote = registerServers(pi, found.served, taken);
+  registerConsole(pi, {
+    pi,
+    servers: declared.servers,
+    skipped: declared.skipped,
+    found,
+    taken: new Set([...taken, ...remote.registered]),
+    registered: new Set(remote.registered),
+    disabled,
+    paths,
+    state,
+    allowNetwork,
+  });
+  return {
+    servers: found.served.length,
+    tools: remote.registered.length,
+    trouble: [...declared.skipped, ...found.trouble, ...remote.trouble],
+  };
+}

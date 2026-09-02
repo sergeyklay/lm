@@ -118,18 +118,8 @@ Options:
   --which <text>                name the verb or workflow that serves a request
   --skill <path>                load one more skill, from a file or a directory
   --no-skills, -ns              load no skills at all this session
+  --disable-mcp                 switch MCP off: no server is read, asked or offered
   -h, --help                    print this help
-
-Skills:
-  .agents/skills                the repository's own, read up to its root
-  ~/.agents/skills              yours, in every repository, behind the repository's
-
-MCP servers:
-  .mcp.json                     the repository's own, ahead of the three below
-  ~/.lm/.mcp.json               yours, written for lm
-  ~/.claude.json                yours, borrowed from another agent
-  ~/.gemini/settings.json       the same, behind the one above
-  /mcp                          in the chat: what answered, and what to do about one that did not
 
 Environment:
   LM_OLLAMA                     where ollama listens (http://127.0.0.1:11434)
@@ -145,6 +135,7 @@ Environment:
 }
 
 const OPTIONS = ["--list", "--which"];
+const DISABLE_MCP = "--disable-mcp";
 
 // `--resume` is this program's word for reopening a chat, and the harness spells
 // the two halves apart: an identifier or a session file is what its `--session`
@@ -215,8 +206,7 @@ const { catalogue, CATALOGUE_DEADLINE_MS } = await import("../src/catalogue.mts"
 const { initialSelection, seedThinkingLevel } = await import("../src/selection.mts");
 const { registerVerbs } = await import("../src/chat.mts");
 const { installChrome, silenceStartup, silenceChangelog, trustProject } = await import("../src/chrome.mts");
-const { configPaths, readServers, discover, registerServers, registerConsole, readDisabled, statePath, MCP_DEADLINE_MS } =
-  await import("../src/mcp.mts");
+const { survey, attach } = await import("../src/mcp.mts");
 
 // Redirecting either stream is enough to open a session with no dialog, and only
 // one of the two ways in was asked for. The flag is read here because this is
@@ -224,6 +214,17 @@ const { configPaths, readServers, discover, registerServers, registerConsole, re
 // bare `--` is a message, so a `-p` there is text.
 const flags = argv.slice(0, argv.indexOf("--") === -1 ? undefined : argv.indexOf("--"));
 const printFlag = flags.includes("-p") || flags.includes("--print");
+
+// `--disable-mcp` is read the same way and is this program's own, so it is taken
+// out of what goes over rather than forwarded with the rest. The harness files a
+// `--flag` it does not know under the extension flags, where it swallows the
+// word after it and then refuses the session by name, so forwarding this one
+// would cost the operator both their message and their chat.
+const mcpOff = flags.includes(DISABLE_MCP);
+const forwarded = (args) => {
+  const end = args.indexOf("--");
+  return args.filter((a, i) => a !== DISABLE_MCP || (end !== -1 && i > end));
+};
 
 silenceStartup();
 
@@ -237,30 +238,18 @@ const selection = initialSelection(settings);
 // model declared from its own card only by the refresh would be a model the
 // operator's own session never sees. `PI_OFFLINE` is the harness's own switch and
 // is honoured here as `catalogue()` honours it.
-// The servers the operator already configured for the agent this replaces, read
-// here for the same reason and awaited beside the catalogue rather than after
-// it, so the launch waits on the slower of the two and not on both.
-const mcpPaths = configPaths(process.cwd(), homedir());
-const declared = readServers(mcpPaths);
-
-// A server the operator switched off through `/mcp` is not asked and is not
-// counted as trouble. It is still declared, so `/mcp` still lists it: a switch
-// with no way back is a switch nobody touches.
-const mcpState = statePath(homedir());
-const disabled = new Set(readDisabled(mcpState));
-
+// The servers the operator already configured for the agent this replaces are
+// surveyed for the same reason and awaited beside the catalogue rather than
+// after it, so the launch waits on the slower of the two and not on both.
 const [models, found] = await Promise.all([
   catalogue({
     allowNetwork: process.env.PI_OFFLINE === undefined,
     signal: AbortSignal.timeout(CATALOGUE_DEADLINE_MS),
   }),
-  discover(declared.servers.filter((s) => !disabled.has(s.name)), {
-    allowNetwork: process.env.PI_OFFLINE === undefined,
-    signal: AbortSignal.timeout(MCP_DEADLINE_MS),
-  }),
+  survey(process.cwd(), homedir(), { off: mcpOff, allowNetwork: process.env.PI_OFFLINE === undefined }),
 ]);
 
-await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))], {
+await main([...selection, ...resumeArgs(forwarded(argv.slice(argv[0] === "chat" ? 1 : 0)))], {
   extensionFactories: [
     {
       name: "lm",
@@ -270,24 +259,7 @@ await main([...selection, ...resumeArgs(argv.slice(argv[0] === "chat" ? 1 : 0))]
         trustProject(pi);
         pi.registerProvider("ollama", { ...providerConfig(), ...(models ? { models } : {}), refreshModels: catalogue });
         const verbs = registerVerbs(pi, files, printFlag);
-        const remote = registerServers(pi, found.served, verbs);
-        registerConsole(pi, {
-          pi,
-          servers: declared.servers,
-          skipped: declared.skipped,
-          found,
-          taken: new Set([...verbs, ...remote.registered]),
-          registered: new Set(remote.registered),
-          disabled,
-          paths: mcpPaths,
-          state: mcpState,
-          allowNetwork: process.env.PI_OFFLINE === undefined,
-        });
-        installChrome(pi, updated, {
-          servers: found.served.length,
-          tools: remote.registered.length,
-          trouble: [...declared.skipped, ...found.trouble, ...remote.trouble],
-        });
+        installChrome(pi, updated, attach(pi, found, verbs));
       },
     },
   ],
