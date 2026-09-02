@@ -79,7 +79,10 @@ function openChat(updated: string | undefined, reason: string = "startup", comma
       setEditorComponent: (factory: any) => { editorFactory = factory; },
     },
   });
-  return { notices, rows, editorFactory, said: (prefix: string) => notices.filter(([m]) => m.startsWith(prefix)) };
+  // The launch speaks once and the lines arrive inside that one notice, so a
+  // case asks for the line it is about rather than for the whole block.
+  const lines = () => notices.flatMap(([m, t]) => String(m).split("\n").map((line) => [line, t] as [string, unknown]));
+  return { notices, rows, editorFactory, said: (prefix: string) => lines().filter(([m]) => m.startsWith(prefix)) };
 }
 
 const opened = openChat("0.84.4");
@@ -91,6 +94,11 @@ check("and the header stays the two rows it always was", 2, opened.rows.length);
 check("saying nothing about the harness itself", false, /harness/.test(plain(opened.rows.join("\n"))));
 check("a launch that moved nothing says nothing about the harness", 0, openChat(undefined).said("harness updated").length);
 check("and a reload, which installed nothing, does not repeat the notice", 0, openChat("0.84.4", "reload").said("harness updated").length);
+// A status notice replaces its predecessor when that predecessor is still the
+// last thing in the chat, so a launch that spoke three times would leave the
+// operator reading only the third. It speaks once.
+check("the launch speaks once, whatever it has to say", 1, opened.notices.length);
+check("and every line it had is in that one notice", 3, String(opened.notices[0]?.[0]).split("\n").length);
 
 // What the operator put in the two directories, counted off the commands the
 // harness registers one per loaded skill. Both tiers are named at every count,

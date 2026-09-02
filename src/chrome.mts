@@ -578,11 +578,21 @@ export function installChrome(
     // is the level that prints it dim and bare, where the other two prefix it
     // with a word claiming something is wrong. Only the launch is announced,
     // because the same event fires again for a reload that installed nothing.
-    if (updated && event?.reason === "startup") ctx.ui.notify(`harness updated to ${updated}`, "info");
-    // Read off what already loaded, so a line that fails to render costs the
-    // screen a number and the session nothing.
-    if (event?.reason === "startup") ctx.ui.notify(skillsLine(pi.getCommands()), "info");
-    if (event?.reason === "startup") ctx.ui.notify(mcpLine(mcp, mcp.trouble), "info");
+    // One notice carrying every line, not one notice each. A status notice
+    // whose predecessor is still the last thing in the chat replaces it rather
+    // than following it - `showStatus` in the harness's interactive mode sets
+    // the text of the row it already drew - so three calls in a row leave the
+    // operator reading only the third. The lines are read off what already
+    // loaded, so a line that fails to render costs the screen a number and the
+    // session nothing.
+    if (event?.reason === "startup") {
+      const lines = [
+        updated ? `harness updated to ${updated}` : "",
+        skillsLine(pi.getCommands()),
+        mcpLine(mcp, mcp.trouble),
+      ].filter(Boolean);
+      if (lines.length > 0) ctx.ui.notify(lines.join("\n"), "info");
+    }
     const autoCompact = compactionEnabled(ctx.cwd);
     ctx.ui.setHeader((_tui: unknown, theme: any) => {
       ink = {
